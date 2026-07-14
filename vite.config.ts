@@ -4,6 +4,8 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // Servido em https://mthscorreiademelo-source.github.io/Main-MthsCMelo/
+  base: '/Main-MthsCMelo/',
   plugins: [
     react(),
     tailwindcss(),
@@ -25,7 +27,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        navigateFallback: '/index.html',
+        navigateFallback: '/Main-MthsCMelo/index.html',
       },
     }),
   ],

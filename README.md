@@ -31,10 +31,13 @@ npm run preview   # serve o build localmente
 
 ## Como instalar no tablet
 
-1. Publique a pasta `dist/` em qualquer hospedagem estática com HTTPS (Netlify, Vercel, Cloudflare Pages…), ou sirva na rede local.
-2. Abra o endereço no navegador do tablet.
-3. Use **"Adicionar à tela inicial"** (Safari/iPad) ou **"Instalar app"** (Chrome/Android).
-4. Pronto: abre em tela cheia e funciona offline. Os dados ficam no aparelho — use *Exportar backup* de vez em quando.
+O app é publicado automaticamente a cada push (GitHub Actions → GitHub Pages):
+
+**https://mthscorreiademelo-source.github.io/Main-MthsCMelo/**
+
+1. Abra o endereço acima no navegador do tablet.
+2. Use **"Adicionar à tela inicial"** (Safari/iPad) ou **"Instalar app"** (Chrome/Android).
+3. Pronto: abre em tela cheia e funciona offline. Os dados ficam no aparelho — use *Exportar backup* de vez em quando.
 
 ## Arquitetura
 
