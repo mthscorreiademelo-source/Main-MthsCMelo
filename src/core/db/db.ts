@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie'
 import type { Task } from '../../modules/tarefas/types'
+import type { Pagina } from '../../modules/notas/types'
 
 /**
  * Banco local (IndexedDB) do app.
@@ -8,11 +9,15 @@ import type { Task } from '../../modules/tarefas/types'
  */
 class VidaDB extends Dexie {
   tasks!: Table<Task, string>
+  paginas!: Table<Pagina, string>
 
   constructor() {
     super('vida')
     this.version(1).stores({
       tasks: 'id, data, concluidaEm, criadaEm',
+    })
+    this.version(2).stores({
+      paginas: 'id, atualizadaEm, criadaEm',
     })
   }
 }
@@ -23,18 +28,22 @@ export const db = new VidaDB()
 export async function exportarBackup() {
   return {
     app: 'vida',
-    versao: 1,
+    versao: 2,
     exportadoEm: new Date().toISOString(),
     tasks: await db.tasks.toArray(),
+    paginas: await db.paginas.toArray(),
   }
 }
 
 /** Restaura um backup gerado por exportarBackup (mescla por id). */
 export async function importarBackup(json: unknown) {
-  const dados = json as { app?: string; tasks?: Task[] }
-  if (dados?.app !== 'vida' || !Array.isArray(dados.tasks)) {
+  const dados = json as { app?: string; tasks?: Task[]; paginas?: Pagina[] }
+  const temTasks = Array.isArray(dados?.tasks)
+  const temPaginas = Array.isArray(dados?.paginas)
+  if (dados?.app !== 'vida' || (!temTasks && !temPaginas)) {
     throw new Error('Arquivo de backup inválido')
   }
-  await db.tasks.bulkPut(dados.tasks)
-  return { tasks: dados.tasks.length }
+  if (temTasks) await db.tasks.bulkPut(dados.tasks!)
+  if (temPaginas) await db.paginas.bulkPut(dados.paginas!)
+  return { tasks: dados.tasks?.length ?? 0, paginas: dados.paginas?.length ?? 0 }
 }

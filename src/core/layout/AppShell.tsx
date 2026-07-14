@@ -21,7 +21,12 @@ export function AppShell() {
   const [overlay, setOverlay] = useState(false)
   const { pathname } = useLocation()
 
-  const moduloAtual = MODULOS.find((m) => m.rota === pathname) ?? MODULOS[0]
+  const moduloAtual =
+    MODULOS.find((m) =>
+      m.rota === '/'
+        ? pathname === '/'
+        : pathname === m.rota || pathname.startsWith(`${m.rota}/`),
+    ) ?? MODULOS[0]
 
   function alternarSidebar() {
     if (window.matchMedia('(min-width: 1024px)').matches) {
@@ -104,8 +109,8 @@ function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
   async function importar(arquivo: File) {
     try {
       const json = JSON.parse(await arquivo.text())
-      const { tasks } = await importarBackup(json)
-      avisar(`${tasks} tarefa(s) restaurada(s)`)
+      const { tasks, paginas } = await importarBackup(json)
+      avisar(`Restaurado: ${tasks} tarefa(s), ${paginas} página(s)`)
     } catch {
       avisar('Arquivo de backup inválido')
     }

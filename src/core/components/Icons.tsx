@@ -107,6 +107,23 @@ export function IconUpload(props: IconProps) {
   )
 }
 
+export function IconDocumento(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M6 3.5h8.5L19 8v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19V5a1.5 1.5 0 0 1 1-1.5Z" />
+      <path d="M14 3.5V8h5M8.5 12.5h7m-7 4h4.5" />
+    </svg>
+  )
+}
+
+export function IconSetaEsquerda(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M19 12H5m0 0 6.5-6.5M5 12l6.5 6.5" />
+    </svg>
+  )
+}
+
 export function IconCaixaEntrada(props: IconProps) {
   return (
     <svg {...base(props)}>
