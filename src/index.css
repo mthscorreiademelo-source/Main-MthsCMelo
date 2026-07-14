@@ -1,0 +1,57 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Tokens do design system — paleta minimal inspirada no Notion */
+:root {
+  --vida-bg: #ffffff;
+  --vida-surface: #f7f7f5;
+  --vida-ink: #37352f;
+  --vida-muted: #787774;
+  --vida-line: #e9e9e7;
+  --vida-hover: #efefed;
+  --vida-accent: #2383e2;
+  --vida-danger: #d44c47;
+}
+
+.dark {
+  --vida-bg: #191919;
+  --vida-surface: #202020;
+  --vida-ink: #e6e6e4;
+  --vida-muted: #9b9b9b;
+  --vida-line: #2f2f2f;
+  --vida-hover: #2c2c2c;
+  --vida-accent: #529cca;
+  --vida-danger: #df5452;
+}
+
+@theme inline {
+  --color-bg: var(--vida-bg);
+  --color-surface: var(--vida-surface);
+  --color-ink: var(--vida-ink);
+  --color-muted: var(--vida-muted);
+  --color-line: var(--vida-line);
+  --color-hover: var(--vida-hover);
+  --color-accent: var(--vida-accent);
+  --color-danger: var(--vida-danger);
+  --font-sans:
+    ui-sans-serif, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-bg font-sans text-ink antialiased;
+  overscroll-behavior-y: none;
+}
+
+/* Barra de rolagem discreta */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--vida-line) transparent;
+}

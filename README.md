@@ -1,0 +1,66 @@
+# Vida
+
+App pessoal minimalista, inspirado no Notion, para centralizar e administrar todas as áreas da sua vida — feito para ser usado principalmente no tablet.
+
+É um **PWA local-first**: instala como app, funciona 100% offline e todos os dados ficam no seu dispositivo (IndexedDB). Sem conta, sem servidor, sem custo.
+
+## Filosofia
+
+Uma coisa de cada vez. O app nasce com um único módulo bem feito e uma fundação modular que permite adicionar novas áreas sem retrabalho.
+
+**v0.1 (atual)**
+- 🌤️ **Hoje** — saudação, data e as tarefas do dia num só lugar
+- ✅ **Tarefas** — adição rápida, data agendada, abas Hoje · Próximas · Todas · Concluídas, edição em painel lateral
+- 🌓 Modo claro/escuro
+- 💾 Exportar/importar backup em JSON (na sidebar)
+
+**Roadmap** (um módulo por versão)
+- v0.2 — Notas/Páginas (blocos simples)
+- v0.3 — Hábitos (streaks, visão semanal)
+- v0.4 — Finanças (entradas/saídas, resumo mensal)
+- v0.5 — Sincronização opcional em nuvem
+
+## Como rodar
+
+```bash
+npm install
+npm run dev       # desenvolvimento
+npm run build     # build de produção (gera dist/ com PWA)
+npm run preview   # serve o build localmente
+```
+
+## Como instalar no tablet
+
+1. Publique a pasta `dist/` em qualquer hospedagem estática com HTTPS (Netlify, Vercel, Cloudflare Pages…), ou sirva na rede local.
+2. Abra o endereço no navegador do tablet.
+3. Use **"Adicionar à tela inicial"** (Safari/iPad) ou **"Instalar app"** (Chrome/Android).
+4. Pronto: abre em tela cheia e funciona offline. Os dados ficam no aparelho — use *Exportar backup* de vez em quando.
+
+## Arquitetura
+
+```
+src/
+  core/            # fundação compartilhada
+    db/            # Dexie (IndexedDB): schema versionado + backup
+    theme/         # modo claro/escuro
+    layout/        # AppShell: sidebar + conteúdo
+    components/    # UI base (Button, Checkbox, Sheet, EmptyState, Icons)
+    modules.ts     # registro central de módulos
+  modules/         # um diretório por área da vida
+    hoje/
+    tarefas/
+```
+
+**Stack:** Vite · React · TypeScript · Tailwind CSS v4 · Dexie.js · react-router · date-fns · vite-plugin-pwa
+
+### Como nasce um módulo novo
+
+1. Crie a pasta `src/modules/<nome>/` com a página e os componentes.
+2. Se precisar de dados, adicione a tabela numa **nova versão** do schema em `src/core/db/db.ts` (nunca edite uma versão publicada).
+3. Registre o módulo em `src/core/modules.ts` (nome, ícone, rota, página).
+
+Nada no core precisa mudar — a sidebar e as rotas são geradas a partir do registro.
+
+## Design
+
+Tokens definidos em `src/index.css` (paleta neutra estilo Notion, claro e escuro). Regras de UX para toque: alvos ≥ 44px, edição em sheet lateral, sidebar fixa em paisagem e overlay em retrato.
