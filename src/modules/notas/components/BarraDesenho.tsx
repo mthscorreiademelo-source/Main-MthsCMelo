@@ -4,12 +4,14 @@ import {
   IconLapis,
   IconMarcador,
   IconPincel,
+  IconPostIt,
   IconRegua,
   IconSelecao,
   IconTinteiro,
 } from '../../../core/components/Icons'
 import {
   CANETAS,
+  CORES_POSTIT,
   LISTA_CANETAS,
   type ConfigCaneta,
   type ConfigsCanetas,
@@ -49,6 +51,7 @@ interface Props {
   onConfigBorracha: (config: ConfigBorracha) => void
   onSelecaoTipo: (tipo: 'retangulo' | 'laco') => void
   onRegua: (ativa: boolean) => void
+  onNovoPostIt: (cor: string) => void
 }
 
 /** Barra flutuante minimalista + painel contextual da ferramenta ativa. */
@@ -63,9 +66,11 @@ export function BarraDesenho({
   onConfigBorracha,
   onSelecaoTipo,
   onRegua,
+  onNovoPostIt,
 }: Props) {
   const [painelAberto, setPainelAberto] = useState(false)
   const [pickerAberto, setPickerAberto] = useState(false)
+  const [postItAberto, setPostItAberto] = useState(false)
   const canetaAtiva = modo !== 'borracha' && modo !== 'selecao' ? CANETAS[modo] : null
   const config = canetaAtiva ? configs[canetaAtiva.id] : null
 
@@ -229,6 +234,33 @@ export function BarraDesenho({
         </div>
       )}
 
+      {postItAberto && (
+        <div
+          data-testid="painel-postit"
+          className="pointer-events-auto absolute bottom-24 left-1/2 flex w-[19rem] -translate-x-1/2 flex-col gap-4 rounded-2xl border border-line bg-bg p-4 shadow-xl"
+        >
+          <span className="text-sm font-medium">Novo post-it</span>
+          <div className="flex justify-between">
+            {CORES_POSTIT.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => {
+                  onNovoPostIt(c.valor)
+                  setPostItAberto(false)
+                }}
+                aria-label={`Post-it ${c.rotulo.toLowerCase()}`}
+                className="size-14 cursor-pointer rounded-md border border-black/10 shadow-sm transition-transform hover:scale-105"
+                style={{ backgroundColor: c.valor }}
+              />
+            ))}
+          </div>
+          <p className="text-xs leading-relaxed text-muted">
+            Toque numa cor para colar o post-it no centro da tela. Risque em
+            cima dele — a tinta acompanha o papel ao mover.
+          </p>
+        </div>
+      )}
+
       {painelAberto && modo === 'selecao' && (
         <div
           data-testid="painel-selecao"
@@ -305,6 +337,19 @@ export function BarraDesenho({
           <IconSelecao width={19} height={19} />
         </button>
         <span className="mx-1 h-6 w-px bg-line" />
+        <button
+          onClick={() => {
+            setPostItAberto((v) => !v)
+            setPainelAberto(false)
+          }}
+          aria-label="Post-it"
+          aria-pressed={postItAberto}
+          className={`flex size-11 cursor-pointer items-center justify-center rounded-full transition-colors ${
+            postItAberto ? 'bg-hover text-ink' : 'text-muted hover:text-ink'
+          }`}
+        >
+          <IconPostIt width={19} height={19} />
+        </button>
         <button
           onClick={() => onRegua(!reguaAtiva)}
           aria-label="Régua"

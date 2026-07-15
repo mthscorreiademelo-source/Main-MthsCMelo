@@ -9,10 +9,11 @@ import {
   IconSetaEsquerda,
 } from '../../../core/components/Icons'
 import { Sheet } from '../../../core/components/Sheet'
+import { nanoid } from 'nanoid'
 import { configsIniciais, gerarMiniatura, type ConfigsCanetas } from '../desenho'
 import { ordenarGrupos } from '../db'
 import { imagemParaItem, pdfParaItens } from '../importar'
-import type { Grupo, ItemQuadro, Pagina, TipoCaneta, Traco } from '../types'
+import type { Grupo, ItemQuadro, Pagina, PostIt, TipoCaneta, Traco } from '../types'
 import { BarraDesenho, type ModoBarra } from './BarraDesenho'
 import { QuadroInfinito, type ConfigBorracha, type QuadroApi } from './QuadroInfinito'
 
@@ -53,17 +54,36 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
 
   const tracos = pagina.tracos ?? []
   const itens = pagina.itens ?? []
+  const postIts = pagina.postIts ?? []
   const ferramenta =
     modo === 'borracha' || modo === 'selecao'
       ? { modo, cor: '', espessura: 0, suavizacao: 0 }
       : { modo, ...configs[modo] }
 
-  function aplicar(novosTracos: Traco[], novosItens: ItemQuadro[] = itens) {
+  function aplicar(
+    novosTracos: Traco[],
+    novosItens: ItemQuadro[] = itens,
+    novosPostIts: PostIt[] = postIts,
+  ) {
     onMudar({
       tracos: novosTracos,
       itens: novosItens,
+      postIts: novosPostIts,
       miniatura: gerarMiniatura(novosTracos),
     })
+  }
+
+  function novoPostIt(cor: string) {
+    const centro = quadro.current!.centroMundo()
+    const postIt: PostIt = {
+      id: nanoid(),
+      x: centro.x,
+      y: centro.y,
+      largura: 280,
+      altura: 280,
+      cor,
+    }
+    aplicar(tracos, itens, [...postIts, postIt])
   }
 
   function mudarConfig(tipo: TipoCaneta, config: ConfigsCanetas[TipoCaneta]) {
@@ -121,6 +141,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
         ref={quadro}
         tracos={tracos}
         itens={itens}
+        postIts={postIts}
         ferramenta={ferramenta}
         configBorracha={configBorracha}
         selecaoTipo={selecaoTipo}
@@ -128,7 +149,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
         cameraInicial={pagina.camera}
         onNovoTraco={(t) => aplicar([...tracos, t])}
         onApagarTraco={(i) => aplicar(tracos.filter((_, j) => j !== i))}
-        onSubstituir={(t, i) => aplicar(t, i)}
+        onSubstituir={(t, i, p) => aplicar(t, i, p)}
         onCamera={(camera) => onMudar({ camera })}
         onSelecaoMudou={setSelecaoAtiva}
       />
@@ -160,9 +181,9 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
         </div>
       </div>
 
-      {/* Ações da seleção ativa */}
+      {/* Ações da seleção ativa (acima da barra de ferramentas, sem cobrir a alça) */}
       {selecaoAtiva && (
-        <div className="pointer-events-auto absolute top-16 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-bg/95 px-2 py-1 shadow-lg backdrop-blur">
+        <div className="pointer-events-auto absolute bottom-20 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-bg/95 px-2 py-1 shadow-lg backdrop-blur">
           <span className="px-2 text-xs text-muted">Arraste para mover · alça ↻ gira</span>
           <Button variante="perigo" onClick={() => quadro.current?.excluirSelecao()}>
             <IconLixeira width={15} height={15} />
@@ -183,6 +204,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
         onConfigBorracha={mudarBorracha}
         onSelecaoTipo={setSelecaoTipo}
         onRegua={setReguaAtiva}
+        onNovoPostIt={novoPostIt}
       />
 
       {/* Menu ⋯: grupo, importar, limpar, excluir */}
@@ -281,11 +303,11 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
                 setTimeout(() => setConfirmandoLimpar(false), 3000)
                 return
               }
-              aplicar([], [])
+              aplicar([], [], [])
               setConfirmandoLimpar(false)
               setMenuAberto(false)
             }}
-            disabled={tracos.length === 0 && itens.length === 0}
+            disabled={tracos.length === 0 && itens.length === 0 && postIts.length === 0}
             className="self-start"
           >
             {confirmandoLimpar ? 'Confirmar limpeza?' : 'Limpar o quadro'}

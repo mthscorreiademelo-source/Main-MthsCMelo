@@ -10,11 +10,12 @@ import {
   desenharTraco,
   limitesDosTracos,
   pontoDentroPoligono,
+  pontoNoPostIt,
   tracoAtingido,
   tracoDentroPoligono,
   transformarTraco,
 } from '../desenho'
-import type { Camera, ItemQuadro, TipoCaneta, Traco } from '../types'
+import type { Camera, ItemQuadro, PostIt, TipoCaneta, Traco } from '../types'
 
 export interface FerramentaAtiva {
   modo: TipoCaneta | 'borracha' | 'selecao'
@@ -37,6 +38,7 @@ export interface QuadroApi {
 interface Props {
   tracos: Traco[]
   itens: ItemQuadro[]
+  postIts: PostIt[]
   ferramenta: FerramentaAtiva
   configBorracha: ConfigBorracha
   selecaoTipo: 'retangulo' | 'laco'
@@ -44,7 +46,7 @@ interface Props {
   cameraInicial?: Camera
   onNovoTraco: (traco: Traco) => void
   onApagarTraco: (indice: number) => void
-  onSubstituir: (tracos: Traco[], itens: ItemQuadro[]) => void
+  onSubstituir: (tracos: Traco[], itens: ItemQuadro[], postIts: PostIt[]) => void
   onCamera: (camera: Camera) => void
   onSelecaoMudou: (ativa: boolean) => void
 }
@@ -57,6 +59,7 @@ const SNAP_REGUA = 32 // px de tela
 interface Selecao {
   indices: number[]
   itemIds: string[]
+  postItIds: string[]
   caixa: { minX: number; minY: number; maxX: number; maxY: number }
 }
 
@@ -70,6 +73,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   {
     tracos,
     itens,
+    postIts,
     ferramenta,
     configBorracha,
     selecaoTipo,
@@ -91,6 +95,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   const inicializada = useRef(false)
   const tracoEmCurso = useRef<number[] | null>(null)
   const tracoNaRegua = useRef(false)
+  const tracoNoPostIt = useRef<string | null>(null)
   const ultimaTela = useRef<{ x: number; y: number } | null>(null)
   const pressaoSuave = useRef(0.5)
   const dedos = useRef(new Map<number, { x: number; y: number }>())
@@ -119,6 +124,8 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   tracosRef.current = tracos
   const itensRef = useRef(itens)
   itensRef.current = itens
+  const postItsRef = useRef(postIts)
+  postItsRef.current = postIts
   const ferramentaRef = useRef(ferramenta)
   ferramentaRef.current = ferramenta
   const borrachaRef = useRef(configBorracha)
@@ -127,8 +134,10 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   selecaoTipoRef.current = selecaoTipo
 
   useEffect(() => {
-    ;(window as unknown as { __tracosDebug?: Traco[] }).__tracosDebug = tracos
-  }, [tracos])
+    const w = window as unknown as { __tracosDebug?: Traco[]; __postItsDebug?: PostIt[] }
+    w.__tracosDebug = tracos
+    w.__postItsDebug = postIts
+  }, [tracos, postIts])
 
   /* ---------- helpers de coordenadas ---------- */
 
@@ -215,20 +224,57 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     const sel = selecao.current
     const selIdx = new Set(sel?.indices ?? [])
     const selIds = new Set(sel?.itemIds ?? [])
+    const selPost = new Set(sel?.postItIds ?? [])
     const t = transSel.current
+    const temTrans = !!(t.dx || t.dy || t.ang)
     const ccx = sel ? (sel.caixa.minX + sel.caixa.maxX) / 2 : 0
     const ccy = sel ? (sel.caixa.minY + sel.caixa.maxY) / 2 : 0
 
+    const comTransTraco = (traco: Traco, i: number) =>
+      selIdx.has(i) && temTrans ? transformarTraco(traco, t.dx, t.dy, t.ang, ccx, ccy) : traco
+
+    // camada 1: imagens/PDF
     desenharItens(ctx, itensRef.current, selIds, t, ccx, ccy)
 
+    // camada 2: traços do quadro (não colados em post-it)
     const lista = tracosLocais.current ?? tracosRef.current
     lista.forEach((traco, i) => {
-      if (selIdx.has(i) && (t.dx || t.dy || t.ang)) {
-        desenharTraco(ctx, transformarTraco(traco, t.dx, t.dy, t.ang, ccx, ccy))
-      } else {
-        desenharTraco(ctx, traco)
-      }
+      if (!traco.postItId) desenharTraco(ctx, comTransTraco(traco, i))
     })
+
+    // camadas 3–4: post-its (papel + sombra) e sua tinta, recortada ao papel
+    for (const p of postItsRef.current) {
+      let { x: px, y: py } = p
+      let rot = p.rotacao ?? 0
+      if (selPost.has(p.id) && temTrans) {
+        const cos = Math.cos(t.ang)
+        const sen = Math.sin(t.ang)
+        const dx0 = px - ccx
+        const dy0 = py - ccy
+        px = ccx + dx0 * cos - dy0 * sen + t.dx
+        py = ccy + dx0 * sen + dy0 * cos + t.dy
+        rot += t.ang
+      }
+      ctx.save()
+      ctx.translate(px, py)
+      ctx.rotate(rot)
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.2)'
+      ctx.shadowBlur = 14
+      ctx.shadowOffsetY = 5
+      ctx.fillStyle = p.cor
+      ctx.beginPath()
+      ctx.roundRect(-p.largura / 2, -p.altura / 2, p.largura, p.altura, 4)
+      ctx.fill()
+      ctx.shadowColor = 'transparent'
+      // tinta colada neste post-it: clip fica registrado no papel;
+      // volta ao sistema de mundo para desenhar os traços
+      ctx.clip()
+      ctx.setTransform(escala * dpr, 0, 0, escala * dpr, -x * escala * dpr, -y * escala * dpr)
+      lista.forEach((traco, i) => {
+        if (traco.postItId === p.id) desenharTraco(ctx, comTransTraco(traco, i))
+      })
+      ctx.restore()
+    }
     cenaSuja.current = false
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -251,11 +297,24 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     if (cena.current) ctx.drawImage(cena.current, 0, 0, w, h)
 
-    // traço em curso
+    // traço em curso (com clip se estiver sobre um post-it)
     if (tracoEmCurso.current && tracoEmCurso.current.length >= 3) {
       const f = ferramentaRef.current
       if (f.modo !== 'borracha' && f.modo !== 'selecao') {
+        ctx.save()
         ctx.setTransform(escala * dpr, 0, 0, escala * dpr, -x * escala * dpr, -y * escala * dpr)
+        const alvo = tracoNoPostIt.current
+          ? postItsRef.current.find((p) => p.id === tracoNoPostIt.current)
+          : null
+        if (alvo) {
+          ctx.save()
+          ctx.translate(alvo.x, alvo.y)
+          ctx.rotate(alvo.rotacao ?? 0)
+          ctx.beginPath()
+          ctx.roundRect(-alvo.largura / 2, -alvo.altura / 2, alvo.largura, alvo.altura, 4)
+          ctx.restore()
+          ctx.clip()
+        }
         desenharTraco(ctx, {
           cor: f.cor,
           espessura: f.espessura,
@@ -263,6 +322,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
           suavizacao: f.suavizacao,
           pontos: tracoEmCurso.current,
         })
+        ctx.restore()
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       }
     }
@@ -361,7 +421,10 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     canvas.dataset.escala = escala.toFixed(3)
     canvas.dataset.cam = `${Math.round(x)},${Math.round(y)}`
     canvas.dataset.regua = reguaAtiva && r ? `${Math.round(r.x)},${Math.round(r.y)},${r.ang.toFixed(2)}` : ''
-    canvas.dataset.selecao = String(sel ? sel.indices.length + sel.itemIds.length : 0)
+    canvas.dataset.selecao = String(
+      sel ? sel.indices.length + sel.itemIds.length + sel.postItIds.length : 0,
+    )
+    canvas.dataset.postits = String(postItsRef.current.length)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [desenharCena, reguaAtiva])
 
@@ -391,12 +454,17 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       if (!sel) return
       const ids = new Set(sel.itemIds)
       const idx = new Set(sel.indices)
+      const postSet = new Set(sel.postItIds)
       selecao.current = null
       transSel.current = { dx: 0, dy: 0, ang: 0 }
       onSelecaoMudou(false)
       onSubstituir(
-        tracosRef.current.filter((_, i) => !idx.has(i)),
+        // apaga também a tinta colada nos post-its excluídos
+        tracosRef.current.filter(
+          (t, i) => !idx.has(i) && !(t.postItId && postSet.has(t.postItId)),
+        ),
         itensRef.current.filter((it) => !ids.has(it.id)),
+        postItsRef.current.filter((p) => !postSet.has(p.id)),
       )
     },
     limparSelecao() {
@@ -463,7 +531,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     tracosLocais.current = null
     cenaSuja.current = true
     pedirRender()
-  }, [tracos, itens, pedirRender])
+  }, [tracos, itens, postIts, pedirRender])
 
   // liga/desliga régua: nasce no centro da tela, horizontal
   useEffect(() => {
@@ -606,15 +674,26 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     } else {
       poligono = m
     }
+    // post-its selecionados pelo centro; a tinta colada neles vem junto
+    const postItIds = postItsRef.current
+      .filter((p) => pontoDentroPoligono(p.x, p.y, poligono))
+      .map((p) => p.id)
+    const postSet = new Set(postItIds)
+
     const indices: number[] = []
     tracosRef.current.forEach((t, i) => {
-      if (tracoDentroPoligono(t, poligono)) indices.push(i)
+      if (t.postItId) {
+        // tinta de post-it só se move com o próprio post-it
+        if (postSet.has(t.postItId)) indices.push(i)
+      } else if (tracoDentroPoligono(t, poligono)) {
+        indices.push(i)
+      }
     })
     const itemIds = itensRef.current
       .filter((it) => pontoDentroPoligono(it.x, it.y, poligono))
       .map((it) => it.id)
 
-    if (indices.length === 0 && itemIds.length === 0) {
+    if (indices.length === 0 && itemIds.length === 0 && postItIds.length === 0) {
       selecao.current = null
       onSelecaoMudou(false)
     } else {
@@ -639,7 +718,15 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
         minY = Math.min(minY, it.y - meia)
         maxY = Math.max(maxY, it.y + meia)
       }
-      selecao.current = { indices, itemIds, caixa: { minX, minY, maxX, maxY } }
+      for (const id of postItIds) {
+        const p = postItsRef.current.find((i) => i.id === id)!
+        const meia = Math.hypot(p.largura, p.altura) / 2
+        minX = Math.min(minX, p.x - meia)
+        maxX = Math.max(maxX, p.x + meia)
+        minY = Math.min(minY, p.y - meia)
+        maxY = Math.max(maxY, p.y + meia)
+      }
+      selecao.current = { indices, itemIds, postItIds, caixa: { minX, minY, maxX, maxY } }
       transSel.current = { dx: 0, dy: 0, ang: 0 }
       onSelecaoMudou(true)
     }
@@ -695,6 +782,18 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
         rotacao: (it.rotacao ?? 0) + t.ang,
       }
     })
+    const postSet = new Set(sel.postItIds)
+    const novosPostIts = postItsRef.current.map((p) => {
+      if (!postSet.has(p.id)) return p
+      const px = p.x - cx
+      const py = p.y - cy
+      return {
+        ...p,
+        x: cx + px * cos - py * sen + t.dx,
+        y: cy + px * sen + py * cos + t.dy,
+        rotacao: (p.rotacao ?? 0) + t.ang,
+      }
+    })
 
     // atualiza a caixa da seleção para a nova posição
     selecao.current = {
@@ -707,7 +806,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       },
     }
     transSel.current = { dx: 0, dy: 0, ang: 0 }
-    onSubstituir(novosTracos, novosItens)
+    onSubstituir(novosTracos, novosItens, novosPostIts)
   }
 
   /* ---------- eventos de ponteiro ---------- */
@@ -774,6 +873,14 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     // canetas
     ultimaTela.current = null
     pressaoSuave.current = e.pointerType === 'pen' && e.pressure > 0 ? e.pressure : 0.5
+    // traço que começa sobre um post-it fica colado nele (o mais de cima)
+    tracoNoPostIt.current = null
+    for (let i = postItsRef.current.length - 1; i >= 0; i--) {
+      if (pontoNoPostIt(postItsRef.current[i], x, y)) {
+        tracoNoPostIt.current = postItsRef.current[i].id
+        break
+      }
+    }
     tracoNaRegua.current =
       reguaAtiva &&
       !!reguaLocal(e.clientX, e.clientY) &&
@@ -907,20 +1014,23 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       if (tracosLocais.current) {
         const finais = tracosLocais.current
         tracosLocais.current = null
-        onSubstituir(finais, itensRef.current)
+        onSubstituir(finais, itensRef.current, postItsRef.current)
       }
       return
     }
 
     const pontos = tracoEmCurso.current
+    const postItId = tracoNoPostIt.current
     tracoEmCurso.current = null
     tracoNaRegua.current = false
+    tracoNoPostIt.current = null
     if (!pontos || pontos.length < 3) return
     onNovoTraco({
       cor: f.cor,
       espessura: f.espessura,
       ferramenta: f.modo as TipoCaneta,
       suavizacao: f.suavizacao,
+      ...(postItId ? { postItId } : {}),
       pontos,
     })
   }

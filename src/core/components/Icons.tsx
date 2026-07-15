@@ -175,6 +175,15 @@ export function IconPincel(props: IconProps) {
   )
 }
 
+export function IconPostIt(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4.5 6.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v8.2L14.7 19.5H6.5a2 2 0 0 1-2-2v-11Z" />
+      <path d="M19.5 14.5h-3a2 2 0 0 0-2 2v3" />
+    </svg>
+  )
+}
+
 export function IconRegua(props: IconProps) {
   return (
     <svg {...base(props)}>

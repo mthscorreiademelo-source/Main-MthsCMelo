@@ -19,6 +19,21 @@ export interface Traco {
   ferramenta?: TipoCaneta
   /** Assistência de caligrafia (0..1) usada ao desenhar; ausente = padrão da caneta */
   suavizacao?: number
+  /** Post-it ao qual o traço está colado (tinta sobre o papel adesivo) */
+  postItId?: string
+}
+
+/** Papel adesivo colado no quadro; traços com postItId acompanham seus movimentos. */
+export interface PostIt {
+  id: string
+  /** Centro em coordenadas de mundo */
+  x: number
+  y: number
+  largura: number
+  altura: number
+  /** Rotação em radianos */
+  rotacao?: number
+  cor: string
 }
 
 /** Posição/zoom do quadro infinito (canto superior esquerdo em mundo + escala). */
@@ -60,6 +75,8 @@ export interface Pagina {
   camera?: Camera
   /** Imagens/páginas de PDF colocadas no quadro */
   itens?: ItemQuadro[]
+  /** Post-its colados no quadro */
+  postIts?: PostIt[]
 }
 
 export interface Grupo {

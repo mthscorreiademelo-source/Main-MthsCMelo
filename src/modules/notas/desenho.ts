@@ -1,4 +1,4 @@
-import type { TipoCaneta, Traco } from './types'
+import type { PostIt, TipoCaneta, Traco } from './types'
 
 /**
  * Motor de tinta: cada traço é renderizado como um CONTORNO PREENCHIDO
@@ -322,6 +322,27 @@ export function tracoAtingido(traco: Traco, x: number, y: number, raio: number):
     if (dx * dx + dy * dy <= alcance) return true
   }
   return false
+}
+
+/* ---------- post-its ---------- */
+
+export const CORES_POSTIT = [
+  { id: 'amarelo', rotulo: 'Amarelo', valor: '#FEF3A2' },
+  { id: 'rosa', rotulo: 'Rosa', valor: '#FFC9DE' },
+  { id: 'verde', rotulo: 'Verde', valor: '#C9F2C8' },
+  { id: 'azul', rotulo: 'Azul', valor: '#BFE4FF' },
+] as const
+
+/** O ponto (mundo) cai dentro do papel (retângulo rotacionado)? */
+export function pontoNoPostIt(postIt: PostIt, x: number, y: number): boolean {
+  const ang = -(postIt.rotacao ?? 0)
+  const cos = Math.cos(ang)
+  const sen = Math.sin(ang)
+  const dx = x - postIt.x
+  const dy = y - postIt.y
+  const lx = dx * cos - dy * sen
+  const ly = dx * sen + dy * cos
+  return Math.abs(lx) <= postIt.largura / 2 && Math.abs(ly) <= postIt.altura / 2
 }
 
 /* ---------- borracha de pixels ---------- */
