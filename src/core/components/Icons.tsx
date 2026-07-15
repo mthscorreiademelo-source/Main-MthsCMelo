@@ -132,6 +132,14 @@ export function IconSetaEsquerda(props: IconProps) {
   )
 }
 
+export function IconCifrao(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 3v18M16.5 7.2c-.7-1.2-2.3-2-4.3-2-2.4 0-4.2 1.3-4.2 3.2 0 4.2 8.8 2.2 8.8 6.7 0 1.9-1.9 3.2-4.5 3.2-2.2 0-3.9-.9-4.6-2.2" />
+    </svg>
+  )
+}
+
 export function IconCaixaEntrada(props: IconProps) {
   return (
     <svg {...base(props)}>
