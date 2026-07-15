@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { useRef, useState, type PointerEvent } from 'react'
 import {
+  IconArrastar,
   IconBorracha,
+  IconDocumento,
+  IconImagem,
   IconLapis,
   IconMarcador,
   IconPincel,
@@ -21,6 +24,7 @@ import type { ConfigBorracha } from './QuadroInfinito'
 import { SeletorCor } from './SeletorCor'
 
 export type ModoBarra = TipoCaneta | 'borracha' | 'selecao'
+type Lado = 'baixo' | 'cima' | 'esquerda' | 'direita'
 
 const ICONES: Record<TipoCaneta, typeof IconLapis> = {
   lapis: IconLapis,
@@ -40,6 +44,25 @@ const PALETA = [
   '#9065B0',
 ]
 
+const POSICAO: Record<Lado, string> = {
+  baixo: 'bottom-5 left-1/2 -translate-x-1/2 flex-row',
+  cima: 'top-20 left-1/2 -translate-x-1/2 flex-row',
+  esquerda: 'left-3 top-1/2 -translate-y-1/2 flex-col',
+  direita: 'right-3 top-1/2 -translate-y-1/2 flex-col',
+}
+
+const POSICAO_PAINEL: Record<Lado, string> = {
+  baixo: 'bottom-24 left-1/2 -translate-x-1/2',
+  cima: 'top-36 left-1/2 -translate-x-1/2',
+  esquerda: 'left-20 top-1/2 -translate-y-1/2',
+  direita: 'right-20 top-1/2 -translate-y-1/2',
+}
+
+function ladoInicial(): Lado {
+  const salvo = localStorage.getItem('vida:barra-lado')
+  return salvo === 'cima' || salvo === 'esquerda' || salvo === 'direita' ? salvo : 'baixo'
+}
+
 interface Props {
   modo: ModoBarra
   configs: ConfigsCanetas
@@ -52,9 +75,11 @@ interface Props {
   onSelecaoTipo: (tipo: 'retangulo' | 'laco') => void
   onRegua: (ativa: boolean) => void
   onNovoPostIt: (cor: string) => void
+  onImportarImagem: () => void
+  onImportarPdf: () => void
 }
 
-/** Barra flutuante minimalista + painel contextual da ferramenta ativa. */
+/** Barra flutuante: acoplável nas 4 bordas (arraste pela alça), minimizável. */
 export function BarraDesenho({
   modo,
   configs,
@@ -67,32 +92,101 @@ export function BarraDesenho({
   onSelecaoTipo,
   onRegua,
   onNovoPostIt,
+  onImportarImagem,
+  onImportarPdf,
 }: Props) {
-  const [painelAberto, setPainelAberto] = useState(false)
+  const [painel, setPainel] = useState<'ferramenta' | 'postit' | 'inserir' | null>(null)
   const [pickerAberto, setPickerAberto] = useState(false)
-  const [postItAberto, setPostItAberto] = useState(false)
+  const [lado, setLado] = useState<Lado>(ladoInicial)
+  const [minimizada, setMinimizada] = useState(false)
+  const [arrasto, setArrasto] = useState<{ x: number; y: number } | null>(null)
+  const inicioArrasto = useRef<{ x: number; y: number } | null>(null)
+
   const canetaAtiva = modo !== 'borracha' && modo !== 'selecao' ? CANETAS[modo] : null
   const config = canetaAtiva ? configs[canetaAtiva.id] : null
+  const vertical = !arrasto && (lado === 'esquerda' || lado === 'direita')
 
   function aoTocarFerramenta(novo: ModoBarra) {
     if (modo === novo) {
-      // tocar na ferramenta já ativa abre/fecha o painel de ajustes
-      setPainelAberto((v) => !v)
+      setPainel((p) => (p === 'ferramenta' ? null : 'ferramenta'))
       setPickerAberto(false)
     } else {
       onModo(novo)
-      setPainelAberto(false)
+      setPainel(null)
       setPickerAberto(false)
     }
   }
 
+  /* ---------- alça: toque = minimizar, arraste = mover ---------- */
+
+  function alcaPressionar(e: PointerEvent<HTMLButtonElement>) {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    inicioArrasto.current = { x: e.clientX, y: e.clientY }
+  }
+
+  function alcaMover(e: PointerEvent<HTMLButtonElement>) {
+    if (!inicioArrasto.current) return
+    const dx = e.clientX - inicioArrasto.current.x
+    const dy = e.clientY - inicioArrasto.current.y
+    if (arrasto || Math.hypot(dx, dy) > 8) {
+      setArrasto({ x: e.clientX, y: e.clientY })
+      setPainel(null)
+    }
+  }
+
+  function alcaSoltar(e: PointerEvent<HTMLButtonElement>) {
+    const inicio = inicioArrasto.current
+    inicioArrasto.current = null
+    if (!inicio) return
+    if (!arrasto) {
+      // toque simples: minimiza/expande
+      setMinimizada((v) => !v)
+      setPainel(null)
+      return
+    }
+    // acopla na borda mais próxima do ponto de soltura
+    const w = window.innerWidth
+    const h = window.innerHeight
+    const dists: [Lado, number][] = [
+      ['esquerda', e.clientX],
+      ['direita', w - e.clientX],
+      ['cima', e.clientY],
+      ['baixo', h - e.clientY],
+    ]
+    dists.sort((a, b) => a[1] - b[1])
+    setLado(dists[0][0])
+    localStorage.setItem('vida:barra-lado', dists[0][0])
+    setArrasto(null)
+  }
+
+  const estiloArrasto = arrasto
+    ? { left: arrasto.x, top: arrasto.y, transform: 'translate(-50%, -50%)' }
+    : undefined
+
+  const painelClasse = `pointer-events-auto absolute flex w-[19rem] flex-col gap-4 rounded-2xl border border-line bg-bg p-4 shadow-xl ${POSICAO_PAINEL[lado]}`
+
+  const botao = (ativa: boolean) =>
+    `flex size-11 cursor-pointer items-center justify-center rounded-full transition-colors ${
+      ativa ? 'bg-hover text-ink' : 'text-muted hover:text-ink'
+    }`
+
+  if (minimizada) {
+    const IconeAtual = canetaAtiva ? ICONES[canetaAtiva.id] : modo === 'borracha' ? IconBorracha : IconSelecao
+    return (
+      <button
+        onClick={() => setMinimizada(false)}
+        aria-label="Expandir barra de ferramentas"
+        className={`pointer-events-auto absolute flex size-12 cursor-pointer items-center justify-center rounded-full border border-line bg-bg/95 text-ink shadow-lg backdrop-blur ${POSICAO[lado].replace('flex-row', '').replace('flex-col', '')}`}
+      >
+        <IconeAtual width={20} height={20} />
+      </button>
+    )
+  }
+
   return (
     <>
-      {painelAberto && canetaAtiva && config && (
-        <div
-          data-testid="painel-caneta"
-          className="pointer-events-auto absolute bottom-24 left-1/2 flex w-[19rem] -translate-x-1/2 flex-col gap-4 rounded-2xl border border-line bg-bg p-4 shadow-xl"
-        >
+      {painel === 'ferramenta' && canetaAtiva && config && (
+        <div data-testid="painel-caneta" className={painelClasse}>
           <div className="flex items-center gap-3">
             <span
               className="rounded-full"
@@ -190,11 +284,8 @@ export function BarraDesenho({
         </div>
       )}
 
-      {painelAberto && modo === 'borracha' && (
-        <div
-          data-testid="painel-borracha"
-          className="pointer-events-auto absolute bottom-24 left-1/2 flex w-[19rem] -translate-x-1/2 flex-col gap-4 rounded-2xl border border-line bg-bg p-4 shadow-xl"
-        >
+      {painel === 'ferramenta' && modo === 'borracha' && (
+        <div data-testid="painel-borracha" className={painelClasse}>
           <span className="text-sm font-medium">Borracha</span>
           <div className="flex overflow-hidden rounded-lg border border-line">
             <button
@@ -234,38 +325,8 @@ export function BarraDesenho({
         </div>
       )}
 
-      {postItAberto && (
-        <div
-          data-testid="painel-postit"
-          className="pointer-events-auto absolute bottom-24 left-1/2 flex w-[19rem] -translate-x-1/2 flex-col gap-4 rounded-2xl border border-line bg-bg p-4 shadow-xl"
-        >
-          <span className="text-sm font-medium">Novo post-it</span>
-          <div className="flex justify-between">
-            {CORES_POSTIT.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => {
-                  onNovoPostIt(c.valor)
-                  setPostItAberto(false)
-                }}
-                aria-label={`Post-it ${c.rotulo.toLowerCase()}`}
-                className="size-14 cursor-pointer rounded-md border border-black/10 shadow-sm transition-transform hover:scale-105"
-                style={{ backgroundColor: c.valor }}
-              />
-            ))}
-          </div>
-          <p className="text-xs leading-relaxed text-muted">
-            Toque numa cor para colar o post-it no centro da tela. Risque em
-            cima dele — a tinta acompanha o papel ao mover.
-          </p>
-        </div>
-      )}
-
-      {painelAberto && modo === 'selecao' && (
-        <div
-          data-testid="painel-selecao"
-          className="pointer-events-auto absolute bottom-24 left-1/2 flex w-[19rem] -translate-x-1/2 flex-col gap-4 rounded-2xl border border-line bg-bg p-4 shadow-xl"
-        >
+      {painel === 'ferramenta' && modo === 'selecao' && (
+        <div data-testid="painel-selecao" className={painelClasse}>
           <span className="text-sm font-medium">Seleção</span>
           <div className="flex overflow-hidden rounded-lg border border-line">
             <button
@@ -293,19 +354,85 @@ export function BarraDesenho({
         </div>
       )}
 
-      <div className="pointer-events-auto absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-line bg-bg/95 px-1.5 py-1 shadow-lg backdrop-blur">
+      {painel === 'postit' && (
+        <div data-testid="painel-postit" className={painelClasse}>
+          <span className="text-sm font-medium">Novo post-it</span>
+          <div className="flex justify-between">
+            {CORES_POSTIT.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => {
+                  onNovoPostIt(c.valor)
+                  setPainel(null)
+                }}
+                aria-label={`Post-it ${c.rotulo.toLowerCase()}`}
+                className="size-14 cursor-pointer rounded-md border border-black/10 shadow-sm transition-transform hover:scale-105"
+                style={{ backgroundColor: c.valor }}
+              />
+            ))}
+          </div>
+          <p className="text-xs leading-relaxed text-muted">
+            Toque numa cor para colar o post-it no centro da tela. Risque em
+            cima dele — a tinta acompanha o papel ao mover.
+          </p>
+        </div>
+      )}
+
+      {painel === 'inserir' && (
+        <div data-testid="painel-inserir" className={painelClasse}>
+          <span className="text-sm font-medium">Adicionar ao quadro</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                onImportarImagem()
+                setPainel(null)
+              }}
+              className="flex min-h-20 flex-1 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-line text-sm font-medium text-muted transition-colors hover:bg-hover hover:text-ink"
+            >
+              <IconImagem />
+              Imagem
+            </button>
+            <button
+              onClick={() => {
+                onImportarPdf()
+                setPainel(null)
+              }}
+              className="flex min-h-20 flex-1 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-line text-sm font-medium text-muted transition-colors hover:bg-hover hover:text-ink"
+            >
+              <IconDocumento />
+              PDF
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div
+        data-testid="barra-desenho"
+        data-lado={lado}
+        style={estiloArrasto}
+        className={`pointer-events-auto absolute flex items-center gap-0.5 border border-line bg-bg/95 shadow-lg backdrop-blur ${
+          vertical ? 'rounded-3xl px-1 py-1.5' : 'rounded-full px-1.5 py-1'
+        } ${arrasto ? 'opacity-80' : POSICAO[lado]}`}
+      >
+        <button
+          onPointerDown={alcaPressionar}
+          onPointerMove={alcaMover}
+          onPointerUp={alcaSoltar}
+          aria-label="Mover ou minimizar barra"
+          className="flex size-11 cursor-grab touch-none items-center justify-center rounded-full text-muted/60 hover:text-ink active:cursor-grabbing"
+        >
+          <IconArrastar width={17} height={17} />
+        </button>
+
         {LISTA_CANETAS.map((c) => {
           const Icone = ICONES[c.id]
-          const ativa = modo === c.id
           return (
             <button
               key={c.id}
               onClick={() => aoTocarFerramenta(c.id)}
               aria-label={c.rotulo}
-              aria-pressed={ativa}
-              className={`relative flex size-11 cursor-pointer items-center justify-center rounded-full transition-colors ${
-                ativa ? 'bg-hover text-ink' : 'text-muted hover:text-ink'
-              }`}
+              aria-pressed={modo === c.id}
+              className={`relative ${botao(modo === c.id)}`}
             >
               <Icone width={19} height={19} />
               <span
@@ -315,14 +442,12 @@ export function BarraDesenho({
             </button>
           )
         })}
-        <span className="mx-1 h-6 w-px bg-line" />
+        <span className={vertical ? 'my-1 h-px w-6 bg-line' : 'mx-1 h-6 w-px bg-line'} />
         <button
           onClick={() => aoTocarFerramenta('borracha')}
           aria-label="Borracha"
           aria-pressed={modo === 'borracha'}
-          className={`flex size-11 cursor-pointer items-center justify-center rounded-full transition-colors ${
-            modo === 'borracha' ? 'bg-hover text-ink' : 'text-muted hover:text-ink'
-          }`}
+          className={botao(modo === 'borracha')}
         >
           <IconBorracha width={19} height={19} />
         </button>
@@ -330,33 +455,32 @@ export function BarraDesenho({
           onClick={() => aoTocarFerramenta('selecao')}
           aria-label="Seleção"
           aria-pressed={modo === 'selecao'}
-          className={`flex size-11 cursor-pointer items-center justify-center rounded-full transition-colors ${
-            modo === 'selecao' ? 'bg-hover text-ink' : 'text-muted hover:text-ink'
-          }`}
+          className={botao(modo === 'selecao')}
         >
           <IconSelecao width={19} height={19} />
         </button>
-        <span className="mx-1 h-6 w-px bg-line" />
+        <span className={vertical ? 'my-1 h-px w-6 bg-line' : 'mx-1 h-6 w-px bg-line'} />
         <button
-          onClick={() => {
-            setPostItAberto((v) => !v)
-            setPainelAberto(false)
-          }}
+          onClick={() => setPainel((p) => (p === 'postit' ? null : 'postit'))}
           aria-label="Post-it"
-          aria-pressed={postItAberto}
-          className={`flex size-11 cursor-pointer items-center justify-center rounded-full transition-colors ${
-            postItAberto ? 'bg-hover text-ink' : 'text-muted hover:text-ink'
-          }`}
+          aria-pressed={painel === 'postit'}
+          className={botao(painel === 'postit')}
         >
           <IconPostIt width={19} height={19} />
+        </button>
+        <button
+          onClick={() => setPainel((p) => (p === 'inserir' ? null : 'inserir'))}
+          aria-label="Inserir imagem ou PDF"
+          aria-pressed={painel === 'inserir'}
+          className={botao(painel === 'inserir')}
+        >
+          <IconImagem width={19} height={19} />
         </button>
         <button
           onClick={() => onRegua(!reguaAtiva)}
           aria-label="Régua"
           aria-pressed={reguaAtiva}
-          className={`flex size-11 cursor-pointer items-center justify-center rounded-full transition-colors ${
-            reguaAtiva ? 'bg-hover text-ink' : 'text-muted hover:text-ink'
-          }`}
+          className={botao(reguaAtiva)}
         >
           <IconRegua width={19} height={19} />
         </button>

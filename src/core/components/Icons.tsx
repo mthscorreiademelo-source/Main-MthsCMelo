@@ -175,6 +175,35 @@ export function IconPincel(props: IconProps) {
   )
 }
 
+export function IconArrastar(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="9" cy="5.5" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="5.5" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="12" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="12" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="18.5" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="18.5" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+export function IconExpandir(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M9 4H4v5m11-5h5v5M9 20H4v-5m11 5h5v-5" />
+    </svg>
+  )
+}
+
+export function IconContrair(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 9h5V4m6 5h5V4M4 15h5v5m6-5h5v5" transform="rotate(180 12 12)" />
+    </svg>
+  )
+}
+
 export function IconPostIt(props: IconProps) {
   return (
     <svg {...base(props)}>

@@ -8,11 +8,11 @@ App pessoal minimalista, inspirado no Notion, para centralizar e administrar tod
 
 Uma coisa de cada vez. O app nasce com um único módulo bem feito e uma fundação modular que permite adicionar novas áreas sem retrabalho.
 
-**v0.9 (atual)**
+**v0.10 (atual)**
 - 🌤️ **Hoje** — saudação, data, tarefas do dia e hábitos com um toque
 - ✅ **Tarefas** — adição rápida, data agendada, abas Hoje · Próximas · Todas · Concluídas, edição em painel lateral
 - 📄 **Notas** — galeria de **grupos com capa 4:5** (nome + imagem, recorte automático) e notas soltas abaixo; dentro do grupo, lista das notas dele; editor de blocos simples (parágrafo, título, lista, to-do) com atalhos `# `, `- `, `[] ` e seletor de grupo
-- ✍️ **Quadro infinito** — desenho em **tela cheia** com **zoom por pinça** e **arrastar com os dedos** (stylus desenha, dedo navega); 4 canetas — lápis grafite, tinteiro, marca-texto e pincel — cada uma com **cor (paleta visual)**, **ponta** e **assistência de caligrafia** próprias; **régua** (1 dedo move, 2 dedos giram; o traço encosta e sai reto), **borracha de traço ou de pixels** com tamanho ajustável, **seleção por retângulo ou laço** (mover, girar e excluir), **imagens da galeria e PDFs** direto no quadro, **post-its** com 4 cores em que dá para riscar por cima (a tinta fica colada no papel e move/gira junto); traços vetoriais + câmera salvos, miniatura na lista
+- ✍️ **Quadro infinito** — desenho em **tela cheia** com **zoom por pinça** e **arrastar com os dedos** (stylus desenha, dedo navega); 4 canetas — lápis grafite, tinteiro, marca-texto e pincel — cada uma com **cor (paleta visual)**, **ponta** e **assistência de caligrafia** próprias; **régua** (1 dedo move, 2 dedos giram; o traço encosta e sai reto), **borracha de traço ou de pixels** com tamanho ajustável, **seleção por retângulo ou laço** (mover, girar e excluir), **imagens da galeria e PDFs** direto no quadro, **post-its** com 4 cores em que dá para riscar por cima (a tinta fica colada no papel e move/gira junto); barra de ferramentas **móvel** (acopla em qualquer borda) e **minimizável**, com inserção de imagem/PDF integrada; **tela cheia imersiva** que esconde a navegação do tablet ao desenhar; traços vetoriais + câmera salvos, miniatura na lista
 - 🔥 **Hábitos** — visão dos últimos 7 dias com marcação por toque (inclusive dias passados) e sequência (streak) automática
 - 💰 **Finanças** — entradas/saídas em reais, categorias, navegação por mês e resumo (entradas, saídas, saldo)
 - 🌓 Modo claro/escuro

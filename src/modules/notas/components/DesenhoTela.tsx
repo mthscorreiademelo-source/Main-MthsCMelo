@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, IconButton } from '../../../core/components/Button'
 import {
+  IconContrair,
   IconDesfazer,
-  IconDocumento,
-  IconImagem,
+  IconExpandir,
   IconLixeira,
   IconMenuPontos,
   IconSetaEsquerda,
@@ -48,9 +48,46 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
   const [importando, setImportando] = useState(false)
   const [avisoImportacao, setAvisoImportacao] = useState('')
+  const [telaCheia, setTelaCheia] = useState(false)
   const quadro = useRef<QuadroApi>(null)
   const inputImagem = useRef<HTMLInputElement>(null)
   const inputPdf = useRef<HTMLInputElement>(null)
+
+  // Tela cheia imersiva: esconde as barras de navegação do tablet enquanto
+  // se desenha (palma da mão encostava nelas). Sai ao fechar o desenho.
+  useEffect(() => {
+    const sincronizar = () => setTelaCheia(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', sincronizar)
+    return () => {
+      document.removeEventListener('fullscreenchange', sincronizar)
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+    }
+  }, [])
+
+  async function alternarTelaCheia(desligarPreferencia = false) {
+    try {
+      if (document.fullscreenElement) {
+        if (desligarPreferencia) localStorage.setItem('vida:telacheia', '0')
+        await document.exitFullscreen()
+      } else {
+        localStorage.setItem('vida:telacheia', '1')
+        await document.documentElement.requestFullscreen({ navigationUI: 'hide' })
+      }
+    } catch {
+      /* navegador pode negar fora de gesto do usuário */
+    }
+  }
+
+  function aoPrimeiroToque() {
+    if (
+      !document.fullscreenElement &&
+      localStorage.getItem('vida:telacheia') !== '0'
+    ) {
+      document.documentElement
+        .requestFullscreen({ navigationUI: 'hide' })
+        .catch(() => {})
+    }
+  }
 
   const tracos = pagina.tracos ?? []
   const itens = pagina.itens ?? []
@@ -136,7 +173,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   }
 
   return (
-    <div className="fixed inset-0 z-30 overflow-hidden bg-white">
+    <div className="fixed inset-0 z-30 overflow-hidden bg-white" onPointerDown={aoPrimeiroToque}>
       <QuadroInfinito
         ref={quadro}
         tracos={tracos}
@@ -175,6 +212,12 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
           >
             <IconDesfazer />
           </IconButton>
+          <IconButton
+            onClick={() => alternarTelaCheia(true)}
+            aria-label={telaCheia ? 'Sair da tela cheia' : 'Tela cheia'}
+          >
+            {telaCheia ? <IconContrair /> : <IconExpandir />}
+          </IconButton>
           <IconButton onClick={() => setMenuAberto(true)} aria-label="Mais opções">
             <IconMenuPontos />
           </IconButton>
@@ -205,7 +248,39 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
         onSelecaoTipo={setSelecaoTipo}
         onRegua={setReguaAtiva}
         onNovoPostIt={novoPostIt}
+        onImportarImagem={() => inputImagem.current?.click()}
+        onImportarPdf={() => inputPdf.current?.click()}
       />
+
+      {/* Inputs de importação (compartilhados pela barra) */}
+      <input
+        ref={inputImagem}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) importarImagem(f)
+          e.target.value = ''
+        }}
+      />
+      <input
+        ref={inputPdf}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) importarPdf(f)
+          e.target.value = ''
+        }}
+      />
+
+      {(avisoImportacao || importando) && (
+        <div className="pointer-events-none absolute top-16 left-1/2 -translate-x-1/2 rounded-full border border-line bg-bg/95 px-4 py-2 text-xs text-muted shadow-md backdrop-blur">
+          {importando && !avisoImportacao ? 'Importando…' : avisoImportacao}
+        </div>
+      )}
 
       {/* Menu ⋯: grupo, importar, limpar, excluir */}
       <Sheet aberto={menuAberto} titulo="Desenho" onFechar={() => setMenuAberto(false)}>
@@ -240,53 +315,6 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
               </div>
             </div>
           )}
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-muted">Adicionar ao quadro</span>
-            <div className="flex gap-2">
-              <Button
-                onClick={() => inputImagem.current?.click()}
-                disabled={importando}
-                className="flex-1 border border-line"
-              >
-                <IconImagem width={16} height={16} />
-                Imagem
-              </Button>
-              <Button
-                onClick={() => inputPdf.current?.click()}
-                disabled={importando}
-                className="flex-1 border border-line"
-              >
-                <IconDocumento width={16} height={16} />
-                PDF
-              </Button>
-            </div>
-            {avisoImportacao && (
-              <p className="text-xs text-muted">{avisoImportacao}</p>
-            )}
-            <input
-              ref={inputImagem}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) importarImagem(f)
-                e.target.value = ''
-              }}
-            />
-            <input
-              ref={inputPdf}
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) importarPdf(f)
-                e.target.value = ''
-              }}
-            />
-          </div>
 
           <p className="text-[13px] leading-relaxed text-muted">
             Stylus desenha (com pressão). Um dedo arrasta o quadro, dois dedos
