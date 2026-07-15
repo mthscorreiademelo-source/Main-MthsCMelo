@@ -5,7 +5,10 @@ import { DetalheRegistro } from './components/DetalheRegistro'
 import { NovoRegistro } from './components/NovoRegistro'
 import { garantirSeedsHumor, mapaFatores } from './humor'
 import { useCategorias, useFatores, useHumorTipos, useRegistros } from './hooks'
+import { Calendario } from './telas/Calendario'
+import { Estatisticas } from './telas/Estatisticas'
 import { Hoje } from './telas/Hoje'
+import { Insights } from './telas/Insights'
 import { LinhaDoTempo } from './telas/LinhaDoTempo'
 import type { Registro } from './types'
 
@@ -16,7 +19,7 @@ export function HumorPage() {
   const fatores = useFatores()
 
   const [aba, setAba] = useState<Aba>('hoje')
-  const [capturando, setCapturando] = useState<{ registro?: Registro } | null>(null)
+  const [capturando, setCapturando] = useState<{ registro?: Registro; data?: string } | null>(null)
   const [detalhe, setDetalhe] = useState<Registro | null>(null)
 
   useEffect(() => {
@@ -56,8 +59,18 @@ export function HumorPage() {
             fatores={fatoresMapa}
             onAbrir={setDetalhe}
           />
+        ) : aba === 'calendario' ? (
+          <Calendario
+            registros={registros}
+            humorTipos={humorTipos}
+            fatores={fatoresMapa}
+            onAbrirRegistro={setDetalhe}
+            onNovoNoDia={(data) => setCapturando({ data })}
+          />
+        ) : aba === 'insights' ? (
+          <Insights registros={registros} fatores={fatores ?? []} />
         ) : (
-          <EmBreve />
+          <Estatisticas registros={registros} humorTipos={humorTipos} fatores={fatoresMapa} />
         )}
       </div>
 
@@ -65,7 +78,7 @@ export function HumorPage() {
 
       {capturando && categorias && fatores && (
         <NovoRegistro
-          data={capturando.registro?.data ?? hojeISO()}
+          data={capturando.registro?.data ?? capturando.data ?? hojeISO()}
           humorTipos={humorTipos}
           categorias={categorias}
           fatores={fatores}
@@ -84,17 +97,6 @@ export function HumorPage() {
           onEditar={editar}
         />
       )}
-    </div>
-  )
-}
-
-function EmBreve() {
-  return (
-    <div className="mx-auto flex h-full max-w-md flex-col items-center justify-center gap-2 py-16 text-center">
-      <p className="text-[15px] font-semibold">Em breve</p>
-      <p className="text-[13px] text-muted">
-        Calendário, Insights e Estatísticas chegam na próxima etapa.
-      </p>
     </div>
   )
 }

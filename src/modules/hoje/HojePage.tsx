@@ -1,26 +1,13 @@
-import { useMemo, useState } from 'react'
-import { EmptyState } from '../../core/components/EmptyState'
-import { IconSol } from '../../core/components/Icons'
-import { dataPorExtenso, hojeISO, saudacao } from '../../core/dates'
-import { QuickAdd } from '../tarefas/components/QuickAdd'
-import { TaskEditorSheet } from '../tarefas/components/TaskEditorSheet'
-import { TaskList } from '../tarefas/components/TaskList'
-import { concluidasHoje, filtrarHoje } from '../tarefas/db'
-import { useTarefas } from '../tarefas/hooks'
-import type { Task } from '../tarefas/types'
-import { HabitosHoje } from '../habitos/components/HabitosHoje'
+import { dataPorExtenso, saudacao } from '../../core/dates'
+import { MODULOS } from '../../core/modules'
 
+/**
+ * Dashboard "Hoje" — o cérebro do app. Não conhece nenhum módulo pelo nome:
+ * compõe as contribuições (SecaoHoje) que cada módulo registra. Módulo novo
+ * com SecaoHoje aparece aqui automaticamente, sem tocar neste arquivo.
+ */
 export function HojePage() {
-  const tarefas = useTarefas()
-  const [selecionada, setSelecionada] = useState<Task | null>(null)
-
-  const { pendentes, concluidas } = useMemo(() => {
-    const todas = tarefas ?? []
-    return {
-      pendentes: filtrarHoje(todas),
-      concluidas: concluidasHoje(todas),
-    }
-  }, [tarefas])
+  const secoes = MODULOS.filter((m) => m.SecaoHoje)
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
@@ -29,35 +16,10 @@ export function HojePage() {
         <p className="mt-1 text-sm text-muted">{dataPorExtenso()}</p>
       </header>
 
-      <QuickAdd dataPadrao={hojeISO()} placeholder="Adicionar tarefa para hoje…" />
-
-      {tarefas && (
-        <TaskList
-          tarefas={pendentes}
-          onAbrir={setSelecionada}
-          ocultarData
-          vazio={
-            <EmptyState
-              icone={<IconSol />}
-              titulo="Dia livre"
-              descricao="Nenhuma tarefa pendente para hoje."
-            />
-          }
-        />
-      )}
-
-      <HabitosHoje />
-
-      {concluidas.length > 0 && (
-        <section className="border-t border-line pt-4">
-          <h2 className="mb-1 px-1 text-[13px] font-medium text-muted">
-            Concluídas hoje · {concluidas.length}
-          </h2>
-          <TaskList tarefas={concluidas} onAbrir={setSelecionada} ocultarData vazio={null} />
-        </section>
-      )}
-
-      <TaskEditorSheet task={selecionada} onFechar={() => setSelecionada(null)} />
+      {secoes.map((m) => {
+        const Secao = m.SecaoHoje!
+        return <Secao key={m.id} />
+      })}
     </div>
   )
 }

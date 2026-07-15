@@ -18,8 +18,8 @@ export function HabitosHoje() {
   const feitos = lista.filter((h) => dias.get(h.id)?.has(hoje)).length
 
   return (
-    <section className="border-t border-line pt-4">
-      <div className="mb-1 flex items-center justify-between px-1">
+    <section className="flex flex-col gap-2">
+      <div className="flex items-center justify-between px-1">
         <h2 className="text-[13px] font-medium text-muted">
           Hábitos · {feitos}/{lista.length}
         </h2>

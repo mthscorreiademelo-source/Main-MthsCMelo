@@ -13,8 +13,12 @@ import { NotasPage } from '../modules/notas/NotasPage'
 import { EditorNotaPage } from '../modules/notas/EditorNotaPage'
 import { GrupoPage } from '../modules/notas/GrupoPage'
 import { HabitosPage } from '../modules/habitos/HabitosPage'
+import { HabitosHoje } from '../modules/habitos/components/HabitosHoje'
 import { HumorPage } from '../modules/humor/HumorPage'
 import { FinancasPage } from '../modules/financas/FinancasPage'
+import { SecaoHoje as TarefasHoje } from '../modules/tarefas/SecaoHoje'
+import { SecaoHoje as HumorHoje } from '../modules/humor/SecaoHoje'
+import { SecaoHoje as FinancasHoje } from '../modules/financas/SecaoHoje'
 
 export interface ModuloDef {
   id: string
@@ -26,6 +30,12 @@ export interface ModuloDef {
   subRotas?: { caminho: string; Pagina: ComponentType }[]
   /** Módulo gerencia o próprio layout (sem padding/scroll do shell). */
   telaCheia?: boolean
+  /**
+   * Contribuição do módulo para o dashboard Hoje. O Hoje compõe todas as
+   * seções registradas — módulo novo aparece sozinho, sem tocar no Hoje.
+   * Retorne null quando não houver nada relevante no dia.
+   */
+  SecaoHoje?: ComponentType
 }
 
 /**
@@ -35,7 +45,14 @@ export interface ModuloDef {
  */
 export const MODULOS: ModuloDef[] = [
   { id: 'hoje', nome: 'Hoje', rota: '/', Icone: IconSol, Pagina: HojePage },
-  { id: 'tarefas', nome: 'Tarefas', rota: '/tarefas', Icone: IconCheckCircle, Pagina: TarefasPage },
+  {
+    id: 'tarefas',
+    nome: 'Tarefas',
+    rota: '/tarefas',
+    Icone: IconCheckCircle,
+    Pagina: TarefasPage,
+    SecaoHoje: TarefasHoje,
+  },
   {
     id: 'notas',
     nome: 'Notas',
@@ -47,7 +64,29 @@ export const MODULOS: ModuloDef[] = [
       { caminho: '/notas/:id', Pagina: EditorNotaPage },
     ],
   },
-  { id: 'habitos', nome: 'Hábitos', rota: '/habitos', Icone: IconChama, Pagina: HabitosPage },
-  { id: 'humor', nome: 'Humor', rota: '/humor', Icone: IconHumor, Pagina: HumorPage, telaCheia: true },
-  { id: 'financas', nome: 'Finanças', rota: '/financas', Icone: IconCifrao, Pagina: FinancasPage },
+  {
+    id: 'habitos',
+    nome: 'Hábitos',
+    rota: '/habitos',
+    Icone: IconChama,
+    Pagina: HabitosPage,
+    SecaoHoje: HabitosHoje,
+  },
+  {
+    id: 'humor',
+    nome: 'Humor',
+    rota: '/humor',
+    Icone: IconHumor,
+    Pagina: HumorPage,
+    telaCheia: true,
+    SecaoHoje: HumorHoje,
+  },
+  {
+    id: 'financas',
+    nome: 'Finanças',
+    rota: '/financas',
+    Icone: IconCifrao,
+    Pagina: FinancasPage,
+    SecaoHoje: FinancasHoje,
+  },
 ]
