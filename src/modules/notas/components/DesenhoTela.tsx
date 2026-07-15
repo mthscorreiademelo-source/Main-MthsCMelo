@@ -32,7 +32,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   const tracos = pagina.tracos ?? []
   const ferramenta =
     modo === 'borracha'
-      ? { modo, cor: '', espessura: 0 }
+      ? { modo, cor: '', espessura: 0, suavizacao: 0 }
       : { modo, ...configs[modo] }
 
   function aplicar(novos: Traco[]) {

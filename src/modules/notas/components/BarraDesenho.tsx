@@ -13,6 +13,7 @@ import {
   type ConfigsCanetas,
 } from '../desenho'
 import type { TipoCaneta } from '../types'
+import { SeletorCor } from './SeletorCor'
 
 const ICONES: Record<TipoCaneta, typeof IconLapis> = {
   lapis: IconLapis,
@@ -42,7 +43,7 @@ interface Props {
 /** Barra flutuante minimalista + painel de cor/tamanho da caneta ativa. */
 export function BarraDesenho({ modo, configs, onModo, onConfig }: Props) {
   const [painelAberto, setPainelAberto] = useState(false)
-  const [hex, setHex] = useState('')
+  const [pickerAberto, setPickerAberto] = useState(false)
   const canetaAtiva = modo !== 'borracha' ? CANETAS[modo] : null
   const config = canetaAtiva ? configs[canetaAtiva.id] : null
 
@@ -50,18 +51,11 @@ export function BarraDesenho({ modo, configs, onModo, onConfig }: Props) {
     if (modo === tipo) {
       // tocar na caneta já ativa abre/fecha o painel de ajustes
       setPainelAberto((v) => !v)
-      setHex('')
+      setPickerAberto(false)
     } else {
       onModo(tipo)
       setPainelAberto(false)
-    }
-  }
-
-  function aplicarHex(texto: string) {
-    setHex(texto)
-    const limpo = texto.trim().replace(/^#/, '')
-    if (/^[0-9a-fA-F]{6}$/.test(limpo) && canetaAtiva) {
-      onConfig(canetaAtiva.id, { ...config!, cor: `#${limpo.toUpperCase()}` })
+      setPickerAberto(false)
     }
   }
 
@@ -106,24 +100,33 @@ export function BarraDesenho({ modo, configs, onModo, onConfig }: Props) {
             ))}
           </div>
 
-          <label className="flex items-center gap-2">
-            <span className="text-xs font-medium text-muted">Hex</span>
-            <input
-              value={hex}
-              onChange={(e) => aplicarHex(e.target.value)}
-              placeholder={config.cor}
-              aria-label="Cor hex"
-              spellCheck={false}
-              className="min-h-10 w-28 rounded-lg border border-line bg-transparent px-2.5 font-mono text-sm outline-none focus:border-muted/50"
-            />
+          <button
+            onClick={() => setPickerAberto((v) => !v)}
+            aria-label="Cor personalizada"
+            aria-expanded={pickerAberto}
+            className={`flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg border px-2.5 transition-colors ${
+              pickerAberto ? 'border-muted/50 bg-hover/60' : 'border-line hover:bg-hover/60'
+            }`}
+          >
             <span
-              className="ml-auto size-6 rounded-full border border-line"
+              className="size-6 rounded-full border border-line"
               style={{ backgroundColor: config.cor }}
             />
-          </label>
+            <span className="font-mono text-sm text-muted">{config.cor}</span>
+            <span className="ml-auto text-xs text-muted/70">
+              {pickerAberto ? 'fechar' : 'paleta'}
+            </span>
+          </button>
+
+          {pickerAberto && (
+            <SeletorCor
+              cor={config.cor}
+              onMudar={(hex) => onConfig(canetaAtiva.id, { ...config, cor: hex })}
+            />
+          )}
 
           <label className="flex items-center gap-3">
-            <span className="text-xs font-medium text-muted">Ponta</span>
+            <span className="w-16 text-xs font-medium text-muted">Ponta</span>
             <input
               type="range"
               min={1}
@@ -135,6 +138,27 @@ export function BarraDesenho({ modo, configs, onModo, onConfig }: Props) {
               }
               className="flex-1 accent-(--vida-accent)"
             />
+          </label>
+
+          <label className="flex items-center gap-3">
+            <span className="w-16 text-xs font-medium text-muted">Assistência</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(config.suavizacao * 100)}
+              aria-label="Assistência de caligrafia"
+              onChange={(e) =>
+                onConfig(canetaAtiva.id, {
+                  ...config,
+                  suavizacao: Number(e.target.value) / 100,
+                })
+              }
+              className="flex-1 accent-(--vida-accent)"
+            />
+            <span className="w-9 text-right text-xs text-muted">
+              {Math.round(config.suavizacao * 100)}%
+            </span>
           </label>
         </div>
       )}

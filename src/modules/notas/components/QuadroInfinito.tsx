@@ -6,6 +6,8 @@ export interface FerramentaAtiva {
   modo: TipoCaneta | 'borracha'
   cor: string
   espessura: number
+  /** Assistência de caligrafia (0..1) */
+  suavizacao: number
 }
 
 interface Props {
@@ -117,6 +119,7 @@ export function QuadroInfinito({
           cor: f.cor,
           espessura: f.espessura,
           ferramenta: f.modo,
+          suavizacao: f.suavizacao,
           pontos: tracoEmCurso.current,
         })
       }
@@ -341,7 +344,13 @@ export function QuadroInfinito({
     tracoEmCurso.current = null
     const f = ferramentaRef.current
     if (f.modo === 'borracha' || !pontos || pontos.length < 3) return
-    onNovoTraco({ cor: f.cor, espessura: f.espessura, ferramenta: f.modo, pontos })
+    onNovoTraco({
+      cor: f.cor,
+      espessura: f.espessura,
+      ferramenta: f.modo,
+      suavizacao: f.suavizacao,
+      pontos,
+    })
   }
 
   return (
@@ -352,6 +361,7 @@ export function QuadroInfinito({
       data-ultima-cor={tracos[tracos.length - 1]?.cor ?? ''}
       data-ultima-caneta={tracos[tracos.length - 1]?.ferramenta ?? ''}
       data-ultima-espessura={tracos[tracos.length - 1]?.espessura ?? ''}
+      data-ultima-suavizacao={tracos[tracos.length - 1]?.suavizacao ?? ''}
       onPointerDown={aoPressionar}
       onPointerMove={aoMover}
       onPointerUp={aoSoltar}

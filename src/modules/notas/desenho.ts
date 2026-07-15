@@ -86,23 +86,34 @@ export const LISTA_CANETAS = [
 export interface ConfigCaneta {
   cor: string
   espessura: number
+  /** Assistência de caligrafia (0..1) — estabilização do traço */
+  suavizacao: number
 }
 
 export type ConfigsCanetas = Record<TipoCaneta, ConfigCaneta>
 
-/** Preferências por caneta (cor/ponta), persistidas entre sessões. */
+/** Preferências por caneta (cor/ponta/assistência), persistidas entre sessões. */
 export function configsIniciais(): ConfigsCanetas {
+  const padroes = Object.fromEntries(
+    LISTA_CANETAS.map((c) => [
+      c.id,
+      { cor: c.corPadrao, espessura: c.espessuraPadrao, suavizacao: c.suavizacao },
+    ]),
+  ) as ConfigsCanetas
+
   const salvas = localStorage.getItem('vida:canetas')
   if (salvas) {
     try {
-      return JSON.parse(salvas) as ConfigsCanetas
+      const lidas = JSON.parse(salvas) as Partial<Record<TipoCaneta, Partial<ConfigCaneta>>>
+      // mescla: configs antigas podem não ter o campo suavizacao
+      for (const c of LISTA_CANETAS) {
+        padroes[c.id] = { ...padroes[c.id], ...lidas[c.id] }
+      }
     } catch {
       /* ignora e usa padrões */
     }
   }
-  return Object.fromEntries(
-    LISTA_CANETAS.map((c) => [c.id, { cor: c.corPadrao, espessura: c.espessuraPadrao }]),
-  ) as ConfigsCanetas
+  return padroes
 }
 
 export function canetaDoTraco(traco: Traco): Caneta {
@@ -210,7 +221,7 @@ export function desenharTraco(ctx: CanvasRenderingContext2D, traco: Traco) {
   ctx.fillStyle = traco.cor
   ctx.strokeStyle = traco.cor
 
-  const pts = suavizar(extrairPontos(flat), caneta.suavizacao)
+  const pts = suavizar(extrairPontos(flat), traco.suavizacao ?? caneta.suavizacao)
 
   if (pts.length === 1 || flat.length === 3) {
     ctx.beginPath()

@@ -17,6 +17,8 @@ export interface Traco {
   pontos: number[]
   /** Caneta usada; ausente = 'tinteiro' (traços antigos) */
   ferramenta?: TipoCaneta
+  /** Assistência de caligrafia (0..1) usada ao desenhar; ausente = padrão da caneta */
+  suavizacao?: number
 }
 
 /** Posição/zoom do quadro infinito (canto superior esquerdo em mundo + escala). */
