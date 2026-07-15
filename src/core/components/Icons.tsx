@@ -175,6 +175,33 @@ export function IconPincel(props: IconProps) {
   )
 }
 
+export function IconRegua(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="1.8" y="9.5" width="20.4" height="6" rx="1.2" transform="rotate(-35 12 12)" />
+      <path d="m8.3 9.9 1.6 2.3m1.9-4.7 1.6 2.3m1.9-4.7 1.6 2.3" transform="rotate(-35 12 12) translate(0 0)" />
+    </svg>
+  )
+}
+
+export function IconSelecao(props: IconProps) {
+  return (
+    <svg {...base(props)} strokeDasharray="3 3">
+      <rect x="4.5" y="4.5" width="15" height="15" rx="2.5" />
+    </svg>
+  )
+}
+
+export function IconImagem(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <circle cx="9" cy="10" r="1.6" />
+      <path d="m4.5 17.5 4.7-4.4 3.6 3.3 3-2.7 3.7 3.4" />
+    </svg>
+  )
+}
+
 export function IconMenuPontos(props: IconProps) {
   return (
     <svg {...base(props)}>

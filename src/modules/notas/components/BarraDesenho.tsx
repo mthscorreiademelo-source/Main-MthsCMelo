@@ -4,6 +4,8 @@ import {
   IconLapis,
   IconMarcador,
   IconPincel,
+  IconRegua,
+  IconSelecao,
   IconTinteiro,
 } from '../../../core/components/Icons'
 import {
@@ -13,7 +15,10 @@ import {
   type ConfigsCanetas,
 } from '../desenho'
 import type { TipoCaneta } from '../types'
+import type { ConfigBorracha } from './QuadroInfinito'
 import { SeletorCor } from './SeletorCor'
+
+export type ModoBarra = TipoCaneta | 'borracha' | 'selecao'
 
 const ICONES: Record<TipoCaneta, typeof IconLapis> = {
   lapis: IconLapis,
@@ -34,26 +39,43 @@ const PALETA = [
 ]
 
 interface Props {
-  modo: TipoCaneta | 'borracha'
+  modo: ModoBarra
   configs: ConfigsCanetas
-  onModo: (modo: TipoCaneta | 'borracha') => void
+  configBorracha: ConfigBorracha
+  selecaoTipo: 'retangulo' | 'laco'
+  reguaAtiva: boolean
+  onModo: (modo: ModoBarra) => void
   onConfig: (tipo: TipoCaneta, config: ConfigCaneta) => void
+  onConfigBorracha: (config: ConfigBorracha) => void
+  onSelecaoTipo: (tipo: 'retangulo' | 'laco') => void
+  onRegua: (ativa: boolean) => void
 }
 
-/** Barra flutuante minimalista + painel de cor/tamanho da caneta ativa. */
-export function BarraDesenho({ modo, configs, onModo, onConfig }: Props) {
+/** Barra flutuante minimalista + painel contextual da ferramenta ativa. */
+export function BarraDesenho({
+  modo,
+  configs,
+  configBorracha,
+  selecaoTipo,
+  reguaAtiva,
+  onModo,
+  onConfig,
+  onConfigBorracha,
+  onSelecaoTipo,
+  onRegua,
+}: Props) {
   const [painelAberto, setPainelAberto] = useState(false)
   const [pickerAberto, setPickerAberto] = useState(false)
-  const canetaAtiva = modo !== 'borracha' ? CANETAS[modo] : null
+  const canetaAtiva = modo !== 'borracha' && modo !== 'selecao' ? CANETAS[modo] : null
   const config = canetaAtiva ? configs[canetaAtiva.id] : null
 
-  function aoTocarCaneta(tipo: TipoCaneta) {
-    if (modo === tipo) {
-      // tocar na caneta já ativa abre/fecha o painel de ajustes
+  function aoTocarFerramenta(novo: ModoBarra) {
+    if (modo === novo) {
+      // tocar na ferramenta já ativa abre/fecha o painel de ajustes
       setPainelAberto((v) => !v)
       setPickerAberto(false)
     } else {
-      onModo(tipo)
+      onModo(novo)
       setPainelAberto(false)
       setPickerAberto(false)
     }
@@ -163,6 +185,82 @@ export function BarraDesenho({ modo, configs, onModo, onConfig }: Props) {
         </div>
       )}
 
+      {painelAberto && modo === 'borracha' && (
+        <div
+          data-testid="painel-borracha"
+          className="pointer-events-auto absolute bottom-24 left-1/2 flex w-[19rem] -translate-x-1/2 flex-col gap-4 rounded-2xl border border-line bg-bg p-4 shadow-xl"
+        >
+          <span className="text-sm font-medium">Borracha</span>
+          <div className="flex overflow-hidden rounded-lg border border-line">
+            <button
+              onClick={() => onConfigBorracha({ ...configBorracha, modo: 'traco' })}
+              aria-pressed={configBorracha.modo === 'traco'}
+              className={`min-h-10 flex-1 cursor-pointer text-sm font-medium transition-colors ${
+                configBorracha.modo === 'traco' ? 'bg-hover text-ink' : 'text-muted hover:bg-hover/60'
+              }`}
+            >
+              Traço inteiro
+            </button>
+            <button
+              onClick={() => onConfigBorracha({ ...configBorracha, modo: 'pixel' })}
+              aria-pressed={configBorracha.modo === 'pixel'}
+              className={`min-h-10 flex-1 cursor-pointer text-sm font-medium transition-colors ${
+                configBorracha.modo === 'pixel' ? 'bg-hover text-ink' : 'text-muted hover:bg-hover/60'
+              }`}
+            >
+              Pixels
+            </button>
+          </div>
+          <label className="flex items-center gap-3">
+            <span className="w-16 text-xs font-medium text-muted">Tamanho</span>
+            <input
+              type="range"
+              min={6}
+              max={80}
+              value={configBorracha.tamanho}
+              aria-label="Tamanho da borracha"
+              onChange={(e) =>
+                onConfigBorracha({ ...configBorracha, tamanho: Number(e.target.value) })
+              }
+              className="flex-1 accent-(--vida-accent)"
+            />
+            <span className="w-9 text-right text-xs text-muted">{configBorracha.tamanho}</span>
+          </label>
+        </div>
+      )}
+
+      {painelAberto && modo === 'selecao' && (
+        <div
+          data-testid="painel-selecao"
+          className="pointer-events-auto absolute bottom-24 left-1/2 flex w-[19rem] -translate-x-1/2 flex-col gap-4 rounded-2xl border border-line bg-bg p-4 shadow-xl"
+        >
+          <span className="text-sm font-medium">Seleção</span>
+          <div className="flex overflow-hidden rounded-lg border border-line">
+            <button
+              onClick={() => onSelecaoTipo('retangulo')}
+              aria-pressed={selecaoTipo === 'retangulo'}
+              className={`min-h-10 flex-1 cursor-pointer text-sm font-medium transition-colors ${
+                selecaoTipo === 'retangulo' ? 'bg-hover text-ink' : 'text-muted hover:bg-hover/60'
+              }`}
+            >
+              Retângulo
+            </button>
+            <button
+              onClick={() => onSelecaoTipo('laco')}
+              aria-pressed={selecaoTipo === 'laco'}
+              className={`min-h-10 flex-1 cursor-pointer text-sm font-medium transition-colors ${
+                selecaoTipo === 'laco' ? 'bg-hover text-ink' : 'text-muted hover:bg-hover/60'
+              }`}
+            >
+              Laço
+            </button>
+          </div>
+          <p className="text-xs leading-relaxed text-muted">
+            Contorne os riscos, depois arraste para mover ou use a alça ↻ para girar.
+          </p>
+        </div>
+      )}
+
       <div className="pointer-events-auto absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-line bg-bg/95 px-1.5 py-1 shadow-lg backdrop-blur">
         {LISTA_CANETAS.map((c) => {
           const Icone = ICONES[c.id]
@@ -170,7 +268,7 @@ export function BarraDesenho({ modo, configs, onModo, onConfig }: Props) {
           return (
             <button
               key={c.id}
-              onClick={() => aoTocarCaneta(c.id)}
+              onClick={() => aoTocarFerramenta(c.id)}
               aria-label={c.rotulo}
               aria-pressed={ativa}
               className={`relative flex size-11 cursor-pointer items-center justify-center rounded-full transition-colors ${
@@ -187,10 +285,7 @@ export function BarraDesenho({ modo, configs, onModo, onConfig }: Props) {
         })}
         <span className="mx-1 h-6 w-px bg-line" />
         <button
-          onClick={() => {
-            onModo('borracha')
-            setPainelAberto(false)
-          }}
+          onClick={() => aoTocarFerramenta('borracha')}
           aria-label="Borracha"
           aria-pressed={modo === 'borracha'}
           className={`flex size-11 cursor-pointer items-center justify-center rounded-full transition-colors ${
@@ -198,6 +293,27 @@ export function BarraDesenho({ modo, configs, onModo, onConfig }: Props) {
           }`}
         >
           <IconBorracha width={19} height={19} />
+        </button>
+        <button
+          onClick={() => aoTocarFerramenta('selecao')}
+          aria-label="Seleção"
+          aria-pressed={modo === 'selecao'}
+          className={`flex size-11 cursor-pointer items-center justify-center rounded-full transition-colors ${
+            modo === 'selecao' ? 'bg-hover text-ink' : 'text-muted hover:text-ink'
+          }`}
+        >
+          <IconSelecao width={19} height={19} />
+        </button>
+        <span className="mx-1 h-6 w-px bg-line" />
+        <button
+          onClick={() => onRegua(!reguaAtiva)}
+          aria-label="Régua"
+          aria-pressed={reguaAtiva}
+          className={`flex size-11 cursor-pointer items-center justify-center rounded-full transition-colors ${
+            reguaAtiva ? 'bg-hover text-ink' : 'text-muted hover:text-ink'
+          }`}
+        >
+          <IconRegua width={19} height={19} />
         </button>
       </div>
     </>

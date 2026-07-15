@@ -28,6 +28,20 @@ export interface Camera {
   escala: number
 }
 
+/** Item colocado no quadro (imagem da galeria ou página de PDF). */
+export interface ItemQuadro {
+  id: string
+  tipo: 'imagem'
+  dataUrl: string
+  /** Centro em coordenadas de mundo */
+  x: number
+  y: number
+  largura: number
+  altura: number
+  /** Rotação em radianos */
+  rotacao?: number
+}
+
 export interface Pagina {
   id: string
   titulo: string
@@ -44,6 +58,8 @@ export interface Pagina {
   miniatura?: string
   /** Última posição/zoom do quadro infinito */
   camera?: Camera
+  /** Imagens/páginas de PDF colocadas no quadro */
+  itens?: ItemQuadro[]
 }
 
 export interface Grupo {

@@ -323,3 +323,85 @@ export function tracoAtingido(traco: Traco, x: number, y: number, raio: number):
   }
   return false
 }
+
+/* ---------- borracha de pixels ---------- */
+
+/**
+ * Remove do traço os pontos dentro do círculo da borracha, dividindo-o
+ * nos pedaços restantes. Retorna null se nada foi atingido.
+ */
+export function apagarPixelsDoTraco(
+  traco: Traco,
+  x: number,
+  y: number,
+  raio: number,
+): Traco[] | null {
+  const p = traco.pontos
+  const r2 = raio * raio
+  const pedacos: number[][] = []
+  let atual: number[] = []
+  let mudou = false
+  for (let i = 0; i < p.length; i += 3) {
+    const dx = p[i] - x
+    const dy = p[i + 1] - y
+    if (dx * dx + dy * dy <= r2) {
+      mudou = true
+      if (atual.length >= 6) pedacos.push(atual)
+      atual = []
+    } else {
+      atual.push(p[i], p[i + 1], p[i + 2])
+    }
+  }
+  if (!mudou) return null
+  if (atual.length >= 6) pedacos.push(atual)
+  return pedacos.map((pontos) => ({ ...traco, pontos }))
+}
+
+/* ---------- seleção ---------- */
+
+export function pontoDentroPoligono(x: number, y: number, poligono: number[]): boolean {
+  // poligono achatado [x,y, x,y, …]; ray casting
+  let dentro = false
+  const n = poligono.length / 2
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = poligono[i * 2]
+    const yi = poligono[i * 2 + 1]
+    const xj = poligono[j * 2]
+    const yj = poligono[j * 2 + 1]
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+      dentro = !dentro
+    }
+  }
+  return dentro
+}
+
+/** Algum ponto do traço dentro do polígono (amostrado p/ desempenho)? */
+export function tracoDentroPoligono(traco: Traco, poligono: number[]): boolean {
+  const p = traco.pontos
+  const passo = p.length > 90 ? 9 : 3
+  for (let i = 0; i < p.length; i += passo) {
+    if (pontoDentroPoligono(p[i], p[i + 1], poligono)) return true
+  }
+  return false
+}
+
+/** Aplica translação + rotação (em torno de cx,cy) aos pontos do traço. */
+export function transformarTraco(
+  traco: Traco,
+  dx: number,
+  dy: number,
+  ang: number,
+  cx: number,
+  cy: number,
+): Traco {
+  const cos = Math.cos(ang)
+  const sen = Math.sin(ang)
+  const pontos = [...traco.pontos]
+  for (let i = 0; i < pontos.length; i += 3) {
+    const px = pontos[i] - cx
+    const py = pontos[i + 1] - cy
+    pontos[i] = cx + px * cos - py * sen + dx
+    pontos[i + 1] = cy + px * sen + py * cos + dy
+  }
+  return { ...traco, pontos }
+}
