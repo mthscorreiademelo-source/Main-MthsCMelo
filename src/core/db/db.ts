@@ -3,7 +3,13 @@ import type { Task } from '../../modules/tarefas/types'
 import type { Grupo, Pagina } from '../../modules/notas/types'
 import type { Habito, HabitoRegistro } from '../../modules/habitos/types'
 import type { Movimento } from '../../modules/financas/types'
-import type { HumorRegistro } from '../../modules/humor/types'
+import type {
+  Categoria,
+  Fator,
+  HumorRegistro,
+  HumorTipo,
+  Registro,
+} from '../../modules/humor/types'
 
 /** Conteúdo binário de um arquivo anexado a uma nota do tipo 'arquivos'. */
 export interface ArquivoDados {
@@ -29,6 +35,10 @@ class VidaDB extends Dexie {
   movimentos!: Table<Movimento, string>
   arquivos!: Table<ArquivoDados, string>
   humores!: Table<HumorRegistro, string>
+  registros!: Table<Registro, string>
+  humorTipos!: Table<HumorTipo, number>
+  categorias!: Table<Categoria, string>
+  fatores!: Table<Fator, string>
 
   constructor() {
     super('vida')
@@ -54,6 +64,12 @@ class VidaDB extends Dexie {
     })
     this.version(7).stores({
       humores: 'id, data',
+    })
+    this.version(8).stores({
+      registros: 'id, data, criadoEm',
+      humorTipos: 'nivel',
+      categorias: 'id, ordem',
+      fatores: 'id, categoriaId, ordem',
     })
   }
 }
@@ -91,7 +107,7 @@ export async function exportarBackup() {
   )
   return {
     app: 'vida',
-    versao: 7,
+    versao: 8,
     exportadoEm: new Date().toISOString(),
     tasks: await db.tasks.toArray(),
     paginas: await db.paginas.toArray(),
@@ -101,6 +117,10 @@ export async function exportarBackup() {
     movimentos: await db.movimentos.toArray(),
     arquivos: arquivosSerial,
     humores: await db.humores.toArray(),
+    registros: await db.registros.toArray(),
+    humorTipos: await db.humorTipos.toArray(),
+    categorias: await db.categorias.toArray(),
+    fatores: await db.fatores.toArray(),
   }
 }
 
@@ -125,6 +145,10 @@ export async function importarBackup(json: unknown) {
     movimentos?: Movimento[]
     arquivos?: ArquivoSerial[]
     humores?: HumorRegistro[]
+    registros?: Registro[]
+    humorTipos?: HumorTipo[]
+    categorias?: Categoria[]
+    fatores?: Fator[]
   }
   const temTasks = Array.isArray(dados?.tasks)
   const temPaginas = Array.isArray(dados?.paginas)
@@ -154,6 +178,10 @@ export async function importarBackup(json: unknown) {
     )
   }
   if (Array.isArray(dados.humores)) await db.humores.bulkPut(dados.humores)
+  if (Array.isArray(dados.registros)) await db.registros.bulkPut(dados.registros)
+  if (Array.isArray(dados.humorTipos)) await db.humorTipos.bulkPut(dados.humorTipos)
+  if (Array.isArray(dados.categorias)) await db.categorias.bulkPut(dados.categorias)
+  if (Array.isArray(dados.fatores)) await db.fatores.bulkPut(dados.fatores)
   return {
     tasks: dados.tasks?.length ?? 0,
     paginas: dados.paginas?.length ?? 0,

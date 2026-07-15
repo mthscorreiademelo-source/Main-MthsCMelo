@@ -1,14 +1,21 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../core/db/db'
-import type { HumorRegistro } from './types'
+import { HUMORES_PADRAO } from './dados'
+import type { Categoria, Fator, HumorTipo, Registro } from './types'
 
-export function useHumores(): HumorRegistro[] | undefined {
-  return useLiveQuery(() => db.humores.toArray(), [])
+export function useRegistros(): Registro[] | undefined {
+  return useLiveQuery(() => db.registros.toArray(), [])
 }
 
-/** Mapa data → registro, para consulta O(1) no calendário. */
-export function mapaPorData(regs: HumorRegistro[]): Map<string, HumorRegistro> {
-  const m = new Map<string, HumorRegistro>()
-  for (const r of regs) m.set(r.data, r)
-  return m
+export function useHumorTipos(): HumorTipo[] {
+  const tipos = useLiveQuery(() => db.humorTipos.orderBy('nivel').toArray(), [])
+  return tipos && tipos.length ? tipos : HUMORES_PADRAO
+}
+
+export function useCategorias(): Categoria[] | undefined {
+  return useLiveQuery(() => db.categorias.orderBy('ordem').toArray(), [])
+}
+
+export function useFatores(): Fator[] | undefined {
+  return useLiveQuery(() => db.fatores.orderBy('ordem').toArray(), [])
 }

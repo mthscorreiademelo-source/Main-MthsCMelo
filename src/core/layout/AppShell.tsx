@@ -74,9 +74,15 @@ export function AppShell() {
           </IconButton>
           <span className="text-sm font-semibold">{moduloAtual.nome}</span>
         </header>
-        <div className="flex-1 overflow-y-auto px-5 pb-24 md:px-10">
-          <Outlet />
-        </div>
+        {moduloAtual.telaCheia ? (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <Outlet />
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto px-5 pb-24 md:px-10">
+            <Outlet />
+          </div>
+        )}
       </main>
     </div>
   )

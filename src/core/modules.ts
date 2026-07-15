@@ -24,6 +24,8 @@ export interface ModuloDef {
   Pagina: ComponentType
   /** Rotas internas do módulo (ex.: detalhe/editor), fora da sidebar. */
   subRotas?: { caminho: string; Pagina: ComponentType }[]
+  /** Módulo gerencia o próprio layout (sem padding/scroll do shell). */
+  telaCheia?: boolean
 }
 
 /**
@@ -46,6 +48,6 @@ export const MODULOS: ModuloDef[] = [
     ],
   },
   { id: 'habitos', nome: 'Hábitos', rota: '/habitos', Icone: IconChama, Pagina: HabitosPage },
-  { id: 'humor', nome: 'Humor', rota: '/humor', Icone: IconHumor, Pagina: HumorPage },
+  { id: 'humor', nome: 'Humor', rota: '/humor', Icone: IconHumor, Pagina: HumorPage, telaCheia: true },
   { id: 'financas', nome: 'Finanças', rota: '/financas', Icone: IconCifrao, Pagina: FinancasPage },
 ]
