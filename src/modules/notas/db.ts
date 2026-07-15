@@ -6,16 +6,20 @@ export function novoBloco(tipo: TipoBloco = 'paragrafo', texto = ''): Bloco {
   return { id: nanoid(), tipo, texto }
 }
 
-/** Cria uma página vazia (opcionalmente já dentro de um grupo) e devolve o id. */
-export async function criarPagina(grupoId?: string): Promise<string> {
+/** Cria uma página vazia (texto ou desenho, solta ou num grupo) e devolve o id. */
+export async function criarPagina(
+  grupoId?: string,
+  tipo: 'texto' | 'desenho' = 'texto',
+): Promise<string> {
   const agora = Date.now()
   const pagina: Pagina = {
     id: nanoid(),
     titulo: '',
-    blocos: [novoBloco()],
+    blocos: tipo === 'desenho' ? [] : [novoBloco()],
     criadaEm: agora,
     atualizadaEm: agora,
     ...(grupoId ? { grupoId } : {}),
+    ...(tipo === 'desenho' ? { tipo, tracos: [] } : {}),
   }
   await db.paginas.add(pagina)
   return pagina.id

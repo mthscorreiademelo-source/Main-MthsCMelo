@@ -30,7 +30,7 @@ export function IconButton({
 }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
-      className={`inline-flex size-11 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-ink select-none ${className}`}
+      className={`inline-flex size-11 cursor-pointer items-center justify-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-ink select-none disabled:cursor-default disabled:opacity-40 ${className}`}
       {...rest}
     />
   )

@@ -8,6 +8,13 @@ export interface Bloco {
   feito?: boolean
 }
 
+/** Traço de desenho: pontos achatados [x, y, pressão, x, y, pressão, …] */
+export interface Traco {
+  cor: string
+  espessura: number
+  pontos: number[]
+}
+
 export interface Pagina {
   id: string
   titulo: string
@@ -16,6 +23,12 @@ export interface Pagina {
   atualizadaEm: number
   /** Grupo (categoria) ao qual a nota pertence; ausente = nota solta */
   grupoId?: string
+  /** Tipo da nota; ausente = 'texto' */
+  tipo?: 'texto' | 'desenho'
+  /** Traços do desenho (somente tipo 'desenho') */
+  tracos?: Traco[]
+  /** Miniatura JPEG (dataURL) para preview na lista */
+  miniatura?: string
 }
 
 export interface Grupo {

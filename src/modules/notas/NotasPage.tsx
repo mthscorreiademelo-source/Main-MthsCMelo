@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { EmptyState } from '../../core/components/EmptyState'
-import { IconDocumento, IconMais } from '../../core/components/Icons'
+import { IconCaneta, IconDocumento, IconMais } from '../../core/components/Icons'
 import { GrupoEditorSheet } from './components/GrupoEditorSheet'
 import { ListaPaginas } from './components/ListaPaginas'
 import { criarPagina, ordenarGrupos } from './db'
@@ -26,8 +26,8 @@ export function NotasPage() {
     return mapa
   }, [paginas])
 
-  async function novaPagina() {
-    const id = await criarPagina()
+  async function novaPagina(tipo: 'texto' | 'desenho' = 'texto') {
+    const id = await criarPagina(undefined, tipo)
     navigate(`/notas/${id}`)
   }
 
@@ -83,15 +83,26 @@ export function NotasPage() {
       {/* Notas soltas */}
       <section className="flex flex-col gap-3">
         <h2 className="px-1 text-[13px] font-medium text-muted">Notas soltas</h2>
-        <button
-          onClick={novaPagina}
-          className="flex min-h-12 cursor-pointer items-center gap-1 rounded-lg border border-line bg-surface/60 px-2 text-[15px] text-muted transition-colors hover:border-muted/50 hover:text-ink"
-        >
-          <span className="flex size-11 items-center justify-center">
-            <IconMais />
-          </span>
-          Nova página
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => novaPagina('texto')}
+            className="flex min-h-12 flex-1 cursor-pointer items-center gap-1 rounded-lg border border-line bg-surface/60 px-2 text-[15px] text-muted transition-colors hover:border-muted/50 hover:text-ink"
+          >
+            <span className="flex size-11 items-center justify-center">
+              <IconMais />
+            </span>
+            Nova página
+          </button>
+          <button
+            onClick={() => novaPagina('desenho')}
+            className="flex min-h-12 flex-1 cursor-pointer items-center gap-1 rounded-lg border border-line bg-surface/60 px-2 text-[15px] text-muted transition-colors hover:border-muted/50 hover:text-ink"
+          >
+            <span className="flex size-11 items-center justify-center">
+              <IconCaneta width={18} height={18} />
+            </span>
+            Novo desenho
+          </button>
+        </div>
 
         {paginas && soltas.length === 0 && (
           <EmptyState

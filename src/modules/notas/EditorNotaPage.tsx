@@ -4,6 +4,7 @@ import { Button, IconButton } from '../../core/components/Button'
 import { IconLixeira, IconSetaEsquerda } from '../../core/components/Icons'
 import { db } from '../../core/db/db'
 import { BlocoEditor } from './components/BlocoEditor'
+import { DesenhoEditor } from './components/DesenhoEditor'
 import { excluirPagina, novoBloco, ordenarGrupos, salvarPagina } from './db'
 import { useGrupos } from './hooks'
 import type { Pagina, TipoBloco } from './types'
@@ -121,6 +122,15 @@ export function EditorNotaPage() {
         className="w-full resize-none overflow-hidden bg-transparent pb-3 text-3xl font-bold tracking-tight outline-none placeholder:text-muted/40"
       />
 
+      {pagina.tipo === 'desenho' && (
+        <DesenhoEditor
+          pagina={pagina}
+          onMudar={(mudancas) => setPagina((p) => (p ? { ...p, ...mudancas } : p))}
+        />
+      )}
+
+      {pagina.tipo !== 'desenho' && (
+      <>
       <div className="flex flex-col">
         {pagina.blocos.map((bloco) => (
           <BlocoEditor
@@ -149,6 +159,8 @@ export function EditorNotaPage() {
           }
         }}
       />
+      </>
+      )}
 
       {(grupos?.length ?? 0) > 0 && (
         <div className="flex items-center gap-1.5 overflow-x-auto border-t border-line py-3">
@@ -179,9 +191,11 @@ export function EditorNotaPage() {
         </div>
       )}
 
-      <p className="pb-2 text-xs text-muted/60">
-        Dicas: <code># </code> título · <code>- </code> lista · <code>[] </code> to-do
-      </p>
+      {pagina.tipo !== 'desenho' && (
+        <p className="pb-2 text-xs text-muted/60">
+          Dicas: <code># </code> título · <code>- </code> lista · <code>[] </code> to-do
+        </p>
+      )}
     </div>
   )
 }

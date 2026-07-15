@@ -124,6 +124,31 @@ export function IconDocumento(props: IconProps) {
   )
 }
 
+export function IconCaneta(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12.8 4.8 19.2 11.2 9.5 20.9 4 22l1.1-5.5 9.7-9.7Z" />
+      <path d="m15.5 2.1 6.4 6.4M5.1 16.5l2.4 2.4" />
+    </svg>
+  )
+}
+
+export function IconBorracha(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="m8.2 20 -4.1-4.1a1.8 1.8 0 0 1 0-2.5L13.6 3.9a1.8 1.8 0 0 1 2.5 0l4 4a1.8 1.8 0 0 1 0 2.5L11 19.9a1.8 1.8 0 0 1-1.3.6H8.2ZM20.5 20H12M9.3 6.7l8 8" />
+    </svg>
+  )
+}
+
+export function IconDesfazer(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 9h10a6 6 0 0 1 0 12h-4M4 9l4-4M4 9l4 4" />
+    </svg>
+  )
+}
+
 export function IconLapis(props: IconProps) {
   return (
     <svg {...base(props)}>
