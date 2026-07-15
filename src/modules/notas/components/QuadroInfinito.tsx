@@ -7,6 +7,7 @@ import {
 } from 'react'
 import {
   apagarPixelsDoTraco,
+  chaveDoItem,
   desenharTraco,
   limitesDosTracos,
   pontoDentroPoligono,
@@ -14,6 +15,7 @@ import {
   tracoAtingido,
   tracoDentroPoligono,
   transformarTraco,
+  urlDoItem,
 } from '../desenho'
 import type { Camera, ItemQuadro, PostIt, TipoCaneta, Traco } from '../types'
 
@@ -22,6 +24,8 @@ export interface FerramentaAtiva {
   cor: string
   espessura: number
   suavizacao: number
+  /** Modo linha reta: o arrasto define uma reta (marca-texto) */
+  linhaReta?: boolean
 }
 
 export interface ConteudoCopiado {
@@ -56,7 +60,8 @@ interface Props {
   onApagarTraco: (indice: number) => void
   onSubstituir: (tracos: Traco[], itens: ItemQuadro[], postIts: PostIt[]) => void
   onCamera: (camera: Camera) => void
-  onSelecaoMudou: (ativa: boolean) => void
+  /** ativa = há seleção; pagerId = id do PDF folheador se ele estiver sozinho na seleção */
+  onSelecaoMudou: (ativa: boolean, pagerId: string | null) => void
   /** Toque longo (dedo) ou clique direito: posição de tela e de mundo */
   onMenuContexto: (sx: number, sy: number, wx: number, wy: number) => void
 }
@@ -106,6 +111,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   const inicializada = useRef(false)
   const tracoEmCurso = useRef<number[] | null>(null)
   const tracoNaRegua = useRef(false)
+  const tracoReto = useRef(false)
   const tracoNoPostIt = useRef<string | null>(null)
   const ultimaTela = useRef<{ x: number; y: number } | null>(null)
   const pressaoSuave = useRef(0.5)
@@ -150,10 +156,15 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   selecaoTipoRef.current = selecaoTipo
 
   useEffect(() => {
-    const w = window as unknown as { __tracosDebug?: Traco[]; __postItsDebug?: PostIt[] }
+    const w = window as unknown as {
+      __tracosDebug?: Traco[]
+      __postItsDebug?: PostIt[]
+      __itensDebug?: ItemQuadro[]
+    }
     w.__tracosDebug = tracos
     w.__postItsDebug = postIts
-  }, [tracos, postIts])
+    w.__itensDebug = itens
+  }, [tracos, postIts, itens])
 
   /* ---------- helpers de coordenadas ---------- */
 
@@ -172,15 +183,18 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
 
   const desenharItens = (ctx: CanvasRenderingContext2D, lista: ItemQuadro[], selIds: Set<string>, t: { dx: number; dy: number; ang: number; s: number }, cx: number, cy: number) => {
     for (const item of lista) {
-      const img = imagens.current.get(item.id)
+      const chave = chaveDoItem(item)
+      const url = urlDoItem(item)
+      const img = imagens.current.get(chave)
       if (!img) {
+        if (!url) continue
         const el = new Image()
         el.onload = () => {
           cenaSuja.current = true
           pedirRender()
         }
-        el.src = item.dataUrl
-        imagens.current.set(item.id, el)
+        el.src = url
+        imagens.current.set(chave, el)
         continue
       }
       if (!img.complete) continue
@@ -483,7 +497,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       const postSet = new Set(sel.postItIds)
       selecao.current = null
       transSel.current = { dx: 0, dy: 0, ang: 0, s: 1 }
-      onSelecaoMudou(false)
+      onSelecaoMudou(false, null)
       onSubstituir(
         // apaga também a tinta colada nos post-its excluídos
         tracosRef.current.filter(
@@ -496,7 +510,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     limparSelecao() {
       selecao.current = null
       transSel.current = { dx: 0, dy: 0, ang: 0, s: 1 }
-      onSelecaoMudou(false)
+      onSelecaoMudou(false, null)
       cenaSuja.current = true
       pedirRender()
     },
@@ -604,7 +618,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     if (ferramenta.modo !== 'selecao' && ferramenta.modo !== 'ponteiro' && selecao.current) {
       selecao.current = null
       transSel.current = { dx: 0, dy: 0, ang: 0, s: 1 }
-      onSelecaoMudou(false)
+      onSelecaoMudou(false, null)
       cenaSuja.current = true
       pedirRender()
     }
@@ -747,11 +761,25 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     definirSelecao(indices, itemIds, postItIds)
   }
 
+  /** Avisa o pai sobre o estado da seleção (e se é um PDF folheador sozinho). */
+  function notificarSelecao() {
+    const sel = selecao.current
+    if (!sel) {
+      onSelecaoMudou(false, null)
+      return
+    }
+    let pagerId: string | null = null
+    if (sel.indices.length === 0 && sel.postItIds.length === 0 && sel.itemIds.length === 1) {
+      const it = itensRef.current.find((i) => i.id === sel.itemIds[0])
+      if (it && it.tipo === 'pdf') pagerId = it.id
+    }
+    onSelecaoMudou(true, pagerId)
+  }
+
   /** Monta (ou limpa) a seleção a partir dos conjuntos escolhidos. */
   function definirSelecao(indices: number[], itemIds: string[], postItIds: string[]) {
     if (indices.length === 0 && itemIds.length === 0 && postItIds.length === 0) {
       selecao.current = null
-      onSelecaoMudou(false)
     } else {
       let minX = Infinity
       let minY = Infinity
@@ -784,8 +812,8 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       }
       selecao.current = { indices, itemIds, postItIds, caixa: { minX, minY, maxX, maxY } }
       transSel.current = { dx: 0, dy: 0, ang: 0, s: 1 }
-      onSelecaoMudou(true)
     }
+    notificarSelecao()
     cenaSuja.current = true
     pedirRender()
   }
@@ -982,7 +1010,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       if (selecao.current) {
         selecao.current = null
         transSel.current = { dx: 0, dy: 0, ang: 0, s: 1 }
-        onSelecaoMudou(false)
+        onSelecaoMudou(false, null)
         cenaSuja.current = true
       }
       marca.current = [x, y]
@@ -1007,7 +1035,10 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
         break
       }
     }
+    // modo linha reta (marca-texto): o arrasto define a reta; ignora a régua
+    tracoReto.current = !!ferramentaRef.current.linhaReta
     tracoNaRegua.current =
+      !tracoReto.current &&
       reguaAtiva &&
       !!reguaLocal(e.clientX, e.clientY) &&
       Math.abs(reguaLocal(e.clientX, e.clientY)!.perp) < SNAP_REGUA
@@ -1124,6 +1155,13 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       apagarEm(x, y)
       return
     }
+    if (tracoReto.current) {
+      // linha reta: mantém só início + ponto atual (o arrasto define a reta)
+      const inicio = tracoEmCurso.current.slice(0, 3)
+      tracoEmCurso.current = [inicio[0], inicio[1], inicio[2], x, y, 0.5]
+      pedirRender()
+      return
+    }
     const nativos = e.nativeEvent.getCoalescedEvents?.() ?? [e.nativeEvent]
     for (const ev of nativos) {
       const [wx, wy] = paraMundo(ev.clientX, ev.clientY)
@@ -1181,10 +1219,14 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
 
     const pontos = tracoEmCurso.current
     const postItId = tracoNoPostIt.current
+    const eraReto = tracoReto.current
     tracoEmCurso.current = null
     tracoNaRegua.current = false
+    tracoReto.current = false
     tracoNoPostIt.current = null
     if (!pontos || pontos.length < 3) return
+    // linha reta precisa de um arrasto de verdade (2 pontos)
+    if (eraReto && pontos.length < 6) return
     onNovoTraco({
       cor: f.cor,
       espessura: f.espessura,

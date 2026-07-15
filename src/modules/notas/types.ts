@@ -43,11 +43,19 @@ export interface Camera {
   escala: number
 }
 
-/** Item colocado no quadro (imagem da galeria ou página de PDF). */
+/**
+ * Item colocado no quadro. `imagem` = uma figura (galeria ou página única de
+ * PDF). `pdf` = folheador com várias páginas navegáveis por setas.
+ */
 export interface ItemQuadro {
   id: string
-  tipo: 'imagem'
-  dataUrl: string
+  tipo: 'imagem' | 'pdf'
+  /** Usado quando tipo = 'imagem' */
+  dataUrl?: string
+  /** Páginas (dataURLs) quando tipo = 'pdf' */
+  paginas?: string[]
+  /** Página exibida atualmente (tipo = 'pdf') */
+  paginaAtual?: number
   /** Centro em coordenadas de mundo */
   x: number
   y: number

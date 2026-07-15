@@ -1,4 +1,15 @@
-import type { PostIt, TipoCaneta, Traco } from './types'
+import type { ItemQuadro, PostIt, TipoCaneta, Traco } from './types'
+
+/** URL da imagem a exibir para um item (página atual, se for PDF). */
+export function urlDoItem(item: ItemQuadro): string | undefined {
+  if (item.tipo === 'pdf') return item.paginas?.[item.paginaAtual ?? 0]
+  return item.dataUrl
+}
+
+/** Chave de cache do item — muda ao virar a página de um PDF. */
+export function chaveDoItem(item: ItemQuadro): string {
+  return item.tipo === 'pdf' ? `${item.id}:${item.paginaAtual ?? 0}` : item.id
+}
 
 /**
  * Motor de tinta: cada traço é renderizado como um CONTORNO PREENCHIDO
@@ -88,6 +99,8 @@ export interface ConfigCaneta {
   espessura: number
   /** Assistência de caligrafia (0..1) — estabilização do traço */
   suavizacao: number
+  /** Modo linha reta (marca-texto): o arrasto define a reta */
+  linhaReta?: boolean
 }
 
 export type ConfigsCanetas = Record<TipoCaneta, ConfigCaneta>

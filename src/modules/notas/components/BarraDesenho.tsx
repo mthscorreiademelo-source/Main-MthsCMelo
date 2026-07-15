@@ -290,6 +290,31 @@ export function BarraDesenho({
               {Math.round(config.suavizacao * 100)}%
             </span>
           </label>
+
+          {canetaAtiva.id === 'marcador' && (
+            <button
+              onClick={() => onConfig('marcador', { ...config, linhaReta: !config.linhaReta })}
+              aria-pressed={!!config.linhaReta}
+              className={`flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border px-3 text-sm font-medium transition-colors ${
+                config.linhaReta
+                  ? 'border-accent bg-accent/10 text-ink'
+                  : 'border-line text-muted hover:bg-hover/60'
+              }`}
+            >
+              <span
+                className={`flex h-4 w-8 shrink-0 items-center rounded-full transition-colors ${
+                  config.linhaReta ? 'bg-accent' : 'bg-line'
+                }`}
+              >
+                <span
+                  className={`size-3 rounded-full bg-white transition-transform ${
+                    config.linhaReta ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}
+                />
+              </span>
+              Linha reta
+            </button>
+          )}
         </div>
       )}
 

@@ -12,7 +12,12 @@ import { Sheet } from '../../../core/components/Sheet'
 import { nanoid } from 'nanoid'
 import { configsIniciais, gerarMiniatura, limitesDosTracos, type ConfigsCanetas } from '../desenho'
 import { ordenarGrupos } from '../db'
-import { imagemParaItem, pdfParaItens } from '../importar'
+import {
+  imagemParaItem,
+  itemImagemDePagina,
+  itemPagerPdf,
+  renderizarPaginasPdf,
+} from '../importar'
 import { guardarPrancheta, lerPrancheta } from '../prancheta'
 import type { Grupo, ItemQuadro, Pagina, PostIt, TipoCaneta, Traco } from '../types'
 import { BarraDesenho, type ModoBarra } from './BarraDesenho'
@@ -45,6 +50,8 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   const [selecaoTipo, setSelecaoTipo] = useState<'retangulo' | 'laco'>('retangulo')
   const [reguaAtiva, setReguaAtiva] = useState(false)
   const [selecaoAtiva, setSelecaoAtiva] = useState(false)
+  const [pagerSelId, setPagerSelId] = useState<string | null>(null)
+  const [dialogoPdf, setDialogoPdf] = useState<{ paginas: string[]; indice: number; total: number } | null>(null)
   const [menuAberto, setMenuAberto] = useState(false)
   const [confirmandoLimpar, setConfirmandoLimpar] = useState(false)
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
@@ -257,16 +264,10 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
     setImportando(true)
     setAvisoImportacao('Convertendo PDF…')
     try {
-      const centro = quadro.current!.centroMundo()
-      const { itens: paginas, totalPaginas } = await pdfParaItens(arquivo, centro.x, centro.y)
-      aplicar(tracos, [...itens, ...paginas])
-      if (paginas.length > 0) selecionarInserido({ itemId: paginas[0].id })
-      setAvisoImportacao(
-        totalPaginas > paginas.length
-          ? `Importadas ${paginas.length} de ${totalPaginas} páginas (limite).`
-          : '',
-      )
-      if (totalPaginas <= paginas.length) setMenuAberto(false)
+      const { paginas, total } = await renderizarPaginasPdf(arquivo)
+      setMenuAberto(false)
+      setAvisoImportacao('')
+      setDialogoPdf({ paginas, indice: 0, total })
     } catch (e) {
       setAvisoImportacao(
         `Não consegui ler esse PDF (${e instanceof Error ? e.message : 'erro desconhecido'}).`,
@@ -275,6 +276,38 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
       setImportando(false)
     }
   }
+
+  async function adicionarPaginaPdf() {
+    if (!dialogoPdf) return
+    const centro = quadro.current!.centroMundo()
+    const item = await itemImagemDePagina(dialogoPdf.paginas[dialogoPdf.indice], centro.x, centro.y)
+    setDialogoPdf(null)
+    aplicar(tracos, [...itens, item])
+    selecionarInserido({ itemId: item.id })
+  }
+
+  async function adicionarPdfInteiro() {
+    if (!dialogoPdf) return
+    const centro = quadro.current!.centroMundo()
+    const item = await itemPagerPdf(dialogoPdf.paginas, centro.x, centro.y)
+    setDialogoPdf(null)
+    aplicar(tracos, [...itens, item])
+    selecionarInserido({ itemId: item.id })
+  }
+
+  /** Vira a página do PDF folheador selecionado (delta -1 ou +1). */
+  function virarPagina(delta: number) {
+    if (!pagerSelId) return
+    const novos = itens.map((it) => {
+      if (it.id !== pagerSelId || it.tipo !== 'pdf') return it
+      const total = it.paginas?.length ?? 1
+      const atual = Math.min(total - 1, Math.max(0, (it.paginaAtual ?? 0) + delta))
+      return { ...it, paginaAtual: atual }
+    })
+    aplicar(tracos, novos)
+  }
+
+  const pagerSel = pagerSelId ? itens.find((i) => i.id === pagerSelId) : undefined
 
   return (
     <div className="fixed inset-0 z-30 overflow-hidden bg-white" onPointerDown={aoPrimeiroToque}>
@@ -292,7 +325,10 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
         onApagarTraco={(i) => aplicar(tracos.filter((_, j) => j !== i))}
         onSubstituir={(t, i, p) => aplicar(t, i, p)}
         onCamera={(camera) => onMudar({ camera })}
-        onSelecaoMudou={setSelecaoAtiva}
+        onSelecaoMudou={(ativa, pagerId) => {
+          setSelecaoAtiva(ativa)
+          setPagerSelId(pagerId)
+        }}
         onMenuContexto={(sx, sy, wx, wy) => setMenuCtx({ sx, sy, wx, wy })}
       />
 
@@ -374,12 +410,95 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
       {/* Ações da seleção ativa (acima da barra de ferramentas, sem cobrir a alça) */}
       {selecaoAtiva && (
         <div className="pointer-events-auto absolute bottom-20 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-line bg-bg/95 px-2 py-1 shadow-lg backdrop-blur">
-          <span className="px-2 text-xs text-muted">Arraste para mover · alça ↻ gira</span>
+          {pagerSel && pagerSel.tipo === 'pdf' ? (
+            <span className="flex items-center gap-1 pr-1">
+              <IconButton
+                onClick={() => virarPagina(-1)}
+                aria-label="Página anterior"
+                disabled={(pagerSel.paginaAtual ?? 0) <= 0}
+              >
+                <IconSetaEsquerda width={18} height={18} />
+              </IconButton>
+              <span className="min-w-14 text-center text-xs font-medium text-muted">
+                {(pagerSel.paginaAtual ?? 0) + 1} / {pagerSel.paginas?.length ?? 1}
+              </span>
+              <IconButton
+                onClick={() => virarPagina(1)}
+                aria-label="Próxima página"
+                disabled={(pagerSel.paginaAtual ?? 0) >= (pagerSel.paginas?.length ?? 1) - 1}
+              >
+                <IconSetaEsquerda width={18} height={18} className="rotate-180" />
+              </IconButton>
+              <span className="mx-1 h-6 w-px bg-line" />
+            </span>
+          ) : (
+            <span className="px-2 text-xs text-muted">Arraste para mover · alça ↻ gira</span>
+          )}
           <Button variante="perigo" onClick={() => quadro.current?.excluirSelecao()}>
             <IconLixeira width={15} height={15} />
             Excluir
           </Button>
           <Button onClick={() => quadro.current?.limparSelecao()}>Concluir</Button>
+        </div>
+      )}
+
+      {/* Diálogo de importação de PDF: escolher uma página ou o documento inteiro */}
+      {dialogoPdf && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div
+            data-testid="dialogo-pdf"
+            className="flex max-h-full w-full max-w-sm flex-col gap-3 rounded-2xl border border-line bg-bg p-4 shadow-xl"
+          >
+            <span className="text-sm font-semibold">Adicionar PDF</span>
+            <div className="flex items-center justify-center rounded-lg border border-line bg-surface/60 p-2">
+              <img
+                src={dialogoPdf.paginas[dialogoPdf.indice]}
+                alt=""
+                className="max-h-64 w-auto rounded shadow-sm"
+              />
+            </div>
+            <div className="flex items-center justify-center gap-2">
+              <IconButton
+                onClick={() =>
+                  setDialogoPdf((d) => (d ? { ...d, indice: Math.max(0, d.indice - 1) } : d))
+                }
+                aria-label="Página anterior"
+                disabled={dialogoPdf.indice <= 0}
+              >
+                <IconSetaEsquerda width={18} height={18} />
+              </IconButton>
+              <span className="min-w-16 text-center text-sm text-muted">
+                {dialogoPdf.indice + 1} / {dialogoPdf.paginas.length}
+              </span>
+              <IconButton
+                onClick={() =>
+                  setDialogoPdf((d) =>
+                    d ? { ...d, indice: Math.min(d.paginas.length - 1, d.indice + 1) } : d,
+                  )
+                }
+                aria-label="Próxima página"
+                disabled={dialogoPdf.indice >= dialogoPdf.paginas.length - 1}
+              >
+                <IconSetaEsquerda width={18} height={18} className="rotate-180" />
+              </IconButton>
+            </div>
+            {dialogoPdf.total > dialogoPdf.paginas.length && (
+              <p className="text-center text-xs text-muted/70">
+                Mostrando as primeiras {dialogoPdf.paginas.length} de {dialogoPdf.total} páginas.
+              </p>
+            )}
+            <div className="flex flex-col gap-2">
+              <Button variante="primaria" onClick={adicionarPaginaPdf} className="w-full">
+                Adicionar só esta página
+              </Button>
+              <Button onClick={adicionarPdfInteiro} className="w-full border border-line">
+                Adicionar PDF inteiro (folhear)
+              </Button>
+              <Button onClick={() => setDialogoPdf(null)} className="w-full text-muted">
+                Cancelar
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
