@@ -209,6 +209,12 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
       mapaPostIt.set(pi.id, novoId)
       return { ...pi, id: novoId, x: pi.x + ddx, y: pi.y + ddy }
     })
+    const mapaItem = new Map<string, string>()
+    const novosItens = p.itens.map((it) => {
+      const novoId = nanoid()
+      mapaItem.set(it.id, novoId)
+      return { ...it, id: novoId, x: it.x + ddx, y: it.y + ddy }
+    })
     const novosTracos = p.tracos.map((t) => {
       const pontos = [...t.pontos]
       for (let i = 0; i < pontos.length; i += 3) {
@@ -216,14 +222,14 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
         pontos[i + 1] += ddy
       }
       const postItId = t.postItId ? mapaPostIt.get(t.postItId) : undefined
-      return { ...t, pontos, ...(postItId ? { postItId } : { postItId: undefined }) }
+      const itemId = t.itemId ? mapaItem.get(t.itemId) : undefined
+      return {
+        ...t,
+        pontos,
+        postItId,
+        itemId,
+      }
     })
-    const novosItens = p.itens.map((it) => ({
-      ...it,
-      id: nanoid(),
-      x: it.x + ddx,
-      y: it.y + ddy,
-    }))
     aplicar(
       [...tracos, ...novosTracos],
       [...itens, ...novosItens],

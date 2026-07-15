@@ -21,6 +21,10 @@ export interface Traco {
   suavizacao?: number
   /** Post-it ao qual o traço está colado (tinta sobre o papel adesivo) */
   postItId?: string
+  /** Item (PDF folheador) ao qual o traço está colado */
+  itemId?: string
+  /** Página do folheador em que o traço foi feito (com itemId) */
+  paginaItem?: number
 }
 
 /** Papel adesivo colado no quadro; traços com postItId acompanham seus movimentos. */

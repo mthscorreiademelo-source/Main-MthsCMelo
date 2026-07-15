@@ -113,6 +113,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   const tracoNaRegua = useRef(false)
   const tracoReto = useRef(false)
   const tracoNoPostIt = useRef<string | null>(null)
+  const tracoNoItem = useRef<{ id: string; pagina: number } | null>(null)
   const ultimaTela = useRef<{ x: number; y: number } | null>(null)
   const pressaoSuave = useRef(0.5)
   const dedos = useRef(new Map<number, { x: number; y: number }>())
@@ -181,44 +182,6 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
 
   /* ---------- render ---------- */
 
-  const desenharItens = (ctx: CanvasRenderingContext2D, lista: ItemQuadro[], selIds: Set<string>, t: { dx: number; dy: number; ang: number; s: number }, cx: number, cy: number) => {
-    for (const item of lista) {
-      const chave = chaveDoItem(item)
-      const url = urlDoItem(item)
-      const img = imagens.current.get(chave)
-      if (!img) {
-        if (!url) continue
-        const el = new Image()
-        el.onload = () => {
-          cenaSuja.current = true
-          pedirRender()
-        }
-        el.src = url
-        imagens.current.set(chave, el)
-        continue
-      }
-      if (!img.complete) continue
-      let { x, y, largura, altura } = item
-      let rot = item.rotacao ?? 0
-      if (selIds.has(item.id) && (t.dx || t.dy || t.ang || t.s !== 1)) {
-        const cos = Math.cos(t.ang)
-        const sen = Math.sin(t.ang)
-        const px = (x - cx) * t.s
-        const py = (y - cy) * t.s
-        x = cx + px * cos - py * sen + t.dx
-        y = cy + px * sen + py * cos + t.dy
-        rot += t.ang
-        largura *= t.s
-        altura *= t.s
-      }
-      ctx.save()
-      ctx.translate(x, y)
-      ctx.rotate(rot)
-      ctx.drawImage(img, -largura / 2, -altura / 2, largura, altura)
-      ctx.restore()
-    }
-  }
-
   const desenharCena = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -265,13 +228,72 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     const comTransTraco = (traco: Traco, i: number) =>
       selIdx.has(i) && temTrans ? transformarTraco(traco, t.dx, t.dy, t.ang, ccx, ccy, t.s) : traco
 
-    // camada 1: imagens/PDF
-    desenharItens(ctx, itensRef.current, selIds, t, ccx, ccy)
-
-    // camada 2: traços do quadro (não colados em post-it)
     const lista = tracosLocais.current ?? tracosRef.current
+    const aplicarMundo = () =>
+      ctx.setTransform(escala * dpr, 0, 0, escala * dpr, -x * escala * dpr, -y * escala * dpr)
+
+    // camada 1: imagens/PDF (e a tinta colada em cada página do folheador)
+    for (const item of itensRef.current) {
+      const chave = chaveDoItem(item)
+      const url = urlDoItem(item)
+      const img = imagens.current.get(chave)
+      if (!img) {
+        if (url) {
+          const el = new Image()
+          el.onload = () => {
+            cenaSuja.current = true
+            pedirRender()
+          }
+          el.src = url
+          imagens.current.set(chave, el)
+        }
+        continue
+      }
+      if (!img.complete) continue
+      let ix = item.x
+      let iy = item.y
+      let ilw = item.largura
+      let ilh = item.altura
+      let irot = item.rotacao ?? 0
+      if (selIds.has(item.id) && temTrans) {
+        const cos = Math.cos(t.ang)
+        const sen = Math.sin(t.ang)
+        const dx0 = (ix - ccx) * t.s
+        const dy0 = (iy - ccy) * t.s
+        ix = ccx + dx0 * cos - dy0 * sen + t.dx
+        iy = ccy + dx0 * sen + dy0 * cos + t.dy
+        irot += t.ang
+        ilw *= t.s
+        ilh *= t.s
+      }
+      ctx.save()
+      ctx.translate(ix, iy)
+      ctx.rotate(irot)
+      ctx.drawImage(img, -ilw / 2, -ilh / 2, ilw, ilh)
+      ctx.restore()
+      // tinta colada nas páginas do PDF (só a página atual), recortada ao papel
+      if (item.tipo === 'pdf') {
+        const pag = item.paginaAtual ?? 0
+        ctx.save()
+        ctx.translate(ix, iy)
+        ctx.rotate(irot)
+        ctx.beginPath()
+        ctx.rect(-ilw / 2, -ilh / 2, ilw, ilh)
+        ctx.clip()
+        aplicarMundo()
+        lista.forEach((traco, i) => {
+          if (traco.itemId === item.id && (traco.paginaItem ?? 0) === pag) {
+            desenharTraco(ctx, comTransTraco(traco, i))
+          }
+        })
+        ctx.restore()
+      }
+    }
+    aplicarMundo()
+
+    // camada 2: traços livres do quadro (não colados em post-it nem PDF)
     lista.forEach((traco, i) => {
-      if (!traco.postItId) desenharTraco(ctx, comTransTraco(traco, i))
+      if (!traco.postItId && !traco.itemId) desenharTraco(ctx, comTransTraco(traco, i))
     })
 
     // camadas 3–4: post-its (papel + sombra) e sua tinta, recortada ao papel
@@ -337,15 +359,19 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       if (f.modo !== 'borracha' && f.modo !== 'selecao' && f.modo !== 'ponteiro') {
         ctx.save()
         ctx.setTransform(escala * dpr, 0, 0, escala * dpr, -x * escala * dpr, -y * escala * dpr)
-        const alvo = tracoNoPostIt.current
-          ? postItsRef.current.find((p) => p.id === tracoNoPostIt.current)
-          : null
+        // recorta o traço em curso ao papel (post-it) ou à página (PDF)
+        const alvo: { x: number; y: number; largura: number; altura: number; rotacao?: number } | undefined =
+          tracoNoPostIt.current
+            ? postItsRef.current.find((p) => p.id === tracoNoPostIt.current)
+            : tracoNoItem.current
+              ? itensRef.current.find((it) => it.id === tracoNoItem.current!.id)
+              : undefined
         if (alvo) {
           ctx.save()
           ctx.translate(alvo.x, alvo.y)
           ctx.rotate(alvo.rotacao ?? 0)
           ctx.beginPath()
-          ctx.roundRect(-alvo.largura / 2, -alvo.altura / 2, alvo.largura, alvo.altura, 4)
+          ctx.rect(-alvo.largura / 2, -alvo.altura / 2, alvo.largura, alvo.altura)
           ctx.restore()
           ctx.clip()
         }
@@ -499,9 +525,12 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       transSel.current = { dx: 0, dy: 0, ang: 0, s: 1 }
       onSelecaoMudou(false, null)
       onSubstituir(
-        // apaga também a tinta colada nos post-its excluídos
+        // apaga também a tinta colada nos post-its e PDFs excluídos
         tracosRef.current.filter(
-          (t, i) => !idx.has(i) && !(t.postItId && postSet.has(t.postItId)),
+          (t, i) =>
+            !idx.has(i) &&
+            !(t.postItId && postSet.has(t.postItId)) &&
+            !(t.itemId && ids.has(t.itemId)),
         ),
         itensRef.current.filter((it) => !ids.has(it.id)),
         postItsRef.current.filter((p) => !postSet.has(p.id)),
@@ -739,24 +768,28 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     } else {
       poligono = m
     }
-    // post-its selecionados pelo centro; a tinta colada neles vem junto
+    // post-its e PDFs selecionados pelo centro; a tinta colada neles vem junto
     const postItIds = postItsRef.current
       .filter((p) => pontoDentroPoligono(p.x, p.y, poligono))
       .map((p) => p.id)
     const postSet = new Set(postItIds)
+    const itemIds = itensRef.current
+      .filter((it) => pontoDentroPoligono(it.x, it.y, poligono))
+      .map((it) => it.id)
+    const itemSet = new Set(itemIds)
 
     const indices: number[] = []
     tracosRef.current.forEach((t, i) => {
       if (t.postItId) {
         // tinta de post-it só se move com o próprio post-it
         if (postSet.has(t.postItId)) indices.push(i)
+      } else if (t.itemId) {
+        // tinta de PDF só se move com o próprio folheador
+        if (itemSet.has(t.itemId)) indices.push(i)
       } else if (tracoDentroPoligono(t, poligono)) {
         indices.push(i)
       }
     })
-    const itemIds = itensRef.current
-      .filter((it) => pontoDentroPoligono(it.x, it.y, poligono))
-      .map((it) => it.id)
 
     definirSelecao(indices, itemIds, postItIds)
   }
@@ -769,9 +802,13 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       return
     }
     let pagerId: string | null = null
-    if (sel.indices.length === 0 && sel.postItIds.length === 0 && sel.itemIds.length === 1) {
+    if (sel.postItIds.length === 0 && sel.itemIds.length === 1) {
       const it = itensRef.current.find((i) => i.id === sel.itemIds[0])
-      if (it && it.tipo === 'pdf') pagerId = it.id
+      // é folheador se só ele (e sua própria tinta) estão selecionados
+      const soTintaDele = sel.indices.every(
+        (i) => tracosRef.current[i]?.itemId === sel.itemIds[0],
+      )
+      if (it && it.tipo === 'pdf' && soTintaDele) pagerId = it.id
     }
     onSelecaoMudou(true, pagerId)
   }
@@ -832,20 +869,24 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
         return
       }
     }
-    // traços do quadro
+    // traços livres do quadro (tinta colada em PDF pertence ao PDF)
     const raio = 12 / cam.current.escala
     for (let i = tracosRef.current.length - 1; i >= 0; i--) {
       const t = tracosRef.current[i]
-      if (!t.postItId && tracoAtingido(t, x, y, raio)) {
+      if (!t.postItId && !t.itemId && tracoAtingido(t, x, y, raio)) {
         definirSelecao([i], [], [])
         return
       }
     }
-    // imagens/PDF (retângulo rotacionado)
+    // imagens/PDF (retângulo rotacionado) — folheador leva sua tinta junto
     for (let i = itensRef.current.length - 1; i >= 0; i--) {
       const it = itensRef.current[i]
       if (pontoNoPostIt(it, x, y)) {
-        definirSelecao([], [it.id], [])
+        const tinta: number[] = []
+        tracosRef.current.forEach((t, k) => {
+          if (t.itemId === it.id) tinta.push(k)
+        })
+        definirSelecao(tinta, [it.id], [])
         return
       }
     }
@@ -1029,10 +1070,21 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     pressaoSuave.current = e.pointerType === 'pen' && e.pressure > 0 ? e.pressure : 0.5
     // traço que começa sobre um post-it fica colado nele (o mais de cima)
     tracoNoPostIt.current = null
+    tracoNoItem.current = null
     for (let i = postItsRef.current.length - 1; i >= 0; i--) {
       if (pontoNoPostIt(postItsRef.current[i], x, y)) {
         tracoNoPostIt.current = postItsRef.current[i].id
         break
+      }
+    }
+    // senão, se começar sobre um PDF folheador, cola na página atual dele
+    if (!tracoNoPostIt.current) {
+      for (let i = itensRef.current.length - 1; i >= 0; i--) {
+        const it = itensRef.current[i]
+        if (it.tipo === 'pdf' && pontoNoPostIt(it, x, y)) {
+          tracoNoItem.current = { id: it.id, pagina: it.paginaAtual ?? 0 }
+          break
+        }
       }
     }
     // modo linha reta (marca-texto): o arrasto define a reta; ignora a régua
@@ -1219,11 +1271,13 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
 
     const pontos = tracoEmCurso.current
     const postItId = tracoNoPostIt.current
+    const noItem = tracoNoItem.current
     const eraReto = tracoReto.current
     tracoEmCurso.current = null
     tracoNaRegua.current = false
     tracoReto.current = false
     tracoNoPostIt.current = null
+    tracoNoItem.current = null
     if (!pontos || pontos.length < 3) return
     // linha reta precisa de um arrasto de verdade (2 pontos)
     if (eraReto && pontos.length < 6) return
@@ -1233,6 +1287,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       ferramenta: f.modo as TipoCaneta,
       suavizacao: f.suavizacao,
       ...(postItId ? { postItId } : {}),
+      ...(noItem ? { itemId: noItem.id, paginaItem: noItem.pagina } : {}),
       pontos,
     })
   }
