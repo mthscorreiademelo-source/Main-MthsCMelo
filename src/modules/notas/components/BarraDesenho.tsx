@@ -2,6 +2,7 @@ import { useRef, useState, type PointerEvent } from 'react'
 import {
   IconArrastar,
   IconBorracha,
+  IconCursor,
   IconDocumento,
   IconImagem,
   IconLapis,
@@ -23,7 +24,7 @@ import type { TipoCaneta } from '../types'
 import type { ConfigBorracha } from './QuadroInfinito'
 import { SeletorCor } from './SeletorCor'
 
-export type ModoBarra = TipoCaneta | 'borracha' | 'selecao'
+export type ModoBarra = TipoCaneta | 'borracha' | 'selecao' | 'ponteiro'
 type Lado = 'baixo' | 'cima' | 'esquerda' | 'direita'
 
 const ICONES: Record<TipoCaneta, typeof IconLapis> = {
@@ -102,12 +103,14 @@ export function BarraDesenho({
   const [arrasto, setArrasto] = useState<{ x: number; y: number } | null>(null)
   const inicioArrasto = useRef<{ x: number; y: number } | null>(null)
 
-  const canetaAtiva = modo !== 'borracha' && modo !== 'selecao' ? CANETAS[modo] : null
+  const canetaAtiva =
+    modo !== 'borracha' && modo !== 'selecao' && modo !== 'ponteiro' ? CANETAS[modo] : null
   const config = canetaAtiva ? configs[canetaAtiva.id] : null
   const vertical = !arrasto && (lado === 'esquerda' || lado === 'direita')
 
   function aoTocarFerramenta(novo: ModoBarra) {
     if (modo === novo) {
+      if (novo === 'ponteiro') return // ponteiro não tem ajustes
       setPainel((p) => (p === 'ferramenta' ? null : 'ferramenta'))
       setPickerAberto(false)
     } else {
@@ -171,7 +174,13 @@ export function BarraDesenho({
     }`
 
   if (minimizada) {
-    const IconeAtual = canetaAtiva ? ICONES[canetaAtiva.id] : modo === 'borracha' ? IconBorracha : IconSelecao
+    const IconeAtual = canetaAtiva
+      ? ICONES[canetaAtiva.id]
+      : modo === 'borracha'
+        ? IconBorracha
+        : modo === 'ponteiro'
+          ? IconCursor
+          : IconSelecao
     return (
       <button
         onClick={() => setMinimizada(false)}
@@ -423,6 +432,16 @@ export function BarraDesenho({
         >
           <IconArrastar width={17} height={17} />
         </button>
+
+        <button
+          onClick={() => aoTocarFerramenta('ponteiro')}
+          aria-label="Ponteiro"
+          aria-pressed={modo === 'ponteiro'}
+          className={botao(modo === 'ponteiro')}
+        >
+          <IconCursor width={19} height={19} />
+        </button>
+        <span className={vertical ? 'my-1 h-px w-6 bg-line' : 'mx-1 h-6 w-px bg-line'} />
 
         {LISTA_CANETAS.map((c) => {
           const Icone = ICONES[c.id]

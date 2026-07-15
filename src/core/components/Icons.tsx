@@ -175,6 +175,15 @@ export function IconPincel(props: IconProps) {
   )
 }
 
+export function IconCursor(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M6 4.2 18.6 11l-5.4 1.6L10 18.4 6 4.2Z" />
+      <path d="m13.8 13.6 4.2 5" />
+    </svg>
+  )
+}
+
 export function IconArrastar(props: IconProps) {
   return (
     <svg {...base(props)}>

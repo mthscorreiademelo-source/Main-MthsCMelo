@@ -18,10 +18,16 @@ import {
 import type { Camera, ItemQuadro, PostIt, TipoCaneta, Traco } from '../types'
 
 export interface FerramentaAtiva {
-  modo: TipoCaneta | 'borracha' | 'selecao'
+  modo: TipoCaneta | 'borracha' | 'selecao' | 'ponteiro'
   cor: string
   espessura: number
   suavizacao: number
+}
+
+export interface ConteudoCopiado {
+  tracos: Traco[]
+  itens: ItemQuadro[]
+  postIts: PostIt[]
 }
 
 export interface ConfigBorracha {
@@ -33,6 +39,8 @@ export interface QuadroApi {
   excluirSelecao: () => void
   limparSelecao: () => void
   centroMundo: () => { x: number; y: number }
+  copiarSelecao: () => ConteudoCopiado | null
+  selecionarObjeto: (alvo: { postItId?: string; itemId?: string }) => void
 }
 
 interface Props {
@@ -49,6 +57,8 @@ interface Props {
   onSubstituir: (tracos: Traco[], itens: ItemQuadro[], postIts: PostIt[]) => void
   onCamera: (camera: Camera) => void
   onSelecaoMudou: (ativa: boolean) => void
+  /** Toque longo (dedo) ou clique direito: posição de tela e de mundo */
+  onMenuContexto: (sx: number, sy: number, wx: number, wy: number) => void
 }
 
 const ESCALA_MIN = 0.1
@@ -84,6 +94,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     onSubstituir,
     onCamera,
     onSelecaoMudou,
+    onMenuContexto,
   },
   apiRef,
 ) {
@@ -110,9 +121,14 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   // seleção
   const marca = useRef<number[] | null>(null) // polígono/retângulo em curso (mundo)
   const selecao = useRef<Selecao | null>(null)
-  const gestoSel = useRef<'mover' | 'girar' | null>(null)
-  const transSel = useRef({ dx: 0, dy: 0, ang: 0 })
-  const inicioGesto = useRef<{ x: number; y: number; ang: number } | null>(null)
+  const gestoSel = useRef<'mover' | 'girar' | 'escala' | null>(null)
+  const transSel = useRef({ dx: 0, dy: 0, ang: 0, s: 1 })
+  const inicioGesto = useRef<{ x: number; y: number; ang: number; dist: number } | null>(null)
+
+  // toque longo (menu de contexto)
+  const timerToqueLongo = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inicioToque = useRef<{ x: number; y: number } | null>(null)
+  const ultimoMenu = useRef(0)
 
   // régua (mundo)
   const regua = useRef<{ x: number; y: number; ang: number } | null>(null)
@@ -154,7 +170,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
 
   /* ---------- render ---------- */
 
-  const desenharItens = (ctx: CanvasRenderingContext2D, lista: ItemQuadro[], selIds: Set<string>, t: { dx: number; dy: number; ang: number }, cx: number, cy: number) => {
+  const desenharItens = (ctx: CanvasRenderingContext2D, lista: ItemQuadro[], selIds: Set<string>, t: { dx: number; dy: number; ang: number; s: number }, cx: number, cy: number) => {
     for (const item of lista) {
       const img = imagens.current.get(item.id)
       if (!img) {
@@ -168,21 +184,23 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
         continue
       }
       if (!img.complete) continue
-      let { x, y } = item
+      let { x, y, largura, altura } = item
       let rot = item.rotacao ?? 0
-      if (selIds.has(item.id) && (t.dx || t.dy || t.ang)) {
+      if (selIds.has(item.id) && (t.dx || t.dy || t.ang || t.s !== 1)) {
         const cos = Math.cos(t.ang)
         const sen = Math.sin(t.ang)
-        const px = x - cx
-        const py = y - cy
+        const px = (x - cx) * t.s
+        const py = (y - cy) * t.s
         x = cx + px * cos - py * sen + t.dx
         y = cy + px * sen + py * cos + t.dy
         rot += t.ang
+        largura *= t.s
+        altura *= t.s
       }
       ctx.save()
       ctx.translate(x, y)
       ctx.rotate(rot)
-      ctx.drawImage(img, -item.largura / 2, -item.altura / 2, item.largura, item.altura)
+      ctx.drawImage(img, -largura / 2, -altura / 2, largura, altura)
       ctx.restore()
     }
   }
@@ -226,12 +244,12 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     const selIds = new Set(sel?.itemIds ?? [])
     const selPost = new Set(sel?.postItIds ?? [])
     const t = transSel.current
-    const temTrans = !!(t.dx || t.dy || t.ang)
+    const temTrans = !!(t.dx || t.dy || t.ang || t.s !== 1)
     const ccx = sel ? (sel.caixa.minX + sel.caixa.maxX) / 2 : 0
     const ccy = sel ? (sel.caixa.minY + sel.caixa.maxY) / 2 : 0
 
     const comTransTraco = (traco: Traco, i: number) =>
-      selIdx.has(i) && temTrans ? transformarTraco(traco, t.dx, t.dy, t.ang, ccx, ccy) : traco
+      selIdx.has(i) && temTrans ? transformarTraco(traco, t.dx, t.dy, t.ang, ccx, ccy, t.s) : traco
 
     // camada 1: imagens/PDF
     desenharItens(ctx, itensRef.current, selIds, t, ccx, ccy)
@@ -244,16 +262,18 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
 
     // camadas 3–4: post-its (papel + sombra) e sua tinta, recortada ao papel
     for (const p of postItsRef.current) {
-      let { x: px, y: py } = p
+      let { x: px, y: py, largura: plw, altura: plh } = p
       let rot = p.rotacao ?? 0
       if (selPost.has(p.id) && temTrans) {
         const cos = Math.cos(t.ang)
         const sen = Math.sin(t.ang)
-        const dx0 = px - ccx
-        const dy0 = py - ccy
+        const dx0 = (px - ccx) * t.s
+        const dy0 = (py - ccy) * t.s
         px = ccx + dx0 * cos - dy0 * sen + t.dx
         py = ccy + dx0 * sen + dy0 * cos + t.dy
         rot += t.ang
+        plw *= t.s
+        plh *= t.s
       }
       ctx.save()
       ctx.translate(px, py)
@@ -263,7 +283,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       ctx.shadowOffsetY = 5
       ctx.fillStyle = p.cor
       ctx.beginPath()
-      ctx.roundRect(-p.largura / 2, -p.altura / 2, p.largura, p.altura, 4)
+      ctx.roundRect(-plw / 2, -plh / 2, plw, plh, 4)
       ctx.fill()
       ctx.shadowColor = 'transparent'
       // tinta colada neste post-it: clip fica registrado no papel;
@@ -300,7 +320,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     // traço em curso (com clip se estiver sobre um post-it)
     if (tracoEmCurso.current && tracoEmCurso.current.length >= 3) {
       const f = ferramentaRef.current
-      if (f.modo !== 'borracha' && f.modo !== 'selecao') {
+      if (f.modo !== 'borracha' && f.modo !== 'selecao' && f.modo !== 'ponteiro') {
         ctx.save()
         ctx.setTransform(escala * dpr, 0, 0, escala * dpr, -x * escala * dpr, -y * escala * dpr)
         const alvo = tracoNoPostIt.current
@@ -336,7 +356,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       ctx.beginPath()
       const [sx, sy] = paraTela(m[0], m[1])
       ctx.moveTo(sx, sy)
-      if (selecaoTipoRef.current === 'retangulo') {
+      if (selecaoTipoRef.current === 'retangulo' || ferramentaRef.current.modo === 'ponteiro') {
         const [ex, ey] = paraTela(m[m.length - 2], m[m.length - 1])
         ctx.strokeRect(Math.min(sx, ex), Math.min(sy, ey), Math.abs(ex - sx), Math.abs(ey - sy))
       } else {
@@ -360,20 +380,26 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       ctx.save()
       ctx.translate((ax + bx) / 2 + t.dx * escala, (ay + by) / 2 + t.dy * escala)
       ctx.rotate(t.ang)
-      const lw = bx - ax
-      const lh = by - ay
+      const lw = (bx - ax) * t.s
+      const lh = (by - ay) * t.s
       ctx.strokeStyle = '#2383E2'
       ctx.setLineDash([6, 4])
       ctx.lineWidth = 1.5
       ctx.strokeRect(-lw / 2 - 8, -lh / 2 - 8, lw + 16, lh + 16)
       ctx.setLineDash([])
-      // alça de rotação
+      // alça de rotação (topo)
       ctx.beginPath()
       ctx.moveTo(0, -lh / 2 - 8)
       ctx.lineTo(0, -lh / 2 - 34)
       ctx.stroke()
       ctx.beginPath()
       ctx.arc(0, -lh / 2 - 44, 10, 0, Math.PI * 2)
+      ctx.fillStyle = '#ffffff'
+      ctx.fill()
+      ctx.stroke()
+      // alça de escala (canto inferior direito, quadrada)
+      ctx.beginPath()
+      ctx.rect(lw / 2 + 8, lh / 2 + 8, 14, 14)
       ctx.fillStyle = '#ffffff'
       ctx.fill()
       ctx.stroke()
@@ -456,7 +482,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       const idx = new Set(sel.indices)
       const postSet = new Set(sel.postItIds)
       selecao.current = null
-      transSel.current = { dx: 0, dy: 0, ang: 0 }
+      transSel.current = { dx: 0, dy: 0, ang: 0, s: 1 }
       onSelecaoMudou(false)
       onSubstituir(
         // apaga também a tinta colada nos post-its excluídos
@@ -469,7 +495,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     },
     limparSelecao() {
       selecao.current = null
-      transSel.current = { dx: 0, dy: 0, ang: 0 }
+      transSel.current = { dx: 0, dy: 0, ang: 0, s: 1 }
       onSelecaoMudou(false)
       cenaSuja.current = true
       pedirRender()
@@ -481,6 +507,31 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       return {
         x: c.x + canvas.width / dpr / 2 / c.escala,
         y: c.y + canvas.height / dpr / 2 / c.escala,
+      }
+    },
+    copiarSelecao() {
+      const sel = selecao.current
+      if (!sel) return null
+      const idx = new Set(sel.indices)
+      const ids = new Set(sel.itemIds)
+      const postSet = new Set(sel.postItIds)
+      return JSON.parse(
+        JSON.stringify({
+          tracos: tracosRef.current.filter((_, i) => idx.has(i)),
+          itens: itensRef.current.filter((it) => ids.has(it.id)),
+          postIts: postItsRef.current.filter((p) => postSet.has(p.id)),
+        }),
+      ) as ConteudoCopiado
+    },
+    selecionarObjeto(alvo) {
+      if (alvo.postItId) {
+        const tinta: number[] = []
+        tracosRef.current.forEach((t, k) => {
+          if (t.postItId === alvo.postItId) tinta.push(k)
+        })
+        definirSelecao(tinta, [], [alvo.postItId])
+      } else if (alvo.itemId) {
+        definirSelecao([], [alvo.itemId], [])
       }
     },
   }))
@@ -550,9 +601,9 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
 
   // sair do modo seleção limpa a seleção
   useEffect(() => {
-    if (ferramenta.modo !== 'selecao' && selecao.current) {
+    if (ferramenta.modo !== 'selecao' && ferramenta.modo !== 'ponteiro' && selecao.current) {
       selecao.current = null
-      transSel.current = { dx: 0, dy: 0, ang: 0 }
+      transSel.current = { dx: 0, dy: 0, ang: 0, s: 1 }
       onSelecaoMudou(false)
       cenaSuja.current = true
       pedirRender()
@@ -660,12 +711,12 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
 
   /* ---------- seleção ---------- */
 
-  function concluirMarca() {
+  function concluirMarca(tipoForcado?: 'retangulo' | 'laco') {
     const m = marca.current
     marca.current = null
     if (!m || m.length < 4) return
     let poligono: number[]
-    if (selecaoTipoRef.current === 'retangulo') {
+    if ((tipoForcado ?? selecaoTipoRef.current) === 'retangulo') {
       const x1 = m[0]
       const y1 = m[1]
       const x2 = m[m.length - 2]
@@ -693,6 +744,11 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       .filter((it) => pontoDentroPoligono(it.x, it.y, poligono))
       .map((it) => it.id)
 
+    definirSelecao(indices, itemIds, postItIds)
+  }
+
+  /** Monta (ou limpa) a seleção a partir dos conjuntos escolhidos. */
+  function definirSelecao(indices: number[], itemIds: string[], postItIds: string[]) {
     if (indices.length === 0 && itemIds.length === 0 && postItIds.length === 0) {
       selecao.current = null
       onSelecaoMudou(false)
@@ -727,11 +783,45 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
         maxY = Math.max(maxY, p.y + meia)
       }
       selecao.current = { indices, itemIds, postItIds, caixa: { minX, minY, maxX, maxY } }
-      transSel.current = { dx: 0, dy: 0, ang: 0 }
+      transSel.current = { dx: 0, dy: 0, ang: 0, s: 1 }
       onSelecaoMudou(true)
     }
     cenaSuja.current = true
     pedirRender()
+  }
+
+  /** Toque simples no modo ponteiro: seleciona o objeto mais de cima. */
+  function tocarSelecionar(x: number, y: number) {
+    // post-its têm prioridade (camada de cima)
+    for (let i = postItsRef.current.length - 1; i >= 0; i--) {
+      const p = postItsRef.current[i]
+      if (pontoNoPostIt(p, x, y)) {
+        const tinta: number[] = []
+        tracosRef.current.forEach((t, k) => {
+          if (t.postItId === p.id) tinta.push(k)
+        })
+        definirSelecao(tinta, [], [p.id])
+        return
+      }
+    }
+    // traços do quadro
+    const raio = 12 / cam.current.escala
+    for (let i = tracosRef.current.length - 1; i >= 0; i--) {
+      const t = tracosRef.current[i]
+      if (!t.postItId && tracoAtingido(t, x, y, raio)) {
+        definirSelecao([i], [], [])
+        return
+      }
+    }
+    // imagens/PDF (retângulo rotacionado)
+    for (let i = itensRef.current.length - 1; i >= 0; i--) {
+      const it = itensRef.current[i]
+      if (pontoNoPostIt(it, x, y)) {
+        definirSelecao([], [it.id], [])
+        return
+      }
+    }
+    definirSelecao([], [], [])
   }
 
   function alcaDeRotacao(clientX: number, clientY: number): boolean {
@@ -743,6 +833,14 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     const hx = (ax + bx) / 2
     const hy = ay - 8 - 44
     return Math.hypot(clientX - rect.left - hx, clientY - rect.top - hy) <= 16
+  }
+
+  function alcaDeEscala(clientX: number, clientY: number): boolean {
+    const sel = selecao.current
+    if (!sel) return false
+    const rect = canvasRef.current!.getBoundingClientRect()
+    const [bx, by] = paraTela(sel.caixa.maxX, sel.caixa.maxY)
+    return Math.hypot(clientX - rect.left - (bx + 15), clientY - rect.top - (by + 15)) <= 18
   }
 
   function dentroDaCaixa(x: number, y: number): boolean {
@@ -760,7 +858,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   function confirmarTransformacao() {
     const sel = selecao.current
     const t = transSel.current
-    if (!sel || (!t.dx && !t.dy && !t.ang)) return
+    if (!sel || (!t.dx && !t.dy && !t.ang && t.s === 1)) return
     const cx = (sel.caixa.minX + sel.caixa.maxX) / 2
     const cy = (sel.caixa.minY + sel.caixa.maxY) / 2
     const idx = new Set(sel.indices)
@@ -769,49 +867,57 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     const sen = Math.sin(t.ang)
 
     const novosTracos = tracosRef.current.map((tr, i) =>
-      idx.has(i) ? transformarTraco(tr, t.dx, t.dy, t.ang, cx, cy) : tr,
+      idx.has(i) ? transformarTraco(tr, t.dx, t.dy, t.ang, cx, cy, t.s) : tr,
     )
     const novosItens = itensRef.current.map((it) => {
       if (!ids.has(it.id)) return it
-      const px = it.x - cx
-      const py = it.y - cy
+      const px = (it.x - cx) * t.s
+      const py = (it.y - cy) * t.s
       return {
         ...it,
         x: cx + px * cos - py * sen + t.dx,
         y: cy + px * sen + py * cos + t.dy,
         rotacao: (it.rotacao ?? 0) + t.ang,
+        largura: it.largura * t.s,
+        altura: it.altura * t.s,
       }
     })
     const postSet = new Set(sel.postItIds)
     const novosPostIts = postItsRef.current.map((p) => {
       if (!postSet.has(p.id)) return p
-      const px = p.x - cx
-      const py = p.y - cy
+      const px = (p.x - cx) * t.s
+      const py = (p.y - cy) * t.s
       return {
         ...p,
         x: cx + px * cos - py * sen + t.dx,
         y: cy + px * sen + py * cos + t.dy,
         rotacao: (p.rotacao ?? 0) + t.ang,
+        largura: p.largura * t.s,
+        altura: p.altura * t.s,
       }
     })
 
-    // atualiza a caixa da seleção para a nova posição
+    // atualiza a caixa da seleção para a nova posição/tamanho
+    const meiaL = ((sel.caixa.maxX - sel.caixa.minX) / 2) * t.s
+    const meiaA = ((sel.caixa.maxY - sel.caixa.minY) / 2) * t.s
     selecao.current = {
       ...sel,
       caixa: {
-        minX: sel.caixa.minX + t.dx,
-        maxX: sel.caixa.maxX + t.dx,
-        minY: sel.caixa.minY + t.dy,
-        maxY: sel.caixa.maxY + t.dy,
+        minX: cx + t.dx - meiaL,
+        maxX: cx + t.dx + meiaL,
+        minY: cy + t.dy - meiaA,
+        maxY: cy + t.dy + meiaA,
       },
     }
-    transSel.current = { dx: 0, dy: 0, ang: 0 }
+    transSel.current = { dx: 0, dy: 0, ang: 0, s: 1 }
     onSubstituir(novosTracos, novosItens, novosPostIts)
   }
 
   /* ---------- eventos de ponteiro ---------- */
 
   function aoPressionar(e: React.PointerEvent<HTMLCanvasElement>) {
+    // botão direito/central do mouse não desenha nem mexe na seleção
+    if (e.pointerType === 'mouse' && e.button !== 0) return
     const canvas = e.currentTarget
     canvas.setPointerCapture(e.pointerId)
 
@@ -819,8 +925,20 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       dedos.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
       if (dedos.current.size === 1) {
         gestoRegua.current = dedoNaRegua(e.clientX, e.clientY) ? 'mover' : null
+        // toque longo parado abre o menu de contexto
+        inicioToque.current = { x: e.clientX, y: e.clientY }
+        if (timerToqueLongo.current) clearTimeout(timerToqueLongo.current)
+        timerToqueLongo.current = setTimeout(() => {
+          const t = inicioToque.current
+          if (t && dedos.current.size === 1) {
+            ultimoMenu.current = Date.now()
+            const [wx, wy] = paraMundo(t.x, t.y)
+            onMenuContexto(t.x, t.y, wx, wy)
+          }
+        }, 550)
       }
       if (dedos.current.size === 2) {
+        if (timerToqueLongo.current) clearTimeout(timerToqueLongo.current)
         const [a, b] = [...dedos.current.values()]
         pinca.current = {
           dist: Math.hypot(a.x - b.x, a.y - b.y),
@@ -838,24 +956,32 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     const [x, y] = paraMundo(e.clientX, e.clientY)
     const f = ferramentaRef.current
 
-    if (f.modo === 'selecao') {
+    if (f.modo === 'selecao' || f.modo === 'ponteiro') {
       if (alcaDeRotacao(e.clientX, e.clientY)) {
         gestoSel.current = 'girar'
         const sel = selecao.current!
         const cx = (sel.caixa.minX + sel.caixa.maxX) / 2
         const cy = (sel.caixa.minY + sel.caixa.maxY) / 2
-        inicioGesto.current = { x, y, ang: Math.atan2(y - cy, x - cx) }
+        inicioGesto.current = { x, y, ang: Math.atan2(y - cy, x - cx), dist: 0 }
+        return
+      }
+      if (alcaDeEscala(e.clientX, e.clientY)) {
+        gestoSel.current = 'escala'
+        const sel = selecao.current!
+        const cx = (sel.caixa.minX + sel.caixa.maxX) / 2
+        const cy = (sel.caixa.minY + sel.caixa.maxY) / 2
+        inicioGesto.current = { x, y, ang: 0, dist: Math.max(1, Math.hypot(x - cx, y - cy)) }
         return
       }
       if (dentroDaCaixa(x, y)) {
         gestoSel.current = 'mover'
-        inicioGesto.current = { x, y, ang: 0 }
+        inicioGesto.current = { x, y, ang: 0, dist: 0 }
         return
       }
       // nova marca
       if (selecao.current) {
         selecao.current = null
-        transSel.current = { dx: 0, dy: 0, ang: 0 }
+        transSel.current = { dx: 0, dy: 0, ang: 0, s: 1 }
         onSelecaoMudou(false)
         cenaSuja.current = true
       }
@@ -898,6 +1024,16 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       const atual = { x: e.clientX, y: e.clientY }
       dedos.current.set(e.pointerId, atual)
       const c = cam.current
+
+      // dedo andou: cancela o toque longo
+      if (
+        timerToqueLongo.current &&
+        inicioToque.current &&
+        Math.hypot(atual.x - inicioToque.current.x, atual.y - inicioToque.current.y) > 10
+      ) {
+        clearTimeout(timerToqueLongo.current)
+        timerToqueLongo.current = null
+      }
 
       if (dedos.current.size >= 2 && pinca.current) {
         const [a, b] = [...dedos.current.values()]
@@ -949,7 +1085,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     const f = ferramentaRef.current
     const [x, y] = paraMundo(e.clientX, e.clientY)
 
-    if (f.modo === 'selecao') {
+    if (f.modo === 'selecao' || f.modo === 'ponteiro') {
       if (gestoSel.current === 'mover' && inicioGesto.current) {
         transSel.current.dx = x - inicioGesto.current.x
         transSel.current.dy = y - inicioGesto.current.y
@@ -962,6 +1098,16 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
         const cx = (sel.caixa.minX + sel.caixa.maxX) / 2
         const cy = (sel.caixa.minY + sel.caixa.maxY) / 2
         transSel.current.ang = Math.atan2(y - cy, x - cx) - inicioGesto.current.ang
+        cenaSuja.current = true
+        pedirRender()
+        return
+      }
+      if (gestoSel.current === 'escala' && inicioGesto.current && selecao.current) {
+        const sel = selecao.current
+        const cx = (sel.caixa.minX + sel.caixa.maxX) / 2
+        const cy = (sel.caixa.minY + sel.caixa.maxY) / 2
+        const dist = Math.hypot(x - cx, y - cy)
+        transSel.current.s = Math.min(8, Math.max(0.2, dist / inicioGesto.current.dist))
         cenaSuja.current = true
         pedirRender()
         return
@@ -991,6 +1137,10 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   function aoSoltar(e: React.PointerEvent<HTMLCanvasElement>) {
     if (e.pointerType === 'touch') {
       dedos.current.delete(e.pointerId)
+      if (timerToqueLongo.current) {
+        clearTimeout(timerToqueLongo.current)
+        timerToqueLongo.current = null
+      }
       if (dedos.current.size < 2) pinca.current = null
       if (dedos.current.size === 0) gestoRegua.current = null
       return
@@ -998,13 +1148,23 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
 
     const f = ferramentaRef.current
 
-    if (f.modo === 'selecao') {
+    if (f.modo === 'selecao' || f.modo === 'ponteiro') {
       if (gestoSel.current) {
         confirmarTransformacao()
         gestoSel.current = null
         inicioGesto.current = null
       } else if (marca.current) {
-        concluirMarca()
+        const m = marca.current
+        const extensao = m.length >= 4
+          ? Math.hypot(m[m.length - 2] - m[0], m[m.length - 1] - m[1])
+          : 0
+        if (f.modo === 'ponteiro' && extensao < 6 / cam.current.escala) {
+          // toque simples: seleção direta do objeto sob o ponteiro
+          marca.current = null
+          tocarSelecionar(m[0], m[1])
+        } else {
+          concluirMarca(f.modo === 'ponteiro' ? 'retangulo' : undefined)
+        }
       }
       return
     }
@@ -1049,6 +1209,13 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       onPointerMove={aoMover}
       onPointerUp={aoSoltar}
       onPointerCancel={aoSoltar}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        // ignora o contextmenu sintético que o navegador emite após o toque longo
+        if (Date.now() - ultimoMenu.current < 800) return
+        const [wx, wy] = paraMundo(e.clientX, e.clientY)
+        onMenuContexto(e.clientX, e.clientY, wx, wy)
+      }}
       className="absolute inset-0 h-full w-full cursor-crosshair"
       style={{ touchAction: 'none' }}
     />

@@ -333,8 +333,12 @@ export const CORES_POSTIT = [
   { id: 'azul', rotulo: 'Azul', valor: '#BFE4FF' },
 ] as const
 
-/** O ponto (mundo) cai dentro do papel (retângulo rotacionado)? */
-export function pontoNoPostIt(postIt: PostIt, x: number, y: number): boolean {
+/** O ponto (mundo) cai dentro do retângulo rotacionado (post-it, imagem…)? */
+export function pontoNoPostIt(
+  postIt: Pick<PostIt, 'x' | 'y' | 'largura' | 'altura' | 'rotacao'>,
+  x: number,
+  y: number,
+): boolean {
   const ang = -(postIt.rotacao ?? 0)
   const cos = Math.cos(ang)
   const sen = Math.sin(ang)
@@ -406,7 +410,7 @@ export function tracoDentroPoligono(traco: Traco, poligono: number[]): boolean {
   return false
 }
 
-/** Aplica translação + rotação (em torno de cx,cy) aos pontos do traço. */
+/** Aplica escala + rotação (em torno de cx,cy) e translação aos pontos do traço. */
 export function transformarTraco(
   traco: Traco,
   dx: number,
@@ -414,15 +418,20 @@ export function transformarTraco(
   ang: number,
   cx: number,
   cy: number,
+  escala = 1,
 ): Traco {
   const cos = Math.cos(ang)
   const sen = Math.sin(ang)
   const pontos = [...traco.pontos]
   for (let i = 0; i < pontos.length; i += 3) {
-    const px = pontos[i] - cx
-    const py = pontos[i + 1] - cy
+    const px = (pontos[i] - cx) * escala
+    const py = (pontos[i + 1] - cy) * escala
     pontos[i] = cx + px * cos - py * sen + dx
     pontos[i + 1] = cy + px * sen + py * cos + dy
   }
-  return { ...traco, pontos }
+  return {
+    ...traco,
+    pontos,
+    ...(escala !== 1 ? { espessura: Math.max(0.5, traco.espessura * escala) } : {}),
+  }
 }

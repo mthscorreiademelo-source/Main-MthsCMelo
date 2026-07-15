@@ -10,9 +10,10 @@ import {
 } from '../../../core/components/Icons'
 import { Sheet } from '../../../core/components/Sheet'
 import { nanoid } from 'nanoid'
-import { configsIniciais, gerarMiniatura, type ConfigsCanetas } from '../desenho'
+import { configsIniciais, gerarMiniatura, limitesDosTracos, type ConfigsCanetas } from '../desenho'
 import { ordenarGrupos } from '../db'
 import { imagemParaItem, pdfParaItens } from '../importar'
+import { guardarPrancheta, lerPrancheta } from '../prancheta'
 import type { Grupo, ItemQuadro, Pagina, PostIt, TipoCaneta, Traco } from '../types'
 import { BarraDesenho, type ModoBarra } from './BarraDesenho'
 import { QuadroInfinito, type ConfigBorracha, type QuadroApi } from './QuadroInfinito'
@@ -38,6 +39,7 @@ function borrachaInicial(): ConfigBorracha {
 /** Tela cheia de desenho: quadro infinito + barra flutuante + menu. */
 export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Props) {
   const [modo, setModo] = useState<ModoBarra>('tinteiro')
+  const [menuCtx, setMenuCtx] = useState<{ sx: number; sy: number; wx: number; wy: number } | null>(null)
   const [configs, setConfigs] = useState<ConfigsCanetas>(configsIniciais)
   const [configBorracha, setConfigBorracha] = useState<ConfigBorracha>(borrachaInicial)
   const [selecaoTipo, setSelecaoTipo] = useState<'retangulo' | 'laco'>('retangulo')
@@ -93,7 +95,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   const itens = pagina.itens ?? []
   const postIts = pagina.postIts ?? []
   const ferramenta =
-    modo === 'borracha' || modo === 'selecao'
+    modo === 'borracha' || modo === 'selecao' || modo === 'ponteiro'
       ? { modo, cor: '', espessura: 0, suavizacao: 0 }
       : { modo, ...configs[modo] }
 
@@ -110,6 +112,12 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
     })
   }
 
+  /** Após inserir algo, ativa o ponteiro e deixa o objeto selecionado. */
+  function selecionarInserido(alvo: { postItId?: string; itemId?: string }) {
+    setModo('ponteiro')
+    setTimeout(() => quadro.current?.selecionarObjeto(alvo), 80)
+  }
+
   function novoPostIt(cor: string) {
     const centro = quadro.current!.centroMundo()
     const postIt: PostIt = {
@@ -121,6 +129,100 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
       cor,
     }
     aplicar(tracos, itens, [...postIts, postIt])
+    selecionarInserido({ postItId: postIt.id })
+  }
+
+  function copiar() {
+    const conteudo = quadro.current?.copiarSelecao()
+    setMenuCtx(null)
+    if (
+      conteudo &&
+      (conteudo.tracos.length || conteudo.itens.length || conteudo.postIts.length)
+    ) {
+      guardarPrancheta(conteudo)
+      setAvisoImportacao('Copiado')
+      setTimeout(() => setAvisoImportacao(''), 2000)
+    } else {
+      setAvisoImportacao('Nada selecionado para copiar')
+      setTimeout(() => setAvisoImportacao(''), 2500)
+    }
+  }
+
+  async function colar(wx: number, wy: number) {
+    setMenuCtx(null)
+    // 1) imagem da área de transferência do sistema
+    try {
+      const doSistema = await navigator.clipboard.read()
+      for (const clip of doSistema) {
+        const tipo = clip.types.find((t) => t.startsWith('image/'))
+        if (tipo) {
+          const blob = await clip.getType(tipo)
+          const arquivo = new File([blob], 'colada.png', { type: tipo })
+          const item = await imagemParaItem(arquivo, wx, wy)
+          aplicar(tracos, [...itens, item])
+          selecionarInserido({ itemId: item.id })
+          return
+        }
+      }
+    } catch {
+      /* sem permissão ou sem imagem no sistema: tenta a prancheta interna */
+    }
+
+    // 2) prancheta interna (conteúdo copiado do quadro)
+    const p = lerPrancheta()
+    if (!p) {
+      setAvisoImportacao('Nada para colar')
+      setTimeout(() => setAvisoImportacao(''), 2500)
+      return
+    }
+    // centro do conteúdo copiado → desloca para o ponto do toque
+    let cx = 0
+    let cy = 0
+    let n = 0
+    const caixa = limitesDosTracos(p.tracos)
+    if (caixa) {
+      cx += (caixa.minX + caixa.maxX) / 2
+      cy += (caixa.minY + caixa.maxY) / 2
+      n++
+    }
+    for (const grupo of [...p.itens, ...p.postIts]) {
+      cx += grupo.x
+      cy += grupo.y
+      n++
+    }
+    if (n > 0) {
+      cx /= n
+      cy /= n
+    }
+    const ddx = wx - cx
+    const ddy = wy - cy
+    const mapaPostIt = new Map<string, string>()
+    const novosPostIts = p.postIts.map((pi) => {
+      const novoId = nanoid()
+      mapaPostIt.set(pi.id, novoId)
+      return { ...pi, id: novoId, x: pi.x + ddx, y: pi.y + ddy }
+    })
+    const novosTracos = p.tracos.map((t) => {
+      const pontos = [...t.pontos]
+      for (let i = 0; i < pontos.length; i += 3) {
+        pontos[i] += ddx
+        pontos[i + 1] += ddy
+      }
+      const postItId = t.postItId ? mapaPostIt.get(t.postItId) : undefined
+      return { ...t, pontos, ...(postItId ? { postItId } : { postItId: undefined }) }
+    })
+    const novosItens = p.itens.map((it) => ({
+      ...it,
+      id: nanoid(),
+      x: it.x + ddx,
+      y: it.y + ddy,
+    }))
+    aplicar(
+      [...tracos, ...novosTracos],
+      [...itens, ...novosItens],
+      [...postIts, ...novosPostIts],
+    )
+    setModo('ponteiro')
   }
 
   function mudarConfig(tipo: TipoCaneta, config: ConfigsCanetas[TipoCaneta]) {
@@ -142,6 +244,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
       const centro = quadro.current!.centroMundo()
       const item = await imagemParaItem(arquivo, centro.x, centro.y)
       aplicar(tracos, [...itens, item])
+      selecionarInserido({ itemId: item.id })
       setMenuAberto(false)
     } catch {
       setAvisoImportacao('Não consegui ler essa imagem.')
@@ -157,6 +260,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
       const centro = quadro.current!.centroMundo()
       const { itens: paginas, totalPaginas } = await pdfParaItens(arquivo, centro.x, centro.y)
       aplicar(tracos, [...itens, ...paginas])
+      if (paginas.length > 0) selecionarInserido({ itemId: paginas[0].id })
       setAvisoImportacao(
         totalPaginas > paginas.length
           ? `Importadas ${paginas.length} de ${totalPaginas} páginas (limite).`
@@ -189,7 +293,50 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
         onSubstituir={(t, i, p) => aplicar(t, i, p)}
         onCamera={(camera) => onMudar({ camera })}
         onSelecaoMudou={setSelecaoAtiva}
+        onMenuContexto={(sx, sy, wx, wy) => setMenuCtx({ sx, sy, wx, wy })}
       />
+
+      {/* Menu de contexto (toque longo / clique direito) */}
+      {menuCtx && (
+        <>
+          <div
+            className="absolute inset-0 z-40"
+            onPointerDown={() => setMenuCtx(null)}
+          />
+          <div
+            data-testid="menu-contexto"
+            className="absolute z-50 flex w-60 flex-col rounded-xl border border-line bg-bg py-1.5 shadow-xl"
+            style={{
+              left: Math.min(menuCtx.sx, window.innerWidth - 260),
+              top: Math.min(menuCtx.sy, window.innerHeight - 220),
+            }}
+          >
+            <button
+              onClick={copiar}
+              disabled={!selecaoAtiva}
+              className="min-h-11 cursor-pointer px-4 text-left text-sm font-medium transition-colors hover:bg-hover disabled:cursor-default disabled:opacity-40"
+            >
+              Copiar seleção
+            </button>
+            <button
+              onClick={() => colar(menuCtx.wx, menuCtx.wy)}
+              className="min-h-11 cursor-pointer px-4 text-left text-sm font-medium transition-colors hover:bg-hover"
+            >
+              Colar aqui
+            </button>
+            <span className="mx-3 my-1 h-px bg-line" />
+            <button
+              onClick={() => {
+                setMenuCtx(null)
+                setMenuAberto(true)
+              }}
+              className="min-h-11 cursor-pointer px-4 text-left text-sm font-medium transition-colors hover:bg-hover"
+            >
+              Configurações da página…
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Topo flutuante */}
       <div className="pointer-events-none absolute top-3 right-3 left-3 flex items-center gap-2">
