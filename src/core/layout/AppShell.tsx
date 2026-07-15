@@ -100,7 +100,7 @@ function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `vida-backup-${dados.exportadoEm.slice(0, 10)}.json`
+    a.download = `lume-backup-${dados.exportadoEm.slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
     avisar('Backup exportado')
@@ -119,7 +119,7 @@ function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
   return (
     <aside className="flex h-full w-64 flex-col border-r border-line bg-surface">
       <div className="px-4 pt-5 pb-3">
-        <span className="text-lg font-bold tracking-tight">Vida</span>
+        <span className="text-lg font-bold tracking-tight">Lume</span>
       </div>
 
       <nav className="flex flex-1 flex-col gap-0.5 px-2" aria-label="Módulos">

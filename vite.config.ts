@@ -13,8 +13,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'Vida',
-        short_name: 'Vida',
+        name: 'Lume',
+        short_name: 'Lume',
         description: 'Seu espaço minimalista para organizar todas as áreas da vida.',
         lang: 'pt-BR',
         display: 'standalone',

@@ -1,4 +1,4 @@
-# Vida
+# Lume
 
 App pessoal minimalista, inspirado no Notion, para centralizar e administrar todas as áreas da sua vida — feito para ser usado principalmente no tablet.
 
