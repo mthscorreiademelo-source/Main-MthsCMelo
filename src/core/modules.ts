@@ -1,9 +1,10 @@
 import type { ComponentType, SVGProps } from 'react'
-import { IconCheckCircle, IconDocumento, IconSol } from './components/Icons'
+import { IconChama, IconCheckCircle, IconDocumento, IconSol } from './components/Icons'
 import { HojePage } from '../modules/hoje/HojePage'
 import { TarefasPage } from '../modules/tarefas/TarefasPage'
 import { NotasPage } from '../modules/notas/NotasPage'
 import { EditorNotaPage } from '../modules/notas/EditorNotaPage'
+import { HabitosPage } from '../modules/habitos/HabitosPage'
 
 export interface ModuloDef {
   id: string
@@ -31,4 +32,5 @@ export const MODULOS: ModuloDef[] = [
     Pagina: NotasPage,
     subRotas: [{ caminho: '/notas/:id', Pagina: EditorNotaPage }],
   },
+  { id: 'habitos', nome: 'Hábitos', rota: '/habitos', Icone: IconChama, Pagina: HabitosPage },
 ]

@@ -8,15 +8,15 @@ App pessoal minimalista, inspirado no Notion, para centralizar e administrar tod
 
 Uma coisa de cada vez. O app nasce com um único módulo bem feito e uma fundação modular que permite adicionar novas áreas sem retrabalho.
 
-**v0.2 (atual)**
-- 🌤️ **Hoje** — saudação, data e as tarefas do dia num só lugar
+**v0.3 (atual)**
+- 🌤️ **Hoje** — saudação, data, tarefas do dia e hábitos com um toque
 - ✅ **Tarefas** — adição rápida, data agendada, abas Hoje · Próximas · Todas · Concluídas, edição em painel lateral
 - 📄 **Notas** — páginas com editor de blocos simples (parágrafo, título, lista, to-do) e atalhos de digitação: `# `, `- `, `[] `
+- 🔥 **Hábitos** — visão dos últimos 7 dias com marcação por toque (inclusive dias passados) e sequência (streak) automática
 - 🌓 Modo claro/escuro
 - 💾 Exportar/importar backup em JSON (na sidebar)
 
 **Roadmap** (um módulo por versão)
-- v0.3 — Hábitos (streaks, visão semanal)
 - v0.4 — Finanças (entradas/saídas, resumo mensal)
 - v0.5 — Sincronização opcional em nuvem
 
@@ -53,6 +53,7 @@ src/
     hoje/
     tarefas/
     notas/
+    habitos/
 ```
 
 **Stack:** Vite · React · TypeScript · Tailwind CSS v4 · Dexie.js · react-router · date-fns · vite-plugin-pwa

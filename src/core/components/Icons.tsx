@@ -107,6 +107,14 @@ export function IconUpload(props: IconProps) {
   )
 }
 
+export function IconChama(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 21c3.9 0 6.5-2.5 6.5-6.1 0-2.5-1.4-4.4-2.8-6C14.4 7.4 13.4 5.6 13 3.5c-2.4 1.5-3.3 3.6-3.2 5.6.1 1.3-.8 1.6-1.5.8-.4-.5-.7-1.1-.8-1.9-1.3 1.5-2 3.5-2 5.4C5.5 18.5 8.1 21 12 21Z" />
+    </svg>
+  )
+}
+
 export function IconDocumento(props: IconProps) {
   return (
     <svg {...base(props)}>

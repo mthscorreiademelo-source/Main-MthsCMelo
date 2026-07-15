@@ -8,6 +8,7 @@ import { TaskList } from '../tarefas/components/TaskList'
 import { concluidasHoje, filtrarHoje } from '../tarefas/db'
 import { useTarefas } from '../tarefas/hooks'
 import type { Task } from '../tarefas/types'
+import { HabitosHoje } from '../habitos/components/HabitosHoje'
 
 export function HojePage() {
   const tarefas = useTarefas()
@@ -44,6 +45,8 @@ export function HojePage() {
           }
         />
       )}
+
+      <HabitosHoje />
 
       {concluidas.length > 0 && (
         <section className="border-t border-line pt-4">
