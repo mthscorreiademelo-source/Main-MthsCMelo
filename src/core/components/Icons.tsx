@@ -124,6 +124,14 @@ export function IconDocumento(props: IconProps) {
   )
 }
 
+export function IconLapis(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="m14.5 5.2 4.3 4.3M4 20l1-4.5L16.2 4.3a1.6 1.6 0 0 1 2.3 0l1.2 1.2a1.6 1.6 0 0 1 0 2.3L8.5 19 4 20Z" />
+    </svg>
+  )
+}
+
 export function IconSetaEsquerda(props: IconProps) {
   return (
     <svg {...base(props)}>

@@ -4,12 +4,14 @@ import { Button, IconButton } from '../../core/components/Button'
 import { IconLixeira, IconSetaEsquerda } from '../../core/components/Icons'
 import { db } from '../../core/db/db'
 import { BlocoEditor } from './components/BlocoEditor'
-import { excluirPagina, novoBloco, salvarPagina } from './db'
+import { excluirPagina, novoBloco, ordenarGrupos, salvarPagina } from './db'
+import { useGrupos } from './hooks'
 import type { Pagina, TipoBloco } from './types'
 
 export function EditorNotaPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const grupos = useGrupos()
   const [pagina, setPagina] = useState<Pagina | null>(null)
   const [focoEm, setFocoEm] = useState<string | null>(null)
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
@@ -72,19 +74,25 @@ export function EditorNotaPage() {
     mudarBlocos((p) => ({ ...p, blocos: p.blocos.filter((b) => b.id !== blocoId) }))
   }
 
+  const rotaVoltar = pagina?.grupoId ? `/notas/grupo/${pagina.grupoId}` : '/notas'
+
   async function aoExcluirPagina() {
     if (!confirmandoExclusao) {
       setConfirmandoExclusao(true)
       return
     }
     await excluirPagina(pagina!.id)
-    navigate('/notas')
+    navigate(rotaVoltar)
+  }
+
+  function moverParaGrupo(grupoId?: string) {
+    setPagina((p) => (p ? { ...p, grupoId } : p))
   }
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col">
       <div className="flex items-center justify-between pb-2">
-        <IconButton onClick={() => navigate('/notas')} aria-label="Voltar para Notas">
+        <IconButton onClick={() => navigate(rotaVoltar)} aria-label="Voltar para Notas">
           <IconSetaEsquerda />
         </IconButton>
         <Button variante="perigo" onClick={aoExcluirPagina}>
@@ -141,6 +149,35 @@ export function EditorNotaPage() {
           }
         }}
       />
+
+      {(grupos?.length ?? 0) > 0 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto border-t border-line py-3">
+          <span className="shrink-0 text-[13px] text-muted">Grupo:</span>
+          <button
+            onClick={() => moverParaGrupo(undefined)}
+            className={`min-h-9 shrink-0 cursor-pointer rounded-full border px-3 text-[13px] font-medium transition-colors ${
+              !pagina.grupoId
+                ? 'border-ink bg-ink text-bg'
+                : 'border-line text-muted hover:bg-hover'
+            }`}
+          >
+            Nenhum
+          </button>
+          {ordenarGrupos(grupos ?? []).map((g) => (
+            <button
+              key={g.id}
+              onClick={() => moverParaGrupo(g.id)}
+              className={`min-h-9 shrink-0 cursor-pointer rounded-full border px-3 text-[13px] font-medium transition-colors ${
+                pagina.grupoId === g.id
+                  ? 'border-ink bg-ink text-bg'
+                  : 'border-line text-muted hover:bg-hover'
+              }`}
+            >
+              {g.nome}
+            </button>
+          ))}
+        </div>
+      )}
 
       <p className="pb-2 text-xs text-muted/60">
         Dicas: <code># </code> título · <code>- </code> lista · <code>[] </code> to-do

@@ -1,14 +1,30 @@
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
 import { EmptyState } from '../../core/components/EmptyState'
 import { IconDocumento, IconMais } from '../../core/components/Icons'
-import { criarPagina, textoResumo } from './db'
-import { usePaginas } from './hooks'
+import { GrupoEditorSheet } from './components/GrupoEditorSheet'
+import { ListaPaginas } from './components/ListaPaginas'
+import { criarPagina, ordenarGrupos } from './db'
+import { useGrupos, usePaginas } from './hooks'
 
 export function NotasPage() {
   const paginas = usePaginas()
+  const grupos = useGrupos()
   const navigate = useNavigate()
+  const [criandoGrupo, setCriandoGrupo] = useState(false)
+
+  const listaGrupos = useMemo(() => ordenarGrupos(grupos ?? []), [grupos])
+  const soltas = useMemo(
+    () => (paginas ?? []).filter((p) => !p.grupoId),
+    [paginas],
+  )
+  const contagem = useMemo(() => {
+    const mapa = new Map<string, number>()
+    for (const p of paginas ?? []) {
+      if (p.grupoId) mapa.set(p.grupoId, (mapa.get(p.grupoId) ?? 0) + 1)
+    }
+    return mapa
+  }, [paginas])
 
   async function novaPagina() {
     const id = await criarPagina()
@@ -16,51 +32,82 @@ export function NotasPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-      <button
-        onClick={novaPagina}
-        className="flex min-h-12 cursor-pointer items-center gap-1 rounded-lg border border-line bg-surface/60 px-2 text-[15px] text-muted transition-colors hover:border-muted/50 hover:text-ink"
-      >
-        <span className="flex size-11 items-center justify-center">
-          <IconMais />
-        </span>
-        Nova página
-      </button>
-
-      {paginas && paginas.length === 0 && (
-        <EmptyState
-          icone={<IconDocumento />}
-          titulo="Nenhuma página ainda"
-          descricao="Crie sua primeira página para anotar qualquer coisa."
-        />
-      )}
-
-      <ul className="flex flex-col">
-        {paginas?.map((p) => {
-          const resumo = textoResumo(p)
-          return (
-            <li key={p.id}>
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+      {/* Galeria de grupos */}
+      <section>
+        <h2 className="mb-2 px-1 text-[13px] font-medium text-muted">Grupos</h2>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          {listaGrupos.map((g) => {
+            const qtd = contagem.get(g.id) ?? 0
+            return (
               <button
-                onClick={() => navigate(`/notas/${p.id}`)}
-                className="flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-lg px-2 text-left transition-colors hover:bg-hover"
+                key={g.id}
+                onClick={() => navigate(`/notas/grupo/${g.id}`)}
+                className="group cursor-pointer text-left"
               >
-                <IconDocumento className="shrink-0 text-muted" width={18} height={18} />
-                <span className="min-w-0 flex-1 py-2.5">
-                  <span className="block truncate text-[15px] font-medium">
-                    {p.titulo || 'Sem título'}
-                  </span>
-                  {resumo && (
-                    <span className="block truncate text-[13px] text-muted">{resumo}</span>
+                <span className="block overflow-hidden rounded-xl border border-line transition-transform duration-150 group-hover:scale-[1.02]">
+                  {g.capa ? (
+                    <img
+                      src={g.capa}
+                      alt=""
+                      className="aspect-[4/5] w-full object-cover"
+                    />
+                  ) : (
+                    <span className="flex aspect-[4/5] w-full items-center justify-center bg-surface text-4xl font-bold text-muted/50">
+                      {g.nome.charAt(0).toUpperCase()}
+                    </span>
                   )}
                 </span>
-                <span className="shrink-0 pr-2 text-[13px] text-muted/70">
-                  {format(p.atualizadaEm, "d 'de' MMM", { locale: ptBR })}
+                <span className="mt-1.5 block truncate px-0.5 text-[14px] font-medium">
+                  {g.nome}
+                </span>
+                <span className="block px-0.5 text-[12px] text-muted">
+                  {qtd} {qtd === 1 ? 'nota' : 'notas'}
                 </span>
               </button>
-            </li>
-          )
-        })}
-      </ul>
+            )
+          })}
+
+          <button
+            onClick={() => setCriandoGrupo(true)}
+            className="cursor-pointer text-left"
+          >
+            <span className="flex aspect-[4/5] w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line text-muted transition-colors hover:border-muted/60 hover:text-ink">
+              <IconMais />
+              <span className="text-[13px] font-medium">Novo grupo</span>
+            </span>
+          </button>
+        </div>
+      </section>
+
+      {/* Notas soltas */}
+      <section className="flex flex-col gap-3">
+        <h2 className="px-1 text-[13px] font-medium text-muted">Notas soltas</h2>
+        <button
+          onClick={novaPagina}
+          className="flex min-h-12 cursor-pointer items-center gap-1 rounded-lg border border-line bg-surface/60 px-2 text-[15px] text-muted transition-colors hover:border-muted/50 hover:text-ink"
+        >
+          <span className="flex size-11 items-center justify-center">
+            <IconMais />
+          </span>
+          Nova página
+        </button>
+
+        {paginas && soltas.length === 0 && (
+          <EmptyState
+            icone={<IconDocumento />}
+            titulo="Nenhuma nota solta"
+            descricao="Notas fora de grupos aparecem aqui."
+          />
+        )}
+        <ListaPaginas paginas={soltas} />
+      </section>
+
+      <GrupoEditorSheet
+        aberto={criandoGrupo}
+        grupo={null}
+        onFechar={() => setCriandoGrupo(false)}
+      />
     </div>
   )
 }

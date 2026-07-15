@@ -8,17 +8,17 @@ App pessoal minimalista, inspirado no Notion, para centralizar e administrar tod
 
 Uma coisa de cada vez. O app nasce com um único módulo bem feito e uma fundação modular que permite adicionar novas áreas sem retrabalho.
 
-**v0.4 (atual)**
+**v0.5 (atual)**
 - 🌤️ **Hoje** — saudação, data, tarefas do dia e hábitos com um toque
 - ✅ **Tarefas** — adição rápida, data agendada, abas Hoje · Próximas · Todas · Concluídas, edição em painel lateral
-- 📄 **Notas** — páginas com editor de blocos simples (parágrafo, título, lista, to-do) e atalhos de digitação: `# `, `- `, `[] `
+- 📄 **Notas** — galeria de **grupos com capa 4:5** (nome + imagem, recorte automático) e notas soltas abaixo; dentro do grupo, lista das notas dele; editor de blocos simples (parágrafo, título, lista, to-do) com atalhos `# `, `- `, `[] ` e seletor de grupo
 - 🔥 **Hábitos** — visão dos últimos 7 dias com marcação por toque (inclusive dias passados) e sequência (streak) automática
 - 💰 **Finanças** — entradas/saídas em reais, categorias, navegação por mês e resumo (entradas, saídas, saldo)
 - 🌓 Modo claro/escuro
 - 💾 Exportar/importar backup em JSON (na sidebar)
 
 **Roadmap** (um módulo por versão)
-- v0.5 — Sincronização opcional em nuvem
+- v0.6 — Sincronização opcional em nuvem
 
 ## Como rodar
 

@@ -4,6 +4,7 @@ import { HojePage } from '../modules/hoje/HojePage'
 import { TarefasPage } from '../modules/tarefas/TarefasPage'
 import { NotasPage } from '../modules/notas/NotasPage'
 import { EditorNotaPage } from '../modules/notas/EditorNotaPage'
+import { GrupoPage } from '../modules/notas/GrupoPage'
 import { HabitosPage } from '../modules/habitos/HabitosPage'
 import { FinancasPage } from '../modules/financas/FinancasPage'
 
@@ -31,7 +32,10 @@ export const MODULOS: ModuloDef[] = [
     rota: '/notas',
     Icone: IconDocumento,
     Pagina: NotasPage,
-    subRotas: [{ caminho: '/notas/:id', Pagina: EditorNotaPage }],
+    subRotas: [
+      { caminho: '/notas/grupo/:id', Pagina: GrupoPage },
+      { caminho: '/notas/:id', Pagina: EditorNotaPage },
+    ],
   },
   { id: 'habitos', nome: 'Hábitos', rota: '/habitos', Icone: IconChama, Pagina: HabitosPage },
   { id: 'financas', nome: 'Finanças', rota: '/financas', Icone: IconCifrao, Pagina: FinancasPage },
