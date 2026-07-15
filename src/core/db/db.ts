@@ -3,6 +3,7 @@ import type { Task } from '../../modules/tarefas/types'
 import type { Grupo, Pagina } from '../../modules/notas/types'
 import type { Habito, HabitoRegistro } from '../../modules/habitos/types'
 import type { Movimento } from '../../modules/financas/types'
+import type { HumorRegistro } from '../../modules/humor/types'
 
 /** Conteúdo binário de um arquivo anexado a uma nota do tipo 'arquivos'. */
 export interface ArquivoDados {
@@ -27,6 +28,7 @@ class VidaDB extends Dexie {
   habitoRegistros!: Table<HabitoRegistro, string>
   movimentos!: Table<Movimento, string>
   arquivos!: Table<ArquivoDados, string>
+  humores!: Table<HumorRegistro, string>
 
   constructor() {
     super('vida')
@@ -49,6 +51,9 @@ class VidaDB extends Dexie {
     })
     this.version(6).stores({
       arquivos: 'id, criadoEm',
+    })
+    this.version(7).stores({
+      humores: 'id, data',
     })
   }
 }
@@ -86,7 +91,7 @@ export async function exportarBackup() {
   )
   return {
     app: 'vida',
-    versao: 6,
+    versao: 7,
     exportadoEm: new Date().toISOString(),
     tasks: await db.tasks.toArray(),
     paginas: await db.paginas.toArray(),
@@ -95,6 +100,7 @@ export async function exportarBackup() {
     habitoRegistros: await db.habitoRegistros.toArray(),
     movimentos: await db.movimentos.toArray(),
     arquivos: arquivosSerial,
+    humores: await db.humores.toArray(),
   }
 }
 
@@ -118,6 +124,7 @@ export async function importarBackup(json: unknown) {
     habitoRegistros?: HabitoRegistro[]
     movimentos?: Movimento[]
     arquivos?: ArquivoSerial[]
+    humores?: HumorRegistro[]
   }
   const temTasks = Array.isArray(dados?.tasks)
   const temPaginas = Array.isArray(dados?.paginas)
@@ -146,6 +153,7 @@ export async function importarBackup(json: unknown) {
       })),
     )
   }
+  if (Array.isArray(dados.humores)) await db.humores.bulkPut(dados.humores)
   return {
     tasks: dados.tasks?.length ?? 0,
     paginas: dados.paginas?.length ?? 0,

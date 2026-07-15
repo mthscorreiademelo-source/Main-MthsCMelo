@@ -1,8 +1,11 @@
 import { useMemo, useState, type FormEvent } from 'react'
+import { addMonths, format, parseISO } from 'date-fns'
 import { EmptyState } from '../../core/components/EmptyState'
-import { IconChama, IconMais } from '../../core/components/Icons'
+import { IconButton } from '../../core/components/Button'
+import { IconChama, IconMais, IconSetaEsquerda } from '../../core/components/Icons'
+import { rotuloMes } from '../../core/dates'
 import { HabitoEditorSheet } from './components/HabitoEditorSheet'
-import { HabitoItem } from './components/HabitoItem'
+import { HabitoMes } from './components/HabitoMes'
 import { criarHabito, ordenarHabitos } from './db'
 import { diasPorHabito, useHabitos, useRegistros } from './hooks'
 import type { Habito } from './types'
@@ -12,9 +15,14 @@ export function HabitosPage() {
   const registros = useRegistros()
   const [nome, setNome] = useState('')
   const [selecionado, setSelecionado] = useState<Habito | null>(null)
+  const [mes, setMes] = useState(() => format(new Date(), 'yyyy-MM'))
 
   const dias = useMemo(() => diasPorHabito(registros ?? []), [registros])
   const lista = useMemo(() => ordenarHabitos(habitos ?? []), [habitos])
+
+  function mudarMes(delta: number) {
+    setMes(format(addMonths(parseISO(`${mes}-01`), delta), 'yyyy-MM'))
+  }
 
   async function aoAdicionar(e: FormEvent) {
     e.preventDefault()
@@ -43,6 +51,18 @@ export function HabitosPage() {
         />
       </form>
 
+      {lista.length > 0 && (
+        <div className="flex items-center justify-between">
+          <IconButton onClick={() => mudarMes(-1)} aria-label="Mês anterior">
+            <IconSetaEsquerda width={18} height={18} />
+          </IconButton>
+          <h2 className="text-[15px] font-semibold">{rotuloMes(mes)}</h2>
+          <IconButton onClick={() => mudarMes(1)} aria-label="Próximo mês">
+            <IconSetaEsquerda width={18} height={18} className="rotate-180" />
+          </IconButton>
+        </div>
+      )}
+
       {habitos && lista.length === 0 && (
         <EmptyState
           icone={<IconChama />}
@@ -51,16 +71,17 @@ export function HabitosPage() {
         />
       )}
 
-      <ul className="flex flex-col divide-y divide-line/60">
+      <div className="flex flex-col gap-3">
         {lista.map((h) => (
-          <HabitoItem
+          <HabitoMes
             key={h.id}
             habito={h}
+            mes={mes}
             diasFeitos={dias.get(h.id) ?? VAZIO}
             onAbrir={setSelecionado}
           />
         ))}
-      </ul>
+      </div>
 
       <HabitoEditorSheet
         habito={selecionado}

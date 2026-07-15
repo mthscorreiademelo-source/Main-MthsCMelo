@@ -8,12 +8,13 @@ App pessoal minimalista, inspirado no Notion, para centralizar e administrar tod
 
 Uma coisa de cada vez. O app nasce com um único módulo bem feito e uma fundação modular que permite adicionar novas áreas sem retrabalho.
 
-**v0.15 (atual)**
+**v0.16 (atual)**
 - 🌤️ **Hoje** — saudação, data, tarefas do dia e hábitos com um toque
 - ✅ **Tarefas** — adição rápida, data agendada, abas Hoje · Próximas · Todas · Concluídas, edição em painel lateral
 - 📄 **Notas** — galeria de **grupos com capa 4:5** (nome + imagem, recorte automático) e notas soltas abaixo; dentro do grupo, lista das notas dele; **três tipos de nota**: **texto** (editor de blocos simples — parágrafo, título, lista, to-do — com atalhos `# `, `- `, `[] `), **desenho** (quadro infinito) e **arquivos** (importe PDFs, imagens, vídeos, áudios, textos e outros; ficam **agrupados por tipo**, com miniatura de imagens e pré-visualização de texto/imagem/vídeo/áudio/PDF); seletor de grupo em qualquer uma
 - ✍️ **Quadro infinito** — desenho em **tela cheia** com **zoom por pinça** e **arrastar com os dedos** (stylus desenha, dedo navega); 4 canetas — lápis grafite, tinteiro, marca-texto e pincel — cada uma com **cor (paleta visual)**, **ponta** e **assistência de caligrafia** próprias; **régua** (1 dedo move, 2 dedos giram; o traço encosta e sai reto), **borracha de traço ou de pixels** com tamanho ajustável, **seleção por retângulo ou laço** (mover, girar e excluir), **imagens da galeria e PDFs** direto no quadro, **post-its** com 4 cores em que dá para riscar por cima (a tinta fica colada no papel e move/gira junto); barra de ferramentas **móvel** (acopla em qualquer borda) e **minimizável**, com inserção de imagem/PDF integrada; **tela cheia imersiva** que esconde a navegação do tablet ao desenhar; ferramenta **ponteiro** (toque seleciona, arrasto move; ativa sozinha após inserções) com **redimensionamento** pela alça do canto; **menu de toque longo** com copiar/colar (inclusive **imagens da área de transferência**); marca-texto com modo **linha reta** (o arrasto define ângulo/comprimento); ao importar PDF, escolha **uma página** ou o **documento inteiro como folheador** (setas para virar as páginas); **anotações feitas sobre o folheador grudam na página** — somem ao virar a página, reaparecem ao voltar e acompanham o PDF ao mover/girar/redimensionar; traços vetoriais + câmera salvos, miniatura na lista
-- 🔥 **Hábitos** — visão dos últimos 7 dias com marcação por toque (inclusive dias passados) e sequência (streak) automática
+- 🔥 **Hábitos** — **visão do mês inteiro** por hábito (grade de calendário estilo Habit Now): marque cada dia por toque, veja quantos dias cumpriu no mês, com **destaque para o dia de hoje** e a sequência (streak) automática; navegação entre meses
+- 🙂 **Humor** — registro diário do humor em 5 níveis (estilo Daylio): toque num rosto para marcar como foi o dia (inclusive dias passados pelo calendário), nota opcional, **calendário do mês colorido pelo humor** e resumo mensal (humor médio + distribuição por nível)
 - 💰 **Finanças** — entradas/saídas em reais, categorias, navegação por mês e resumo (entradas, saídas, saldo)
 - 🌓 Modo claro/escuro
 - 💾 Exportar/importar backup em JSON (na sidebar)
@@ -55,6 +56,7 @@ src/
     tarefas/
     notas/
     habitos/
+    humor/
     financas/
 ```
 

@@ -1,11 +1,19 @@
 import type { ComponentType, SVGProps } from 'react'
-import { IconChama, IconCheckCircle, IconCifrao, IconDocumento, IconSol } from './components/Icons'
+import {
+  IconChama,
+  IconCheckCircle,
+  IconCifrao,
+  IconDocumento,
+  IconHumor,
+  IconSol,
+} from './components/Icons'
 import { HojePage } from '../modules/hoje/HojePage'
 import { TarefasPage } from '../modules/tarefas/TarefasPage'
 import { NotasPage } from '../modules/notas/NotasPage'
 import { EditorNotaPage } from '../modules/notas/EditorNotaPage'
 import { GrupoPage } from '../modules/notas/GrupoPage'
 import { HabitosPage } from '../modules/habitos/HabitosPage'
+import { HumorPage } from '../modules/humor/HumorPage'
 import { FinancasPage } from '../modules/financas/FinancasPage'
 
 export interface ModuloDef {
@@ -38,5 +46,6 @@ export const MODULOS: ModuloDef[] = [
     ],
   },
   { id: 'habitos', nome: 'Hábitos', rota: '/habitos', Icone: IconChama, Pagina: HabitosPage },
+  { id: 'humor', nome: 'Humor', rota: '/humor', Icone: IconHumor, Pagina: HumorPage },
   { id: 'financas', nome: 'Finanças', rota: '/financas', Icone: IconCifrao, Pagina: FinancasPage },
 ]

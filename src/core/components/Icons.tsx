@@ -335,3 +335,13 @@ export function IconCaixaEntrada(props: IconProps) {
     </svg>
   )
 }
+
+export function IconHumor(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8.5 14.5c.9 1.1 2.1 1.7 3.5 1.7s2.6-.6 3.5-1.7" />
+      <path d="M9 9.5h.01M15 9.5h.01" strokeWidth={2.4} />
+    </svg>
+  )
+}
