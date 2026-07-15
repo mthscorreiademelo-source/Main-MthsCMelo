@@ -149,6 +149,42 @@ export function IconDesfazer(props: IconProps) {
   )
 }
 
+export function IconTinteiro(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="m13 5.5 5.5 5.5-8.2 8.2c-.5.5-1.1.8-1.8.9l-4 .4.4-4c.1-.7.4-1.3.9-1.8L13 5.5Z" />
+      <path d="m11.2 7.3 5.5 5.5M15.5 3l5.5 5.5M7.5 16.5l1-1" />
+    </svg>
+  )
+}
+
+export function IconMarcador(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M9 15 4.5 19.5M9.8 6.7l7.5 7.5-3.9 3.9a1.5 1.5 0 0 1-2.1 0L5.9 12.7a1.5 1.5 0 0 1 0-2.1l3.9-3.9ZM12.5 4l7.5 7.5" />
+    </svg>
+  )
+}
+
+export function IconPincel(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M20.5 3.5c-4.3 1.2-8 4-10.4 7.7l3 3c3.7-2.4 6.4-6.2 7.4-10.7Z" />
+      <path d="M9.5 12a4.3 4.3 0 0 0-4.2 3.4c-.3 1.5-1 2.4-1.8 3.1 1.3.6 3 .9 4.3.7a4.2 4.2 0 0 0 3.7-3.9" />
+    </svg>
+  )
+}
+
+export function IconMenuPontos(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="5" cy="12" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.1" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
 export function IconLapis(props: IconProps) {
   return (
     <svg {...base(props)}>

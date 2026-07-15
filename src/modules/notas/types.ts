@@ -8,11 +8,22 @@ export interface Bloco {
   feito?: boolean
 }
 
+export type TipoCaneta = 'lapis' | 'tinteiro' | 'marcador' | 'pincel'
+
 /** Traço de desenho: pontos achatados [x, y, pressão, x, y, pressão, …] */
 export interface Traco {
   cor: string
   espessura: number
   pontos: number[]
+  /** Caneta usada; ausente = 'tinteiro' (traços antigos) */
+  ferramenta?: TipoCaneta
+}
+
+/** Posição/zoom do quadro infinito (canto superior esquerdo em mundo + escala). */
+export interface Camera {
+  x: number
+  y: number
+  escala: number
 }
 
 export interface Pagina {
@@ -29,6 +40,8 @@ export interface Pagina {
   tracos?: Traco[]
   /** Miniatura JPEG (dataURL) para preview na lista */
   miniatura?: string
+  /** Última posição/zoom do quadro infinito */
+  camera?: Camera
 }
 
 export interface Grupo {
