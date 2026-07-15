@@ -5,6 +5,7 @@ import { DetalheRegistro } from './components/DetalheRegistro'
 import { NovoRegistro } from './components/NovoRegistro'
 import { garantirSeedsHumor, mapaFatores } from './humor'
 import { useCategorias, useFatores, useHumorTipos, useRegistros } from './hooks'
+import { Ajustes } from './telas/Ajustes'
 import { Calendario } from './telas/Calendario'
 import { Estatisticas } from './telas/Estatisticas'
 import { Hoje } from './telas/Hoje'
@@ -21,6 +22,7 @@ export function HumorPage() {
   const [aba, setAba] = useState<Aba>('hoje')
   const [capturando, setCapturando] = useState<{ registro?: Registro; data?: string } | null>(null)
   const [detalhe, setDetalhe] = useState<Registro | null>(null)
+  const [ajustes, setAjustes] = useState(false)
 
   useEffect(() => {
     garantirSeedsHumor()
@@ -51,7 +53,12 @@ export function HumorPage() {
             Carregando…
           </div>
         ) : aba === 'hoje' ? (
-          <Hoje registros={registros} humorTipos={humorTipos} onNovo={abrirNovo} />
+          <Hoje
+            registros={registros}
+            humorTipos={humorTipos}
+            onNovo={abrirNovo}
+            onAjustes={() => setAjustes(true)}
+          />
         ) : aba === 'linha' ? (
           <LinhaDoTempo
             registros={registros}
@@ -95,6 +102,15 @@ export function HumorPage() {
           fatores={fatoresMapa}
           onFechar={() => setDetalhe(null)}
           onEditar={editar}
+        />
+      )}
+
+      {ajustes && categorias && fatores && (
+        <Ajustes
+          humorTipos={humorTipos}
+          categorias={categorias}
+          fatores={fatores}
+          onFechar={() => setAjustes(false)}
         />
       )}
     </div>

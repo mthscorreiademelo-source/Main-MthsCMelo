@@ -345,3 +345,37 @@ export function IconHumor(props: IconProps) {
     </svg>
   )
 }
+
+export function IconEngrenagem(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6" />
+    </svg>
+  )
+}
+
+export function IconSeta(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 5v14M12 5l-6 6M12 5l6 6" />
+    </svg>
+  )
+}
+
+export function IconArquivar(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8Z" />
+      <path d="M3 4h18v4H3zM10 12h4" />
+    </svg>
+  )
+}
+
+export function IconChevron(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  )
+}

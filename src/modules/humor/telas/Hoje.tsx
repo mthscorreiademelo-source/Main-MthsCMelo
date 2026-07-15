@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { getDay, parseISO } from 'date-fns'
+import { IconEngrenagem } from '../../../core/components/Icons'
 import { dataPorExtenso, hojeISO } from '../../../core/dates'
 import { GraficoRecente } from '../components/GraficoRecente'
 import { RostoHumor } from '../components/RostoHumor'
@@ -17,10 +18,12 @@ export function Hoje({
   registros,
   humorTipos,
   onNovo,
+  onAjustes,
 }: {
   registros: Registro[]
   humorTipos: HumorTipo[]
   onNovo: () => void
+  onAjustes: () => void
 }) {
   const hoje = hojeISO()
   const doDia = useMemo(() => registrosDoDia(registros, hoje), [registros, hoje])
@@ -39,11 +42,20 @@ export function Hoje({
           <h1 className="text-2xl font-bold tracking-tight">{dataPorExtenso()}</h1>
           <p className="mt-0.5 text-[14px] text-muted">Como está o seu dia?</p>
         </div>
-        {streak > 0 && (
-          <span className="shrink-0 rounded-full bg-hover px-3 py-1.5 text-[13px] font-semibold text-muted">
-            🔥 {streak} {streak === 1 ? 'dia' : 'dias'}
-          </span>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {streak > 0 && (
+            <span className="rounded-full bg-hover px-3 py-1.5 text-[13px] font-semibold text-muted">
+              🔥 {streak} {streak === 1 ? 'dia' : 'dias'}
+            </span>
+          )}
+          <button
+            onClick={onAjustes}
+            aria-label="Personalizar humores e fatores"
+            className="flex size-9 cursor-pointer items-center justify-center rounded-full text-muted transition-colors hover:bg-hover hover:text-ink"
+          >
+            <IconEngrenagem width={19} height={19} />
+          </button>
+        </div>
       </div>
 
       {/* Humor de hoje / CTA */}
