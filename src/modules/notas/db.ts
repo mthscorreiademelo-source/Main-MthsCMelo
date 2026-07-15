@@ -1,25 +1,27 @@
 import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
+import { excluirArquivos } from './arquivos'
 import type { Bloco, Grupo, Pagina, TipoBloco } from './types'
 
 export function novoBloco(tipo: TipoBloco = 'paragrafo', texto = ''): Bloco {
   return { id: nanoid(), tipo, texto }
 }
 
-/** Cria uma página vazia (texto ou desenho, solta ou num grupo) e devolve o id. */
+/** Cria uma página vazia (texto, desenho ou arquivos), solta ou num grupo. */
 export async function criarPagina(
   grupoId?: string,
-  tipo: 'texto' | 'desenho' = 'texto',
+  tipo: 'texto' | 'desenho' | 'arquivos' = 'texto',
 ): Promise<string> {
   const agora = Date.now()
   const pagina: Pagina = {
     id: nanoid(),
     titulo: '',
-    blocos: tipo === 'desenho' ? [] : [novoBloco()],
+    blocos: tipo === 'texto' ? [novoBloco()] : [],
     criadaEm: agora,
     atualizadaEm: agora,
     ...(grupoId ? { grupoId } : {}),
     ...(tipo === 'desenho' ? { tipo, tracos: [] } : {}),
+    ...(tipo === 'arquivos' ? { tipo, arquivos: [] } : {}),
   }
   await db.paginas.add(pagina)
   return pagina.id
@@ -35,6 +37,9 @@ export async function salvarPagina(pagina: Pagina) {
 }
 
 export async function excluirPagina(id: string) {
+  // limpa também os blobs dos arquivos anexados, se houver
+  const pagina = await db.paginas.get(id)
+  if (pagina?.arquivos?.length) await excluirArquivos(pagina.arquivos)
   await db.paginas.delete(id)
 }
 

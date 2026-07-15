@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { IconCaneta, IconDocumento } from '../../../core/components/Icons'
+import { IconCaneta, IconDocumento, IconPasta } from '../../../core/components/Icons'
 import { textoResumo } from '../db'
 import type { Pagina } from '../types'
 
@@ -12,7 +12,13 @@ export function ListaPaginas({ paginas }: { paginas: Pagina[] }) {
     <ul className="flex flex-col">
       {paginas.map((p) => {
         const ehDesenho = p.tipo === 'desenho'
-        const resumo = ehDesenho ? 'Desenho à mão' : textoResumo(p)
+        const ehArquivos = p.tipo === 'arquivos'
+        const qtdArq = p.arquivos?.length ?? 0
+        const resumo = ehDesenho
+          ? 'Desenho à mão'
+          : ehArquivos
+            ? `${qtdArq} ${qtdArq === 1 ? 'arquivo' : 'arquivos'}`
+            : textoResumo(p)
         return (
           <li key={p.id}>
             <button
@@ -27,6 +33,8 @@ export function ListaPaginas({ paginas }: { paginas: Pagina[] }) {
                 />
               ) : ehDesenho ? (
                 <IconCaneta className="shrink-0 text-muted" width={18} height={18} />
+              ) : ehArquivos ? (
+                <IconPasta className="shrink-0 text-muted" width={18} height={18} />
               ) : (
                 <IconDocumento className="shrink-0 text-muted" width={18} height={18} />
               )}

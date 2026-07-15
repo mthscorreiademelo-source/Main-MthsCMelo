@@ -239,6 +239,50 @@ export function IconSelecao(props: IconProps) {
   )
 }
 
+export function IconPasta(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3.5 6.5a1.5 1.5 0 0 1 1.5-1.5h3.8l2 2.2h7.7a1.5 1.5 0 0 1 1.5 1.5v8.3a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5V6.5Z" />
+    </svg>
+  )
+}
+
+export function IconArquivo(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M6 3.5h8.5L19 8v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19V5a1.5 1.5 0 0 1 1-1.5Z" />
+      <path d="M14 3.5V8h5" />
+    </svg>
+  )
+}
+
+export function IconVideo(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3.5" y="6" width="12" height="12" rx="2" />
+      <path d="m15.5 10 5-2.6v9.2l-5-2.6" />
+    </svg>
+  )
+}
+
+export function IconMusica(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M9 18V6l10-2v12" />
+      <circle cx="6.5" cy="18" r="2.5" />
+      <circle cx="16.5" cy="16" r="2.5" />
+    </svg>
+  )
+}
+
+export function IconAbrir(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M14 4h6v6m0-6-8.5 8.5M18 13.5V19a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 19V8a1.5 1.5 0 0 1 1.5-1.5H11" />
+    </svg>
+  )
+}
+
 export function IconImagem(props: IconProps) {
   return (
     <svg {...base(props)}>

@@ -4,6 +4,16 @@ import type { Grupo, Pagina } from '../../modules/notas/types'
 import type { Habito, HabitoRegistro } from '../../modules/habitos/types'
 import type { Movimento } from '../../modules/financas/types'
 
+/** Conteúdo binário de um arquivo anexado a uma nota do tipo 'arquivos'. */
+export interface ArquivoDados {
+  id: string
+  blob: Blob
+  nome: string
+  tipo: string
+  tamanho: number
+  criadoEm: number
+}
+
 /**
  * Banco local (IndexedDB) do app.
  * Regra: cada módulo novo ganha sua(s) tabela(s) numa nova versão do schema —
@@ -16,6 +26,7 @@ class VidaDB extends Dexie {
   habitos!: Table<Habito, string>
   habitoRegistros!: Table<HabitoRegistro, string>
   movimentos!: Table<Movimento, string>
+  arquivos!: Table<ArquivoDados, string>
 
   constructor() {
     super('vida')
@@ -36,16 +47,46 @@ class VidaDB extends Dexie {
       grupos: 'id, ordem, criadoEm',
       paginas: 'id, atualizadaEm, criadaEm, grupoId',
     })
+    this.version(6).stores({
+      arquivos: 'id, criadoEm',
+    })
   }
 }
 
 export const db = new VidaDB()
 
-/** Exporta todo o banco como objeto serializável (backup JSON). */
+function blobParaBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader()
+    leitor.onload = () => resolve((leitor.result as string).split(',')[1] ?? '')
+    leitor.onerror = () => reject(leitor.error)
+    leitor.readAsDataURL(blob)
+  })
+}
+
+function base64ParaBlob(base64: string, tipo: string): Blob {
+  const bin = atob(base64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return new Blob([bytes], { type: tipo })
+}
+
+/** Exporta todo o banco como objeto serializável (backup JSON, arquivos em base64). */
 export async function exportarBackup() {
+  const arquivos = await db.arquivos.toArray()
+  const arquivosSerial = await Promise.all(
+    arquivos.map(async (a) => ({
+      id: a.id,
+      nome: a.nome,
+      tipo: a.tipo,
+      tamanho: a.tamanho,
+      criadoEm: a.criadoEm,
+      dados: await blobParaBase64(a.blob),
+    })),
+  )
   return {
     app: 'vida',
-    versao: 5,
+    versao: 6,
     exportadoEm: new Date().toISOString(),
     tasks: await db.tasks.toArray(),
     paginas: await db.paginas.toArray(),
@@ -53,7 +94,17 @@ export async function exportarBackup() {
     habitos: await db.habitos.toArray(),
     habitoRegistros: await db.habitoRegistros.toArray(),
     movimentos: await db.movimentos.toArray(),
+    arquivos: arquivosSerial,
   }
+}
+
+interface ArquivoSerial {
+  id: string
+  nome: string
+  tipo: string
+  tamanho: number
+  criadoEm: number
+  dados: string
 }
 
 /** Restaura um backup gerado por exportarBackup (mescla por id). */
@@ -66,6 +117,7 @@ export async function importarBackup(json: unknown) {
     habitos?: Habito[]
     habitoRegistros?: HabitoRegistro[]
     movimentos?: Movimento[]
+    arquivos?: ArquivoSerial[]
   }
   const temTasks = Array.isArray(dados?.tasks)
   const temPaginas = Array.isArray(dados?.paginas)
@@ -82,6 +134,18 @@ export async function importarBackup(json: unknown) {
     await db.habitoRegistros.bulkPut(dados.habitoRegistros)
   }
   if (temMovimentos) await db.movimentos.bulkPut(dados.movimentos!)
+  if (Array.isArray(dados.arquivos)) {
+    await db.arquivos.bulkPut(
+      dados.arquivos.map((a) => ({
+        id: a.id,
+        nome: a.nome,
+        tipo: a.tipo,
+        tamanho: a.tamanho,
+        criadoEm: a.criadoEm,
+        blob: base64ParaBlob(a.dados, a.tipo),
+      })),
+    )
+  }
   return {
     tasks: dados.tasks?.length ?? 0,
     paginas: dados.paginas?.length ?? 0,

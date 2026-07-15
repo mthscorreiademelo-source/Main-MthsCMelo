@@ -69,6 +69,17 @@ export interface ItemQuadro {
   rotacao?: number
 }
 
+/** Metadados de um arquivo anexado (o conteúdo fica na tabela `arquivos`). */
+export interface ArquivoRef {
+  id: string
+  nome: string
+  /** Tipo MIME (ex.: image/png, video/mp4, application/pdf) */
+  tipo: string
+  /** Tamanho em bytes */
+  tamanho: number
+  criadoEm: number
+}
+
 export interface Pagina {
   id: string
   titulo: string
@@ -78,7 +89,7 @@ export interface Pagina {
   /** Grupo (categoria) ao qual a nota pertence; ausente = nota solta */
   grupoId?: string
   /** Tipo da nota; ausente = 'texto' */
-  tipo?: 'texto' | 'desenho'
+  tipo?: 'texto' | 'desenho' | 'arquivos'
   /** Traços do desenho (somente tipo 'desenho') */
   tracos?: Traco[]
   /** Miniatura JPEG (dataURL) para preview na lista */
@@ -89,6 +100,8 @@ export interface Pagina {
   itens?: ItemQuadro[]
   /** Post-its colados no quadro */
   postIts?: PostIt[]
+  /** Arquivos anexados (somente tipo 'arquivos') — metadados; blob na tabela */
+  arquivos?: ArquivoRef[]
 }
 
 export interface Grupo {

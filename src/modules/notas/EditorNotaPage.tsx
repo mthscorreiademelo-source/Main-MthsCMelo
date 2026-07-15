@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Button, IconButton } from '../../core/components/Button'
 import { IconLixeira, IconSetaEsquerda } from '../../core/components/Icons'
 import { db } from '../../core/db/db'
+import { ArquivosPainel } from './components/ArquivosPainel'
 import { BlocoEditor } from './components/BlocoEditor'
 import { DesenhoTela } from './components/DesenhoTela'
 import { excluirPagina, novoBloco, ordenarGrupos, salvarPagina } from './db'
@@ -130,41 +131,50 @@ export function EditorNotaPage() {
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault()
-            setFocoEm(pagina.blocos[0]?.id ?? null)
+            if (pagina.tipo !== 'arquivos') setFocoEm(pagina.blocos[0]?.id ?? null)
           }
         }}
         placeholder="Sem título"
         className="w-full resize-none overflow-hidden bg-transparent pb-3 text-3xl font-bold tracking-tight outline-none placeholder:text-muted/40"
       />
 
-      <div className="flex flex-col">
-        {pagina.blocos.map((bloco) => (
-          <BlocoEditor
-            key={bloco.id}
-            bloco={bloco}
-            focar={focoEm === bloco.id}
-            onMudar={(texto) => atualizarBloco(bloco.id, { texto })}
-            onTransformar={(tipo) => atualizarBloco(bloco.id, { tipo, texto: '' })}
-            onEnter={() => inserirDepois(bloco.id)}
-            onApagarVazio={() => removerBloco(bloco.id)}
-            onAlternarFeito={() => atualizarBloco(bloco.id, { feito: !bloco.feito })}
-            onDesfocar={() => setFocoEm((f) => (f === bloco.id ? null : f))}
-          />
-        ))}
-      </div>
+      {pagina.tipo === 'arquivos' ? (
+        <ArquivosPainel
+          arquivos={pagina.arquivos ?? []}
+          onMudar={(arquivos) => setPagina((p) => (p ? { ...p, arquivos } : p))}
+        />
+      ) : (
+        <>
+          <div className="flex flex-col">
+            {pagina.blocos.map((bloco) => (
+              <BlocoEditor
+                key={bloco.id}
+                bloco={bloco}
+                focar={focoEm === bloco.id}
+                onMudar={(texto) => atualizarBloco(bloco.id, { texto })}
+                onTransformar={(tipo) => atualizarBloco(bloco.id, { tipo, texto: '' })}
+                onEnter={() => inserirDepois(bloco.id)}
+                onApagarVazio={() => removerBloco(bloco.id)}
+                onAlternarFeito={() => atualizarBloco(bloco.id, { feito: !bloco.feito })}
+                onDesfocar={() => setFocoEm((f) => (f === bloco.id ? null : f))}
+              />
+            ))}
+          </div>
 
-      {/* Área clicável abaixo do conteúdo: adiciona bloco no fim (gesto Notion) */}
-      <div
-        className="min-h-32 flex-1 cursor-text"
-        onClick={() => {
-          const ultimo = pagina.blocos[pagina.blocos.length - 1]
-          if (ultimo && ultimo.texto === '' && ultimo.tipo === 'paragrafo') {
-            setFocoEm(ultimo.id)
-          } else {
-            inserirDepois(ultimo.id)
-          }
-        }}
-      />
+          {/* Área clicável abaixo do conteúdo: adiciona bloco no fim (gesto Notion) */}
+          <div
+            className="min-h-32 flex-1 cursor-text"
+            onClick={() => {
+              const ultimo = pagina.blocos[pagina.blocos.length - 1]
+              if (ultimo && ultimo.texto === '' && ultimo.tipo === 'paragrafo') {
+                setFocoEm(ultimo.id)
+              } else {
+                inserirDepois(ultimo.id)
+              }
+            }}
+          />
+        </>
+      )}
 
       {(grupos?.length ?? 0) > 0 && (
         <div className="flex items-center gap-1.5 overflow-x-auto border-t border-line py-3">
@@ -195,9 +205,11 @@ export function EditorNotaPage() {
         </div>
       )}
 
-      <p className="pb-2 text-xs text-muted/60">
-        Dicas: <code># </code> título · <code>- </code> lista · <code>[] </code> to-do
-      </p>
+      {pagina.tipo !== 'arquivos' && (
+        <p className="pb-2 text-xs text-muted/60">
+          Dicas: <code># </code> título · <code>- </code> lista · <code>[] </code> to-do
+        </p>
+      )}
     </div>
   )
 }

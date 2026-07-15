@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { EmptyState } from '../../core/components/EmptyState'
-import { IconCaneta, IconDocumento, IconMais } from '../../core/components/Icons'
+import { IconCaneta, IconDocumento, IconMais, IconPasta } from '../../core/components/Icons'
 import { GrupoEditorSheet } from './components/GrupoEditorSheet'
 import { ListaPaginas } from './components/ListaPaginas'
 import { criarPagina, ordenarGrupos } from './db'
@@ -26,7 +26,7 @@ export function NotasPage() {
     return mapa
   }, [paginas])
 
-  async function novaPagina(tipo: 'texto' | 'desenho' = 'texto') {
+  async function novaPagina(tipo: 'texto' | 'desenho' | 'arquivos' = 'texto') {
     const id = await criarPagina(undefined, tipo)
     navigate(`/notas/${id}`)
   }
@@ -86,21 +86,24 @@ export function NotasPage() {
         <div className="flex gap-2">
           <button
             onClick={() => novaPagina('texto')}
-            className="flex min-h-12 flex-1 cursor-pointer items-center gap-1 rounded-lg border border-line bg-surface/60 px-2 text-[15px] text-muted transition-colors hover:border-muted/50 hover:text-ink"
+            className="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line bg-surface/60 px-2 text-[14px] font-medium text-muted transition-colors hover:border-muted/50 hover:text-ink"
           >
-            <span className="flex size-11 items-center justify-center">
-              <IconMais />
-            </span>
-            Nova página
+            <IconMais width={18} height={18} />
+            Texto
           </button>
           <button
             onClick={() => novaPagina('desenho')}
-            className="flex min-h-12 flex-1 cursor-pointer items-center gap-1 rounded-lg border border-line bg-surface/60 px-2 text-[15px] text-muted transition-colors hover:border-muted/50 hover:text-ink"
+            className="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line bg-surface/60 px-2 text-[14px] font-medium text-muted transition-colors hover:border-muted/50 hover:text-ink"
           >
-            <span className="flex size-11 items-center justify-center">
-              <IconCaneta width={18} height={18} />
-            </span>
-            Novo desenho
+            <IconCaneta width={18} height={18} />
+            Desenho
+          </button>
+          <button
+            onClick={() => novaPagina('arquivos')}
+            className="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line bg-surface/60 px-2 text-[14px] font-medium text-muted transition-colors hover:border-muted/50 hover:text-ink"
+          >
+            <IconPasta width={18} height={18} />
+            Arquivos
           </button>
         </div>
 
