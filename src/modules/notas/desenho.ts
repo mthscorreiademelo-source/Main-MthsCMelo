@@ -1,17 +1,26 @@
 import type { TipoCaneta, Traco } from './types'
 
-/** Comportamento de render de cada caneta. */
+/**
+ * Motor de tinta: cada traço é renderizado como um CONTORNO PREENCHIDO
+ * (outline) com curvas quadráticas — sem emendas entre segmentos — e a
+ * largura varia continuamente com a pressão filtrada. É a técnica usada
+ * por apps de caligrafia (perfect-freehand, GoodNotes etc.).
+ */
+
 interface Caneta {
   id: TipoCaneta
   rotulo: string
-  /** Opacidade do traço */
   alpha: number
-  /** Largura do risco em função da espessura da ponta e da pressão */
-  largura: (espessura: number, pressao: number) => number
-  /** true = um caminho só com largura constante (evita manchas em cor translúcida) */
+  /** Quanto a pressão afina o traço (0 = largura fixa, 1 = afina tudo) */
+  afinamento: number
+  /** Suavização da trajetória (0..1); maior = linha mais "amanteigada" */
+  suavizacao: number
+  /** Comprimento do afilamento nas pontas, em múltiplos da espessura */
+  afilaPontas: number
+  /** Multiplicador da espessura nominal */
+  fatorLargura: number
+  /** true = caminho único de largura constante (marca-texto) */
   caminhoUnico: boolean
-  /** Afilamento nas pontas (pincel) */
-  afila: boolean
   espessuraPadrao: number
   corPadrao: string
 }
@@ -20,10 +29,12 @@ export const CANETAS: Record<TipoCaneta, Caneta> = {
   lapis: {
     id: 'lapis',
     rotulo: 'Lápis grafite',
-    alpha: 0.72,
-    largura: (e, p) => e * (0.7 + p * 0.5),
+    alpha: 0.7,
+    afinamento: 0.3,
+    suavizacao: 0.35,
+    afilaPontas: 0.8,
+    fatorLargura: 0.9,
     caminhoUnico: false,
-    afila: false,
     espessuraPadrao: 3,
     corPadrao: '#5A5A56',
   },
@@ -31,9 +42,11 @@ export const CANETAS: Record<TipoCaneta, Caneta> = {
     id: 'tinteiro',
     rotulo: 'Caneta tinteiro',
     alpha: 1,
-    largura: (e, p) => e * (0.35 + p * 1.3),
+    afinamento: 0.68,
+    suavizacao: 0.5,
+    afilaPontas: 1.4,
+    fatorLargura: 1.35,
     caminhoUnico: false,
-    afila: false,
     espessuraPadrao: 5,
     corPadrao: '#37352F',
   },
@@ -41,9 +54,11 @@ export const CANETAS: Record<TipoCaneta, Caneta> = {
     id: 'marcador',
     rotulo: 'Marca-texto',
     alpha: 0.35,
-    largura: (e) => e * 2.5,
+    afinamento: 0,
+    suavizacao: 0.4,
+    afilaPontas: 0,
+    fatorLargura: 2.5,
     caminhoUnico: true,
-    afila: false,
     espessuraPadrao: 10,
     corPadrao: '#FFD400',
   },
@@ -51,9 +66,11 @@ export const CANETAS: Record<TipoCaneta, Caneta> = {
     id: 'pincel',
     rotulo: 'Pincel',
     alpha: 1,
-    largura: (e, p) => e * (0.15 + p * 2.3),
+    afinamento: 0.85,
+    suavizacao: 0.55,
+    afilaPontas: 5,
+    fatorLargura: 1.7,
     caminhoUnico: false,
-    afila: true,
     espessuraPadrao: 8,
     corPadrao: '#2383E2',
   },
@@ -94,52 +111,150 @@ export function canetaDoTraco(traco: Traco): Caneta {
   return traco.cor.startsWith('rgba') ? CANETAS.marcador : CANETAS.tinteiro
 }
 
+interface Ponto {
+  x: number
+  y: number
+  p: number
+}
+
+function extrairPontos(flat: number[]): Ponto[] {
+  const pts: Ponto[] = []
+  for (let i = 0; i < flat.length; i += 3) {
+    pts.push({ x: flat[i], y: flat[i + 1], p: flat[i + 2] || 0.5 })
+  }
+  return pts
+}
+
+/** Suavização exponencial da trajetória e da pressão (streamline). */
+function suavizar(pts: Ponto[], fator: number): Ponto[] {
+  if (pts.length < 3 || fator <= 0) return pts
+  const alfa = 1 - fator * 0.85
+  const saida: Ponto[] = [pts[0]]
+  let ax = pts[0].x
+  let ay = pts[0].y
+  let ap = pts[0].p
+  for (let i = 1; i < pts.length; i++) {
+    ax += (pts[i].x - ax) * alfa
+    ay += (pts[i].y - ay) * alfa
+    ap += (pts[i].p - ap) * 0.3
+    saida.push({ x: ax, y: ay, p: ap })
+  }
+  saida.push(pts[pts.length - 1]) // preserva a ponta final exata
+  return saida
+}
+
+/** Caminho fechado suave passando pelos pontos (quadráticas por ponto médio). */
+function caminhoFechado(contorno: { x: number; y: number }[]): Path2D {
+  const path = new Path2D()
+  const n = contorno.length
+  if (n < 3) return path
+  const ultimo = contorno[n - 1]
+  path.moveTo((ultimo.x + contorno[0].x) / 2, (ultimo.y + contorno[0].y) / 2)
+  for (let i = 0; i < n; i++) {
+    const a = contorno[i]
+    const b = contorno[(i + 1) % n]
+    path.quadraticCurveTo(a.x, a.y, (a.x + b.x) / 2, (a.y + b.y) / 2)
+  }
+  path.closePath()
+  return path
+}
+
+/** Constrói o contorno preenchível de um traço com raio variável. */
+function contornoDoTraco(pts: Ponto[], raios: number[]): Path2D {
+  const n = pts.length
+  const esq: { x: number; y: number }[] = []
+  const dir: { x: number; y: number }[] = []
+
+  for (let i = 0; i < n; i++) {
+    const ant = pts[Math.max(0, i - 1)]
+    const prox = pts[Math.min(n - 1, i + 1)]
+    let dx = prox.x - ant.x
+    let dy = prox.y - ant.y
+    const len = Math.hypot(dx, dy) || 1
+    dx /= len
+    dy /= len
+    const r = raios[i]
+    esq.push({ x: pts[i].x - dy * r, y: pts[i].y + dx * r })
+    dir.push({ x: pts[i].x + dy * r, y: pts[i].y - dx * r })
+  }
+
+  // tampas arredondadas: pontos de arco em volta das extremidades
+  const capa = (centro: Ponto, vizinho: Ponto, raio: number) => {
+    let dx = centro.x - vizinho.x
+    let dy = centro.y - vizinho.y
+    const len = Math.hypot(dx, dy) || 1
+    dx /= len
+    dy /= len
+    const base = Math.atan2(dx, -dy) // ângulo da normal esquerda
+    const pontos: { x: number; y: number }[] = []
+    for (const t of [0.25, 0.5, 0.75]) {
+      const ang = base - Math.PI * t
+      pontos.push({ x: centro.x + Math.cos(ang) * raio, y: centro.y + Math.sin(ang) * raio })
+    }
+    return pontos
+  }
+
+  const fim = capa(pts[n - 1], pts[Math.max(0, n - 2)], raios[n - 1])
+  const inicio = capa(pts[0], pts[Math.min(n - 1, 1)], raios[0])
+  return caminhoFechado([...esq, ...fim, ...dir.reverse(), ...inicio])
+}
+
 export function desenharTraco(ctx: CanvasRenderingContext2D, traco: Traco) {
-  const p = traco.pontos
-  if (p.length < 3) return
+  const flat = traco.pontos
+  if (flat.length < 3) return
   const caneta = canetaDoTraco(traco)
+  const base = traco.espessura * caneta.fatorLargura
 
   ctx.save()
   ctx.globalAlpha = caneta.alpha
-  ctx.strokeStyle = traco.cor
   ctx.fillStyle = traco.cor
-  ctx.lineCap = 'round'
-  ctx.lineJoin = 'round'
+  ctx.strokeStyle = traco.cor
 
-  if (p.length === 3) {
+  const pts = suavizar(extrairPontos(flat), caneta.suavizacao)
+
+  if (pts.length === 1 || flat.length === 3) {
     ctx.beginPath()
-    ctx.arc(p[0], p[1], caneta.largura(traco.espessura, p[2] || 0.5) / 2, 0, Math.PI * 2)
+    ctx.arc(pts[0].x, pts[0].y, Math.max(0.6, (base * (1 - caneta.afinamento * 0.5)) / 2), 0, Math.PI * 2)
     ctx.fill()
     ctx.restore()
     return
   }
 
   if (caneta.caminhoUnico) {
+    // marca-texto: caminho único de largura constante (sem manchas nas emendas)
     ctx.beginPath()
-    ctx.lineWidth = caneta.largura(traco.espessura, 0.5)
-    ctx.moveTo(p[0], p[1])
-    for (let i = 3; i < p.length; i += 3) ctx.lineTo(p[i], p[i + 1])
+    ctx.lineWidth = base
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.moveTo(pts[0].x, pts[0].y)
+    for (let i = 1; i < pts.length - 1; i++) {
+      ctx.quadraticCurveTo(pts[i].x, pts[i].y, (pts[i].x + pts[i + 1].x) / 2, (pts[i].y + pts[i + 1].y) / 2)
+    }
+    ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y)
     ctx.stroke()
     ctx.restore()
     return
   }
 
-  const totalSegs = p.length / 3 - 1
-  const zonaAfila = Math.max(2, Math.min(6, totalSegs * 0.25))
-  for (let i = 3; i < p.length; i += 3) {
-    const seg = i / 3
-    const pressao = ((p[i - 1] || 0.5) + (p[i + 2] || 0.5)) / 2
-    let largura = caneta.largura(traco.espessura, pressao)
-    if (caneta.afila) {
-      const fator = Math.min(1, seg / zonaAfila, (totalSegs - seg + 1) / zonaAfila)
-      largura *= 0.25 + 0.75 * fator
-    }
-    ctx.beginPath()
-    ctx.lineWidth = Math.max(0.5, largura)
-    ctx.moveTo(p[i - 3], p[i - 2])
-    ctx.lineTo(p[i], p[i + 1])
-    ctx.stroke()
+  // distâncias acumuladas para o afilamento das pontas
+  const dist: number[] = [0]
+  let total = 0
+  for (let i = 1; i < pts.length; i++) {
+    total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y)
+    dist.push(total)
   }
+  const taper = caneta.afilaPontas * base
+
+  const raios = pts.map((pt, i) => {
+    let fator = 1 - caneta.afinamento * (1 - pt.p)
+    if (taper > 0 && total > taper) {
+      const daPonta = Math.min(dist[i], total - dist[i])
+      if (daPonta < taper) fator *= 0.2 + 0.8 * Math.sqrt(daPonta / taper)
+    }
+    return Math.max(base * 0.06, (base * fator) / 2)
+  })
+
+  ctx.fill(contornoDoTraco(pts, raios))
   ctx.restore()
 }
 
