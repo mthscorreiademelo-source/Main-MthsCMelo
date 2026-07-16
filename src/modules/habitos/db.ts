@@ -144,12 +144,35 @@ function idReg(habitoId: string, data: string) {
   return `${habitoId}:${data}`
 }
 
-/** Sim/Não: marca ou desmarca o dia. */
-export async function alternarSimNao(habitoId: string, data: string) {
+/** Sim/Não: ciclo pendente → feito → não fez → pendente. */
+export async function cicloSimNao(habitoId: string, data: string) {
   const id = idReg(habitoId, data)
   const existe = await db.habitoRegistros.get(id)
-  if (existe) await db.habitoRegistros.delete(id)
-  else await db.habitoRegistros.add({ id, habitoId, data, valor: 1 })
+  const estado = existe?.estado ?? (existe && (existe.valor ?? 0) >= 1 ? 'feito' : undefined)
+  if (!existe) {
+    await db.habitoRegistros.add({ id, habitoId, data, estado: 'feito', valor: 1 })
+  } else if (estado === 'feito') {
+    await db.habitoRegistros.update(id, { estado: 'falhou', valor: 0 })
+  } else {
+    await db.habitoRegistros.delete(id)
+  }
+}
+
+/** Define diretamente um estado do dia (usado no histórico/detalhe). */
+export async function definirEstadoSimNao(
+  habitoId: string,
+  data: string,
+  estado: 'feito' | 'falhou' | 'pendente',
+) {
+  const id = idReg(habitoId, data)
+  if (estado === 'pendente') {
+    await db.habitoRegistros.delete(id)
+    return
+  }
+  const existe = await db.habitoRegistros.get(id)
+  const doc = { estado, valor: estado === 'feito' ? 1 : 0 }
+  if (existe) await db.habitoRegistros.update(id, doc)
+  else await db.habitoRegistros.add({ id, habitoId, data, ...doc })
 }
 
 /** Tipos medidos: soma `delta` (pode ser negativo). Remove o registro se zerar. */

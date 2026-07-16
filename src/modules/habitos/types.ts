@@ -61,6 +61,8 @@ export interface HabitoRegistro {
   valor?: number
   /** ids dos itens de checklist concluídos no dia. */
   itens?: string[]
+  /** Sim/Não: feito ou explicitamente não feito. Ausente = pendente. */
+  estado?: 'feito' | 'falhou'
   criadoEm?: number
   atualizadoEm?: number
 }

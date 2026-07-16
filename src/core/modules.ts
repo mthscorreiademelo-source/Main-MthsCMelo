@@ -15,6 +15,7 @@ import { NotasPage } from '../modules/notas/NotasPage'
 import { EditorNotaPage } from '../modules/notas/EditorNotaPage'
 import { GrupoPage } from '../modules/notas/GrupoPage'
 import { HabitosPage } from '../modules/habitos/HabitosPage'
+import { HabitoDetalhePage } from '../modules/habitos/HabitoDetalhePage'
 import { HabitosHoje } from '../modules/habitos/components/HabitosHoje'
 import { HumorPage } from '../modules/humor/HumorPage'
 import { SaudePage } from '../modules/saude/SaudePage'
@@ -78,6 +79,7 @@ export const MODULOS: ModuloDef[] = [
     rota: '/habitos',
     Icone: IconChama,
     Pagina: HabitosPage,
+    subRotas: [{ caminho: '/habitos/:id', Pagina: HabitoDetalhePage }],
     SecaoHoje: HabitosHoje,
   },
   {
