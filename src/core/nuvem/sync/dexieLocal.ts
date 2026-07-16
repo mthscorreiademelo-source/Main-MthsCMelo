@@ -63,12 +63,17 @@ export const localDexie: LocalStore = {
         upserts.push({ colecao: cur.colecao, id: cur.id, doc: cur.doc, atualizadoEm: cur.at, excluido: false })
       }
     }
+    // Carimbo fresco na exclusão: garante que o "tombstone" vença por LWW
+    // qualquer cópia antiga ainda presente em outro aparelho (senão o item
+    // ressuscita: o outro aparelho reenvia o registro toda sincronização).
+    const agora = Date.now()
     for (const [chave, espAt] of espelho) {
       if (!atualPorChave.has(chave)) {
         const idx = chave.indexOf(':')
         const colecao = chave.slice(0, idx)
         const id = chave.slice(idx + 1)
-        remocoes.push({ colecao, id, doc: { id }, atualizadoEm: espAt, excluido: true })
+        const at = Math.max(agora, espAt + 1)
+        remocoes.push({ colecao, id, doc: { id, atualizadoEm: at }, atualizadoEm: at, excluido: true })
       }
     }
     return { upserts, remocoes }
