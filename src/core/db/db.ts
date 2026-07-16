@@ -103,6 +103,14 @@ class VidaDB extends Dexie {
       livros: 'id, status, tipo, atualizadoEm',
       arquivosLivros: 'id',
     })
+    // v12: reafirma as tabelas recentes para curar bancos que, por terem passado
+    // por versões intermediárias, ficaram sem alguma object store (ex.: `saude`).
+    // Redeclarar com o mesmo schema preserva os dados e só cria o que falta.
+    this.version(12).stores({
+      saude: 'id, data',
+      livros: 'id, status, tipo, atualizadoEm',
+      arquivosLivros: 'id',
+    })
   }
 }
 

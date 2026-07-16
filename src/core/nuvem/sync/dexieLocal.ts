@@ -5,6 +5,11 @@ import { remotoVence, type Cursor, type LinhaDoc, type LocalStore, type Pendente
 
 type Registro = Record<string, unknown> & { atualizadoEm?: number }
 
+/** A object store realmente existe no schema aberto do Dexie? */
+function tabelaExiste(nome: string): boolean {
+  return db.tables.some((t) => t.name === nome)
+}
+
 /** LocalStore sobre o Dexie: aplica remoto por LWW e detecta mudanças/remoções
  *  locais comparando o estado atual com um "espelho" do último sync. */
 export const localDexie: LocalStore = {
@@ -12,6 +17,7 @@ export const localDexie: LocalStore = {
     let aplicados = 0
     await comAplicacaoRemota(async () => {
       for (const l of linhas) {
+        if (!tabelaExiste(l.colecao)) continue
         const tabela = (db as unknown as Record<string, any>)[l.colecao]
         if (!tabela) continue
         const chave = chaveReal(l.colecao, l.id)
@@ -39,6 +45,7 @@ export const localDexie: LocalStore = {
   async coletarPendentes(): Promise<Pendentes> {
     const atualPorChave = new Map<string, { colecao: string; id: string; doc: Registro; at: number }>()
     for (const { colecao } of COLECOES) {
+      if (!tabelaExiste(colecao)) continue
       const tabela = (db as unknown as Record<string, any>)[colecao]
       const registros = (await tabela.toArray()) as Registro[]
       for (const r of registros) {
