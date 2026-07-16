@@ -35,16 +35,13 @@ export function urlCsv(url: string): string {
   return u
 }
 
-/** Lê a planilha conectada e importa os dias. Lança erro amigável em falha. */
-export async function sincronizarPlanilha(): Promise<ResultadoImport> {
-  const url = getUrlPlanilha()
-  if (!url) throw new Error('Nenhuma planilha conectada.')
+async function lerUma(url: string): Promise<ResultadoImport> {
   let resp: Response
   try {
     resp = await fetch(urlCsv(url), { redirect: 'follow' })
   } catch {
     throw new Error(
-      'Não consegui ler a planilha pelo navegador (provável bloqueio do Google). Publique a planilha como CSV em Arquivo → Compartilhar → Publicar na web.',
+      'Não consegui ler a planilha pelo navegador (provável bloqueio do Google). Publique-a como CSV em Arquivo → Compartilhar → Publicar na web.',
     )
   }
   if (!resp.ok) throw new Error(`A planilha respondeu HTTP ${resp.status}. Confira se está pública.`)
@@ -52,7 +49,37 @@ export async function sincronizarPlanilha(): Promise<ResultadoImport> {
   if (/<html/i.test(texto.slice(0, 200))) {
     throw new Error('O link não devolveu uma planilha (veio uma página). Use "Publicar na web → CSV".')
   }
-  const res = await importarSaude(texto)
+  return importarSaude(texto)
+}
+
+/**
+ * Lê a(s) planilha(s) conectada(s) e importa os dias. Aceita várias URLs (uma
+ * por linha) — útil quando cada aba (Sono, Atividade, Vitais) é publicada à
+ * parte; os dias se mesclam por data.
+ */
+export async function sincronizarPlanilha(): Promise<ResultadoImport> {
+  const urls = getUrlPlanilha()
+    .split(/\r?\n/)
+    .map((u) => u.trim())
+    .filter(Boolean)
+  if (!urls.length) throw new Error('Nenhuma planilha conectada.')
+
+  const colunas = new Set<string>()
+  const dias = new Set<string>()
+  let ignoradas = 0
+  let erro: Error | null = null
+  for (const url of urls) {
+    try {
+      const r = await lerUma(url)
+      r.colunas.forEach((c) => colunas.add(c))
+      ignoradas += r.ignoradas
+      // `dias` é contagem; aproximamos somando (dias distintos por aba)
+      for (let i = 0; i < r.dias; i++) dias.add(`${url}#${i}`)
+    } catch (e) {
+      erro = e as Error
+    }
+  }
+  if (dias.size === 0 && erro) throw erro
   localStorage.setItem(CHAVE_ULTIMA, String(Date.now()))
-  return res
+  return { dias: dias.size, colunas: [...colunas], ignoradas }
 }

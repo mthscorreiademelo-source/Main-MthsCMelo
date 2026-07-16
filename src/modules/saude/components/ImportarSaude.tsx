@@ -118,15 +118,17 @@ export function ImportarSaude({ onFechar }: { onFechar: () => void }) {
           Conectar planilha do Google
         </p>
         <p className="text-[12px] leading-relaxed text-muted">
-          Cole o link de uma Planilha Google com os mesmos tipos de coluna. Publique-a em{' '}
-          <strong>Arquivo → Compartilhar → Publicar na web → CSV</strong>. O Lume relê e importa a
-          cada vez que você abre a Saúde.
+          Cole o link de uma Planilha Google publicada em{' '}
+          <strong>Arquivo → Compartilhar → Publicar na web → CSV</strong>. Pode colar{' '}
+          <strong>uma URL por linha</strong> (ex.: uma aba de Sono, outra de Atividade) — os dias se
+          mesclam por data. O Lume relê e importa ao abrir a Saúde.
         </p>
-        <input
+        <textarea
           value={urlPlan}
           onChange={(e) => setUrlPlan(e.target.value)}
+          rows={3}
           placeholder="https://docs.google.com/spreadsheets/…"
-          className="w-full rounded-xl border border-line bg-surface/60 px-3 py-2.5 text-[13px] outline-none transition-colors focus:border-muted/50 placeholder:text-muted/50"
+          className="w-full resize-none rounded-xl border border-line bg-surface/60 px-3 py-2.5 text-[13px] outline-none transition-colors focus:border-muted/50 placeholder:text-muted/50"
         />
         <button
           onClick={conectarPlanilha}
