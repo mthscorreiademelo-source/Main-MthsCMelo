@@ -23,7 +23,8 @@ export function SecaoHoje() {
   )
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="mb-4 flex break-inside-avoid flex-col gap-3">
+      <h2 className="px-1 text-[13px] font-medium text-muted">Tarefas de hoje</h2>
       <QuickAdd projetos={ps} dataPadrao={hojeISO()} placeholder="Adicionar tarefa para hoje…" />
 
       {tarefas && (

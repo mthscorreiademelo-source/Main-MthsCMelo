@@ -25,10 +25,15 @@ import { BibliotecaPage } from '../modules/biblioteca/BibliotecaPage'
 import { LivroPage } from '../modules/biblioteca/LivroPage'
 import { LeitorPage } from '../modules/biblioteca/leitor/LeitorPage'
 import { SecaoHoje as TarefasHoje } from '../modules/tarefas/SecaoHoje'
+import { SecaoHoje as NotasHoje } from '../modules/notas/SecaoHoje'
 import { SecaoHoje as HumorHoje } from '../modules/humor/SecaoHoje'
 import { SecaoHoje as SaudeHoje } from '../modules/saude/SecaoHoje'
 import { SecaoHoje as FinancasHoje } from '../modules/financas/SecaoHoje'
 import { SecaoHoje as BibliotecaHoje } from '../modules/biblioteca/SecaoHoje'
+import { HojeResumo as TarefasResumo } from '../modules/tarefas/HojeResumo'
+import { HojeResumo as HabitosResumo } from '../modules/habitos/HojeResumo'
+import { HojeResumo as HumorResumo } from '../modules/humor/HojeResumo'
+import { HojeResumo as SaudeResumo } from '../modules/saude/HojeResumo'
 
 export interface ModuloDef {
   id: string
@@ -46,6 +51,10 @@ export interface ModuloDef {
    * Retorne null quando não houver nada relevante no dia.
    */
   SecaoHoje?: ComponentType
+  /** Mini-tile glanceável do "cockpit" no topo do Hoje (null se nada). */
+  HojeResumo?: ComponentType
+  /** Peso do cartão na grade do Hoje: 'destaque' (ancora o topo) ou 'compacto'. */
+  hojeTamanho?: 'destaque' | 'compacto'
 }
 
 /**
@@ -62,6 +71,8 @@ export const MODULOS: ModuloDef[] = [
     Icone: IconCheckCircle,
     Pagina: TarefasPage,
     SecaoHoje: TarefasHoje,
+    HojeResumo: TarefasResumo,
+    hojeTamanho: 'destaque',
   },
   {
     id: 'notas',
@@ -73,6 +84,8 @@ export const MODULOS: ModuloDef[] = [
       { caminho: '/notas/grupo/:id', Pagina: GrupoPage },
       { caminho: '/notas/:id', Pagina: EditorNotaPage },
     ],
+    SecaoHoje: NotasHoje,
+    hojeTamanho: 'compacto',
   },
   {
     id: 'habitos',
@@ -85,6 +98,8 @@ export const MODULOS: ModuloDef[] = [
       { caminho: '/habitos/:id', Pagina: HabitoDetalhePage },
     ],
     SecaoHoje: HabitosHoje,
+    HojeResumo: HabitosResumo,
+    hojeTamanho: 'destaque',
   },
   {
     id: 'humor',
@@ -94,6 +109,8 @@ export const MODULOS: ModuloDef[] = [
     Pagina: HumorPage,
     telaCheia: true,
     SecaoHoje: HumorHoje,
+    HojeResumo: HumorResumo,
+    hojeTamanho: 'compacto',
   },
   {
     id: 'saude',
@@ -102,6 +119,8 @@ export const MODULOS: ModuloDef[] = [
     Icone: IconSaude,
     Pagina: SaudePage,
     SecaoHoje: SaudeHoje,
+    HojeResumo: SaudeResumo,
+    hojeTamanho: 'compacto',
   },
   {
     id: 'financas',
@@ -110,6 +129,7 @@ export const MODULOS: ModuloDef[] = [
     Icone: IconCifrao,
     Pagina: FinancasPage,
     SecaoHoje: FinancasHoje,
+    hojeTamanho: 'compacto',
   },
   {
     id: 'biblioteca',
@@ -122,5 +142,6 @@ export const MODULOS: ModuloDef[] = [
       { caminho: '/biblioteca/:id', Pagina: LivroPage },
     ],
     SecaoHoje: BibliotecaHoje,
+    hojeTamanho: 'compacto',
   },
 ]
