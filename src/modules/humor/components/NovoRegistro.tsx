@@ -10,7 +10,7 @@ import { rotuloData } from '../../../core/dates'
 import { atualizarRegistro, criarRegistro, humorDe, salvarAnexo } from '../humor'
 import type { Categoria, Fator, HumorTipo, Intensidade, NivelHumor, Registro } from '../types'
 import { DiscoHumor } from './RostoHumor'
-import { IconeFator } from './icones'
+import { IconeFator } from '../../../core/components/icones'
 import { SketchPad } from './SketchPad'
 
 interface Props {

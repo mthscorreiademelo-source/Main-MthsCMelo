@@ -1,5 +1,5 @@
 import { PALETA_HUMOR } from '../personalizar'
-import { CHAVES_ICONE, IconeFator } from './icones'
+import { CHAVES_ICONE, IconeFator } from '../../../core/components/icones'
 
 export function SeletorCor({
   valor,

@@ -12,6 +12,7 @@ import type {
   HumorTipo,
   Registro,
 } from '../../modules/humor/types'
+import type { SaudeDia } from '../../modules/saude/types'
 
 /** Conteúdo binário de um arquivo anexado a uma nota do tipo 'arquivos'. */
 export interface ArquivoDados {
@@ -41,6 +42,7 @@ class VidaDB extends Dexie {
   humorTipos!: Table<HumorTipo, number>
   categorias!: Table<Categoria, string>
   fatores!: Table<Fator, string>
+  saude!: Table<SaudeDia, string>
   /** Espelho do último estado sincronizado (chave → atualizadoEm). */
   espelho!: Table<{ chave: string; atualizadoEm: number }, string>
 
@@ -89,6 +91,9 @@ class VidaDB extends Dexie {
             })
         }
       })
+    this.version(10).stores({
+      saude: 'id, data',
+    })
   }
 }
 
@@ -152,6 +157,7 @@ export async function exportarBackup() {
     humorTipos: await db.humorTipos.toArray(),
     categorias: await db.categorias.toArray(),
     fatores: await db.fatores.toArray(),
+    saude: await db.saude.toArray(),
   }
 }
 
@@ -180,6 +186,7 @@ export async function importarBackup(json: unknown) {
     humorTipos?: HumorTipo[]
     categorias?: Categoria[]
     fatores?: Fator[]
+    saude?: SaudeDia[]
   }
   const temTasks = Array.isArray(dados?.tasks)
   const temPaginas = Array.isArray(dados?.paginas)
@@ -213,6 +220,7 @@ export async function importarBackup(json: unknown) {
   if (Array.isArray(dados.humorTipos)) await db.humorTipos.bulkPut(dados.humorTipos)
   if (Array.isArray(dados.categorias)) await db.categorias.bulkPut(dados.categorias)
   if (Array.isArray(dados.fatores)) await db.fatores.bulkPut(dados.fatores)
+  if (Array.isArray(dados.saude)) await db.saude.bulkPut(dados.saude)
   return {
     tasks: dados.tasks?.length ?? 0,
     paginas: dados.paginas?.length ?? 0,

@@ -3,7 +3,7 @@ import { IconLixeira } from '../../../core/components/Icons'
 import { atualizarCategoria, criarCategoria, excluirCategoria } from '../personalizar'
 import type { Categoria } from '../types'
 import { Campo } from './EditorHumorTipo'
-import { FolhaInferior } from './FolhaInferior'
+import { FolhaInferior } from '../../../core/components/FolhaInferior'
 import { CampoTexto, SeletorIcone } from './seletores'
 
 export function EditorCategoria({

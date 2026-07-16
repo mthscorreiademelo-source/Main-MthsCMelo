@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { humorDe, urlDoAnexo } from '../humor'
 import type { Fator, HumorTipo, Registro } from '../types'
-import { IconeFator } from './icones'
+import { IconeFator } from '../../../core/components/icones'
 import { RostoHumor } from './RostoHumor'
 
 interface Props {

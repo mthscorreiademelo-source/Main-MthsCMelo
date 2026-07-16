@@ -4,7 +4,7 @@ import { rotuloData } from '../../../core/dates'
 import { IconLixeira } from '../../../core/components/Icons'
 import { excluirRegistro, humorDe, urlDoAnexo } from '../humor'
 import type { Fator, HumorTipo, Registro } from '../types'
-import { IconeFator } from './icones'
+import { IconeFator } from '../../../core/components/icones'
 import { RostoHumor } from './RostoHumor'
 
 const INTENSIDADE_ROTULO = ['', 'Leve', 'Médio', 'Forte']

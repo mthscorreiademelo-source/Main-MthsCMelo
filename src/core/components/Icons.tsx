@@ -396,3 +396,11 @@ export function IconSair(props: IconProps) {
     </svg>
   )
 }
+
+export function IconSaude(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 12h3l2-5 3 10 2.5-7 1.5 4h6" />
+    </svg>
+  )
+}

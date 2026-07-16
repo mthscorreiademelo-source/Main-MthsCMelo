@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { atualizarHumorTipo } from '../personalizar'
 import type { HumorTipo } from '../types'
-import { FolhaInferior } from './FolhaInferior'
+import { FolhaInferior } from '../../../core/components/FolhaInferior'
 import { RostoHumor } from './RostoHumor'
 import { CampoTexto, SeletorCor } from './seletores'
 

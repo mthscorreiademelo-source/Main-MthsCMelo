@@ -9,7 +9,7 @@ import {
 import { EditorCategoria } from '../components/EditorCategoria'
 import { EditorFator } from '../components/EditorFator'
 import { EditorHumorTipo } from '../components/EditorHumorTipo'
-import { IconeFator } from '../components/icones'
+import { IconeFator } from '../../../core/components/icones'
 import { RostoHumor } from '../components/RostoHumor'
 import { moverCategoria, moverFator, atualizarCategoria } from '../personalizar'
 import type { Categoria, Fator, HumorTipo } from '../types'

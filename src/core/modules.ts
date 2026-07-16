@@ -5,6 +5,7 @@ import {
   IconCifrao,
   IconDocumento,
   IconHumor,
+  IconSaude,
   IconSol,
 } from './components/Icons'
 import { HojePage } from '../modules/hoje/HojePage'
@@ -15,9 +16,11 @@ import { GrupoPage } from '../modules/notas/GrupoPage'
 import { HabitosPage } from '../modules/habitos/HabitosPage'
 import { HabitosHoje } from '../modules/habitos/components/HabitosHoje'
 import { HumorPage } from '../modules/humor/HumorPage'
+import { SaudePage } from '../modules/saude/SaudePage'
 import { FinancasPage } from '../modules/financas/FinancasPage'
 import { SecaoHoje as TarefasHoje } from '../modules/tarefas/SecaoHoje'
 import { SecaoHoje as HumorHoje } from '../modules/humor/SecaoHoje'
+import { SecaoHoje as SaudeHoje } from '../modules/saude/SecaoHoje'
 import { SecaoHoje as FinancasHoje } from '../modules/financas/SecaoHoje'
 
 export interface ModuloDef {
@@ -80,6 +83,14 @@ export const MODULOS: ModuloDef[] = [
     Pagina: HumorPage,
     telaCheia: true,
     SecaoHoje: HumorHoje,
+  },
+  {
+    id: 'saude',
+    nome: 'Saúde',
+    rota: '/saude',
+    Icone: IconSaude,
+    Pagina: SaudePage,
+    SecaoHoje: SaudeHoje,
   },
   {
     id: 'financas',

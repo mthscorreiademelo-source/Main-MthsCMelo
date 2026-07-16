@@ -3,8 +3,8 @@ import { IconArquivar, IconLixeira } from '../../../core/components/Icons'
 import { arquivarFator, atualizarFator, criarFator, excluirFator } from '../personalizar'
 import type { Fator } from '../types'
 import { Campo } from './EditorHumorTipo'
-import { FolhaInferior } from './FolhaInferior'
-import { IconeFator } from './icones'
+import { FolhaInferior } from '../../../core/components/FolhaInferior'
+import { IconeFator } from '../../../core/components/icones'
 import { CampoTexto, SeletorCor, SeletorIcone } from './seletores'
 
 export function EditorFator({
