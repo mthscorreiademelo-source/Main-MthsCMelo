@@ -5,7 +5,7 @@ plugins {
 
 android {
   namespace = "com.lume.saude"
-  compileSdk = 34
+  compileSdk = 36
 
   defaultConfig {
     applicationId = "com.lume.saude"
