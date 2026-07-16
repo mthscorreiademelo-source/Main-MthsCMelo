@@ -64,10 +64,13 @@ export function useSessao(): EstadoSessao {
 
     obterCliente().then((cliente) => {
       if (!cliente || !vivo) return
-      cliente.auth.getSession().then(({ data }) => {
-        if (!vivo) return
-        setEstado({ pronta: true, sessao: data.session, email: data.session?.user.email ?? null })
-      })
+      cliente.auth
+        .getSession()
+        .then(({ data }) => {
+          if (!vivo) return
+          setEstado({ pronta: true, sessao: data.session, email: data.session?.user.email ?? null })
+        })
+        .catch(() => vivo && setEstado((e) => ({ ...e, pronta: true })))
       const { data } = cliente.auth.onAuthStateChange((_evento, sessao) => {
         setEstado({ pronta: true, sessao, email: sessao?.user.email ?? null })
       })
