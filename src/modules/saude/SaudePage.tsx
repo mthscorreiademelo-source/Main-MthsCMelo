@@ -2,6 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { EmptyState } from '../../core/components/EmptyState'
 import { IconMais, IconSaude, IconUpload } from '../../core/components/Icons'
 import { hojeISO, rotuloData } from '../../core/dates'
+import {
+  conectarSaudeAndroid,
+  noAppAndroid,
+  ouvirSaude,
+  sincronizarSaudeAndroid,
+} from '../../core/ponteAndroid'
 import { CartaoMetrica } from './components/CartaoMetrica'
 import { EditorDia } from './components/EditorDia'
 import { ImportarSaude } from './components/ImportarSaude'
@@ -16,6 +22,14 @@ export function SaudePage() {
   const [importando, setImportando] = useState(false)
   const [statusPlan, setStatusPlan] = useState<string | null>(null)
   const jaSincronizou = useRef(false)
+  const emApp = noAppAndroid()
+  const [statusApp, setStatusApp] = useState<string | null>(null)
+
+  // Dentro do app Android: ouve os avisos da ponte de saúde (Health Connect).
+  useEffect(() => {
+    if (!emApp) return
+    return ouvirSaude((e) => setStatusApp(e.mensagem))
+  }, [emApp])
 
   // Ao abrir a Saúde, relê a planilha conectada (se houver) e importa.
   useEffect(() => {
@@ -59,6 +73,30 @@ export function SaudePage() {
         <IconMais width={18} height={18} />
         Registrar hoje
       </button>
+
+      {emApp && (
+        <section className="flex flex-col gap-2.5 rounded-xl border border-line bg-surface/60 p-3">
+          <div className="flex items-center gap-1.5 text-[13px] font-medium text-muted">
+            <IconSaude width={16} height={16} />
+            Conexão Saúde (Health Connect)
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={conectarSaudeAndroid}
+              className="min-h-10 flex-1 cursor-pointer rounded-lg bg-ink px-3 text-[14px] font-medium text-surface transition-opacity hover:opacity-90"
+            >
+              Conectar Saúde
+            </button>
+            <button
+              onClick={sincronizarSaudeAndroid}
+              className="min-h-10 flex-1 cursor-pointer rounded-lg border border-line px-3 text-[14px] font-medium text-ink transition-colors hover:bg-hover"
+            >
+              Sincronizar agora
+            </button>
+          </div>
+          {statusApp && <p className="text-[12px] text-muted">{statusApp}</p>}
+        </section>
+      )}
 
       {statusPlan && <p className="px-1 text-[12px] text-muted">{statusPlan}</p>}
 

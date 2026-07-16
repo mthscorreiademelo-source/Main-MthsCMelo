@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
+import { loginSaudeAndroid, sairSaudeAndroid } from '../ponteAndroid'
 import { nuvemAtiva } from './config'
 import { obterCliente } from './cliente'
 
@@ -23,7 +24,9 @@ export async function entrar(email: string, senha: string): Promise<Resultado> {
   const cliente = await obterCliente()
   if (!cliente) return { ok: false, mensagem: 'Nuvem não configurada.' }
   const { error } = await cliente.auth.signInWithPassword({ email: email.trim(), password: senha })
-  return error ? { ok: false, mensagem: traduzir(error.message) } : { ok: true }
+  if (error) return { ok: false, mensagem: traduzir(error.message) }
+  loginSaudeAndroid(email.trim(), senha)
+  return { ok: true }
 }
 
 export async function cadastrar(email: string, senha: string): Promise<Resultado> {
@@ -35,12 +38,14 @@ export async function cadastrar(email: string, senha: string): Promise<Resultado
   if (!data.session) {
     return { ok: true, mensagem: 'Conta criada! Confirme o e-mail que enviamos para entrar.' }
   }
+  loginSaudeAndroid(email.trim(), senha)
   return { ok: true }
 }
 
 export async function sair() {
   const cliente = await obterCliente()
   await cliente?.auth.signOut()
+  sairSaudeAndroid()
 }
 
 export interface EstadoSessao {
