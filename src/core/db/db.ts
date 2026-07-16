@@ -1,7 +1,7 @@
 import Dexie, { type Table } from 'dexie'
 import type { Task } from '../../modules/tarefas/types'
 import type { Grupo, Pagina } from '../../modules/notas/types'
-import type { Habito, HabitoRegistro } from '../../modules/habitos/types'
+import type { CategoriaHabito, Habito, HabitoRegistro } from '../../modules/habitos/types'
 import type { Movimento } from '../../modules/financas/types'
 import { deveIgnorarHooks } from '../nuvem/sync/bandeira'
 import { NOMES_SYNC } from '../nuvem/sync/colecoes'
@@ -36,6 +36,7 @@ class VidaDB extends Dexie {
   grupos!: Table<Grupo, string>
   habitos!: Table<Habito, string>
   habitoRegistros!: Table<HabitoRegistro, string>
+  categoriasHabito!: Table<CategoriaHabito, string>
   movimentos!: Table<Movimento, string>
   arquivos!: Table<ArquivoDados, string>
   humores!: Table<HumorRegistro, string>
@@ -111,6 +112,22 @@ class VidaDB extends Dexie {
       livros: 'id, status, tipo, atualizadoEm',
       arquivosLivros: 'id',
     })
+    // v13: redesenho de Hábitos — categorias + tipos/frequência.
+    this.version(13)
+      .stores({
+        categoriasHabito: 'id, ordem',
+        habitos: 'id, ordem, criadoEm, categoriaId',
+      })
+      .upgrade(async (tx) => {
+        // Hábitos antigos viram tipo "Sim/Não", diários e sem categoria.
+        await tx
+          .table('habitos')
+          .toCollection()
+          .modify((h: Record<string, unknown>) => {
+            if (h.tipo == null) h.tipo = 'sim_nao'
+            if (h.frequencia == null) h.frequencia = { tipo: 'diario' }
+          })
+      })
   }
 }
 
@@ -176,6 +193,7 @@ export async function exportarBackup() {
     fatores: await db.fatores.toArray(),
     saude: await db.saude.toArray(),
     livros: await db.livros.toArray(),
+    categoriasHabito: await db.categoriasHabito.toArray(),
   }
 }
 
@@ -206,6 +224,7 @@ export async function importarBackup(json: unknown) {
     fatores?: Fator[]
     saude?: SaudeDia[]
     livros?: Livro[]
+    categoriasHabito?: CategoriaHabito[]
   }
   const temTasks = Array.isArray(dados?.tasks)
   const temPaginas = Array.isArray(dados?.paginas)
@@ -241,6 +260,7 @@ export async function importarBackup(json: unknown) {
   if (Array.isArray(dados.fatores)) await db.fatores.bulkPut(dados.fatores)
   if (Array.isArray(dados.saude)) await db.saude.bulkPut(dados.saude)
   if (Array.isArray(dados.livros)) await db.livros.bulkPut(dados.livros)
+  if (Array.isArray(dados.categoriasHabito)) await db.categoriasHabito.bulkPut(dados.categoriasHabito)
   return {
     tasks: dados.tasks?.length ?? 0,
     paginas: dados.paginas?.length ?? 0,

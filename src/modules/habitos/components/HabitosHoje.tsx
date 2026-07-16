@@ -1,68 +1,43 @@
 import { useMemo } from 'react'
-import { Link } from 'react-router-dom'
-import { IconCheck } from '../../../core/components/Icons'
+import { useNavigate } from 'react-router-dom'
+import { SecaoDashboard } from '../../../core/components/SecaoDashboard'
 import { hojeISO } from '../../../core/dates'
-import { alternarDia, calcularStreak, ordenarHabitos } from '../db'
-import { diasPorHabito, useHabitos, useRegistros } from '../hooks'
+import { ordenarHabitos } from '../db'
+import { devidoNoDia } from '../freq'
+import { useHabitos, useRegistros } from '../hooks'
+import { registrosDoDia, resumoDoDia } from '../progresso'
+import { CartaoHabito } from './CartaoHabito'
 
-/** Seção compacta de hábitos para a tela Hoje: um toque marca o dia. */
+/** Seção de hábitos para o dashboard Hoje: os hábitos devidos hoje, com um-toque. */
 export function HabitosHoje() {
   const habitos = useHabitos()
   const registros = useRegistros()
-  const dias = useMemo(() => diasPorHabito(registros ?? []), [registros])
-  const lista = ordenarHabitos(habitos ?? [])
-  const hoje = hojeISO()
+  const navigate = useNavigate()
+  const data = hojeISO()
 
-  if (lista.length === 0) return null
+  const ativos = useMemo(() => (habitos ?? []).filter((h) => !h.arquivado), [habitos])
+  const devidos = useMemo(
+    () => ordenarHabitos(ativos).filter((h) => devidoNoDia(h, data)),
+    [ativos, data],
+  )
+  const regs = useMemo(() => registrosDoDia(registros ?? [], data), [registros, data])
 
-  const feitos = lista.filter((h) => dias.get(h.id)?.has(hoje)).length
+  if (habitos === undefined || devidos.length === 0) return null
+  const resumo = resumoDoDia(ativos, registros ?? [], data)
 
   return (
-    <section className="flex flex-col gap-2">
-      <div className="flex items-center justify-between px-1">
-        <h2 className="text-[13px] font-medium text-muted">
-          Hábitos · {feitos}/{lista.length}
-        </h2>
-        <Link to="/habitos" className="text-[13px] text-muted hover:text-ink">
-          ver todos
-        </Link>
+    <SecaoDashboard titulo={`Hábitos · ${resumo.feitos}/${resumo.total}`} verTodos="/habitos">
+      <div className="flex flex-col gap-2">
+        {devidos.map((h) => (
+          <CartaoHabito
+            key={h.id}
+            habito={h}
+            registro={regs.get(h.id)}
+            data={data}
+            onEditar={() => navigate('/habitos')}
+          />
+        ))}
       </div>
-      <ul className="flex flex-col">
-        {lista.map((h) => {
-          const diasFeitos = dias.get(h.id) ?? new Set<string>()
-          const feitoHoje = diasFeitos.has(hoje)
-          const streak = calcularStreak(diasFeitos, hoje)
-          return (
-            <li key={h.id}>
-              <button
-                onClick={() => alternarDia(h.id, hoje)}
-                aria-pressed={feitoHoje}
-                className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-lg px-2 transition-colors hover:bg-hover"
-              >
-                <span
-                  className={`flex size-7 shrink-0 items-center justify-center rounded-full border transition-all ${
-                    feitoHoje
-                      ? 'border-accent bg-accent text-white'
-                      : 'border-muted/50 text-transparent'
-                  }`}
-                >
-                  <IconCheck width={14} height={14} strokeWidth={2.4} />
-                </span>
-                <span
-                  className={`min-w-0 flex-1 truncate text-left text-[15px] ${
-                    feitoHoje ? 'text-muted line-through' : ''
-                  }`}
-                >
-                  {h.nome}
-                </span>
-                {streak > 0 && (
-                  <span className="shrink-0 text-[12px] text-muted">🔥 {streak}</span>
-                )}
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-    </section>
+    </SecaoDashboard>
   )
 }

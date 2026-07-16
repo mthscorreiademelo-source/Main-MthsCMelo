@@ -1,93 +1,138 @@
-import { useMemo, useState, type FormEvent } from 'react'
-import { addMonths, format, parseISO } from 'date-fns'
+import { useEffect, useMemo, useState } from 'react'
 import { EmptyState } from '../../core/components/EmptyState'
-import { IconButton } from '../../core/components/Button'
-import { IconChama, IconMais, IconSetaEsquerda } from '../../core/components/Icons'
-import { rotuloMes } from '../../core/dates'
-import { HabitoEditorSheet } from './components/HabitoEditorSheet'
-import { HabitoMes } from './components/HabitoMes'
-import { criarHabito, ordenarHabitos } from './db'
-import { diasPorHabito, useHabitos, useRegistros } from './hooks'
+import { IconChama, IconMais, IconMenuPontos } from '../../core/components/Icons'
+import { hojeISO } from '../../core/dates'
+import { CabecalhoProgresso } from './components/CabecalhoProgresso'
+import { CartaoHabito } from './components/CartaoHabito'
+import { CategoriaSecao } from './components/CategoriaSecao'
+import { EditorHabito } from './components/EditorHabito'
+import { GerenciarCategorias } from './components/GerenciarCategorias'
+import { alternarRecolhida, garantirSeedsHabitos, ordenarHabitos } from './db'
+import { useCategoriasHabito, useHabitos, useRegistros } from './hooks'
+import { registrosDoDia, resumoDoDia, streakGeral } from './progresso'
 import type { Habito } from './types'
 
 export function HabitosPage() {
   const habitos = useHabitos()
   const registros = useRegistros()
-  const [nome, setNome] = useState('')
-  const [selecionado, setSelecionado] = useState<Habito | null>(null)
-  const [mes, setMes] = useState(() => format(new Date(), 'yyyy-MM'))
+  const categorias = useCategoriasHabito()
+  const data = hojeISO()
 
-  const dias = useMemo(() => diasPorHabito(registros ?? []), [registros])
-  const lista = useMemo(() => ordenarHabitos(habitos ?? []), [habitos])
+  const [editor, setEditor] = useState<{ habito: Habito | null } | null>(null)
+  const [gerenciando, setGerenciando] = useState(false)
+  const [semCatRecolhida, setSemCatRecolhida] = useState(false)
 
-  function mudarMes(delta: number) {
-    setMes(format(addMonths(parseISO(`${mes}-01`), delta), 'yyyy-MM'))
-  }
+  useEffect(() => {
+    garantirSeedsHabitos()
+  }, [])
 
-  async function aoAdicionar(e: FormEvent) {
-    e.preventDefault()
-    if (!nome.trim()) return
-    await criarHabito(nome)
-    setNome('')
-  }
+  const ativos = useMemo(() => (habitos ?? []).filter((h) => !h.arquivado), [habitos])
+  const regsDia = useMemo(() => registrosDoDia(registros ?? [], data), [registros, data])
+  const resumo = useMemo(() => resumoDoDia(ativos, registros ?? [], data), [ativos, registros, data])
+  const streak = useMemo(() => streakGeral(ativos, registros ?? []), [ativos, registros])
 
-  const VAZIO = new Set<string>()
+  const cats = useMemo(
+    () => [...(categorias ?? [])].sort((a, b) => a.ordem - b.ordem),
+    [categorias],
+  )
+  const { porCategoria, semCategoria } = useMemo(() => {
+    const mapa = new Map<string, Habito[]>()
+    const sem: Habito[] = []
+    const idsCat = new Set(cats.map((c) => c.id))
+    for (const h of ordenarHabitos(ativos)) {
+      if (h.categoriaId && idsCat.has(h.categoriaId)) {
+        const arr = mapa.get(h.categoriaId) ?? []
+        arr.push(h)
+        mapa.set(h.categoriaId, arr)
+      } else {
+        sem.push(h)
+      }
+    }
+    return { porCategoria: mapa, semCategoria: sem }
+  }, [ativos, cats])
+
+  const vazio = habitos && ativos.length === 0
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-      <form
-        onSubmit={aoAdicionar}
-        className="flex min-h-12 items-center gap-1 rounded-lg border border-line bg-surface/60 px-2 transition-colors focus-within:border-muted/50"
-      >
-        <span className="flex size-11 items-center justify-center text-muted">
-          <IconMais />
-        </span>
-        <input
-          value={nome}
-          onChange={(e) => setNome(e.target.value)}
-          placeholder="Novo hábito (ex.: ler 10 páginas)…"
-          enterKeyHint="done"
-          className="min-w-0 flex-1 bg-transparent py-3 text-[15px] outline-none placeholder:text-muted/70"
-        />
-      </form>
-
-      {lista.length > 0 && (
-        <div className="flex items-center justify-between">
-          <IconButton onClick={() => mudarMes(-1)} aria-label="Mês anterior">
-            <IconSetaEsquerda width={18} height={18} />
-          </IconButton>
-          <h2 className="text-[15px] font-semibold">{rotuloMes(mes)}</h2>
-          <IconButton onClick={() => mudarMes(1)} aria-label="Próximo mês">
-            <IconSetaEsquerda width={18} height={18} className="rotate-180" />
-          </IconButton>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight">Hábitos</h1>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setGerenciando(true)}
+            className="flex size-10 cursor-pointer items-center justify-center rounded-full text-muted transition-colors hover:bg-hover hover:text-ink"
+            aria-label="Gerenciar categorias"
+          >
+            <IconMenuPontos width={18} height={18} />
+          </button>
+          <button
+            onClick={() => setEditor({ habito: null })}
+            className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full bg-ink px-4 text-[14px] font-medium text-surface transition-opacity hover:opacity-90"
+          >
+            <IconMais width={16} height={16} />
+            Adicionar
+          </button>
         </div>
-      )}
+      </div>
 
-      {habitos && lista.length === 0 && (
+      {!vazio && ativos.length > 0 && <CabecalhoProgresso resumo={resumo} streak={streak} />}
+
+      {vazio ? (
         <EmptyState
           icone={<IconChama />}
           titulo="Nenhum hábito ainda"
-          descricao="Crie um hábito e marque os dias em que cumprir — a sequência cuida da motivação."
+          descricao="Crie seu primeiro hábito — escolha o tipo (sim/não, contador, tempo…), a frequência e uma categoria."
         />
+      ) : (
+        <div className="flex flex-col gap-4">
+          {cats.map((c) => (
+            <CategoriaSecao
+              key={c.id}
+              nome={c.nome}
+              cor={c.cor}
+              icone={c.icone}
+              recolhida={!!c.recolhida}
+              habitos={porCategoria.get(c.id) ?? []}
+              registros={regsDia}
+              data={data}
+              onToggle={() => alternarRecolhida(c.id, !c.recolhida)}
+              onEditar={(h) => setEditor({ habito: h })}
+            />
+          ))}
+
+          {/* Hábitos sem categoria */}
+          {semCategoria.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <button
+                onClick={() => setSemCatRecolhida((v) => !v)}
+                className="flex items-center gap-2 rounded-lg px-1 py-1 text-left text-[14px] font-semibold text-muted transition-colors hover:bg-hover"
+              >
+                Sem categoria <span className="text-[12px] font-normal">{semCategoria.length}</span>
+              </button>
+              {!semCatRecolhida && (
+                <div className="flex flex-col gap-2 pl-1">
+                  {semCategoria.map((h) => (
+                    <CartaoHabito
+                      key={h.id}
+                      habito={h}
+                      registro={regsDia.get(h.id)}
+                      data={data}
+                      onEditar={(hh) => setEditor({ habito: hh })}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+        </div>
       )}
 
-      <div className="flex flex-col gap-3">
-        {lista.map((h) => (
-          <HabitoMes
-            key={h.id}
-            habito={h}
-            mes={mes}
-            diasFeitos={dias.get(h.id) ?? VAZIO}
-            onAbrir={setSelecionado}
-          />
-        ))}
-      </div>
-
-      <HabitoEditorSheet
-        habito={selecionado}
-        diasFeitos={selecionado ? (dias.get(selecionado.id) ?? VAZIO) : VAZIO}
-        onFechar={() => setSelecionado(null)}
-      />
+      {editor && (
+        <EditorHabito habito={editor.habito} categorias={cats} onFechar={() => setEditor(null)} />
+      )}
+      {gerenciando && (
+        <GerenciarCategorias categorias={cats} onFechar={() => setGerenciando(false)} />
+      )}
     </div>
   )
 }
