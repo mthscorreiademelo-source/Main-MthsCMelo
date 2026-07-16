@@ -38,6 +38,14 @@ drop policy if exists "donos apagam" on public.documentos;
 create policy "donos apagam" on public.documentos
   for delete using (auth.uid() = user_id);
 
+-- updated_at sempre no relógio do SERVIDOR (na inserção e em toda atualização).
+-- É o que a sincronização usa como cursor confiável entre aparelhos.
+create extension if not exists moddatetime schema extensions;
+drop trigger if exists documentos_updated_at on public.documentos;
+create trigger documentos_updated_at
+  before update on public.documentos
+  for each row execute procedure extensions.moddatetime (updated_at);
+
 -- Storage: bucket privado para os arquivos (PDFs, imagens, vídeos, desenhos).
 -- Usado numa etapa futura; criar já não custa nada.
 insert into storage.buckets (id, name, public)

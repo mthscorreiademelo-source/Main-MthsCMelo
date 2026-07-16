@@ -10,7 +10,9 @@ import {
 } from '../components/Icons'
 import { exportarBackup, importarBackup } from '../db/db'
 import { MODULOS } from '../modules'
+import { useSessao } from '../nuvem/auth'
 import { ContaSidebar } from '../nuvem/ContaSidebar'
+import { useSincronizacao } from '../nuvem/sync'
 import { useTheme } from '../theme/useTheme'
 
 const CHAVE_SIDEBAR = 'vida:sidebar'
@@ -21,6 +23,8 @@ export function AppShell() {
   )
   const [overlay, setOverlay] = useState(false)
   const { pathname } = useLocation()
+  const { sessao } = useSessao()
+  useSincronizacao(sessao)
 
   const moduloAtual =
     MODULOS.find((m) =>

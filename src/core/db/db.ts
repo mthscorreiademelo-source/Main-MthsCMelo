@@ -3,6 +3,8 @@ import type { Task } from '../../modules/tarefas/types'
 import type { Grupo, Pagina } from '../../modules/notas/types'
 import type { Habito, HabitoRegistro } from '../../modules/habitos/types'
 import type { Movimento } from '../../modules/financas/types'
+import { deveIgnorarHooks } from '../nuvem/sync/bandeira'
+import { NOMES_SYNC } from '../nuvem/sync/colecoes'
 import type {
   Categoria,
   Fator,
@@ -39,6 +41,8 @@ class VidaDB extends Dexie {
   humorTipos!: Table<HumorTipo, number>
   categorias!: Table<Categoria, string>
   fatores!: Table<Fator, string>
+  /** Espelho do último estado sincronizado (chave → atualizadoEm). */
+  espelho!: Table<{ chave: string; atualizadoEm: number }, string>
 
   constructor() {
     super('vida')
@@ -71,10 +75,37 @@ class VidaDB extends Dexie {
       categorias: 'id, ordem',
       fatores: 'id, categoriaId, ordem',
     })
+    // v9: espelho de sincronização + carimbo `atualizadoEm` em tudo que sincroniza.
+    this.version(9)
+      .stores({ espelho: 'chave' })
+      .upgrade(async (tx) => {
+        const agora = Date.now()
+        for (const nome of NOMES_SYNC) {
+          await tx
+            .table(nome)
+            .toCollection()
+            .modify((r: Record<string, unknown>) => {
+              if (r.atualizadoEm == null) r.atualizadoEm = agora
+            })
+        }
+      })
   }
 }
 
 export const db = new VidaDB()
+
+// Carimba `atualizadoEm` a cada escrita local (não nas aplicações vindas da
+// nuvem) para o motor de sincronização detectar mudanças.
+for (const nome of NOMES_SYNC) {
+  const tabela = (db as unknown as Record<string, Table>)[nome]
+  tabela.hook('creating', (_pk, obj: Record<string, unknown>) => {
+    if (!deveIgnorarHooks() && obj.atualizadoEm == null) obj.atualizadoEm = Date.now()
+  })
+  tabela.hook('updating', (_mods, _pk, _obj) => {
+    if (deveIgnorarHooks()) return undefined
+    return { atualizadoEm: Date.now() }
+  })
+}
 
 function blobParaBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
