@@ -1,59 +1,178 @@
-import { Checkbox } from '../../../core/components/Checkbox'
-import { IconCalendario } from '../../../core/components/Icons'
+import { useState } from 'react'
+import {
+  IconCalendario,
+  IconChevron,
+  IconCheck,
+  IconRelogio,
+  IconRepetir,
+} from '../../../core/components/Icons'
 import { rotuloData } from '../../../core/dates'
-import { alternarConclusao, estaAtrasada } from '../db'
-import type { Task } from '../types'
+import { alternarConclusao, contarSubtarefas, corPrioridade, estaAtrasada, subtarefas } from '../db'
+import type { Projeto, Task } from '../types'
 
 interface Props {
   task: Task
+  todas: Task[]
+  projetos: Projeto[]
   onAbrir: (task: Task) => void
-  /** Oculta o chip de data (útil na visão "Hoje", onde a data é óbvia). */
+  /** Renderiza subtarefas aninhadas (visões Entrada/Projeto). */
+  aninhar?: boolean
+  nivel?: number
   ocultarData?: boolean
+  /** Mostra o ponto/nome do projeto (visões mistas: Hoje/Próximas/Entrada). */
+  mostrarProjeto?: boolean
 }
 
-export function TaskItem({ task, onAbrir, ocultarData }: Props) {
+/** Checkbox redondo colorido pela prioridade (estilo Todoist). */
+function CheckPrioridade({ task }: { task: Task }) {
+  const concluida = !!task.concluidaEm
+  const cor = corPrioridade(task.prioridade)
+  const fundo = task.prioridade < 4 ? `${cor}1a` : 'transparent'
+  return (
+    <button
+      role="checkbox"
+      aria-checked={concluida}
+      aria-label={`Concluir ${task.titulo}`}
+      onClick={(e) => {
+        e.stopPropagation()
+        alternarConclusao(task)
+      }}
+      className="flex size-9 shrink-0 items-center justify-center"
+    >
+      <span
+        className="flex size-[19px] items-center justify-center rounded-full border-[1.5px] transition-all"
+        style={{
+          borderColor: cor,
+          backgroundColor: concluida ? cor : fundo,
+          color: concluida ? '#fff' : cor,
+        }}
+      >
+        <IconCheck
+          width={12}
+          height={12}
+          strokeWidth={3}
+          className={concluida ? 'opacity-100' : 'opacity-0'}
+        />
+      </span>
+    </button>
+  )
+}
+
+export function TaskItem({
+  task,
+  todas,
+  projetos,
+  onAbrir,
+  aninhar,
+  nivel = 0,
+  ocultarData,
+  mostrarProjeto,
+}: Props) {
   const concluida = !!task.concluidaEm
   const atrasada = estaAtrasada(task)
+  const filhas = aninhar ? subtarefas(todas, task.id) : []
+  const cont = contarSubtarefas(todas, task.id)
+  const projeto = task.projetoId ? projetos.find((p) => p.id === task.projetoId) : undefined
+  const [aberto, setAberto] = useState(true)
 
   return (
-    <li className="group">
+    <li className="group/task">
       <div
         onClick={() => onAbrir(task)}
-        className="flex min-h-12 cursor-pointer items-center gap-1 rounded-lg px-1 transition-colors hover:bg-hover"
+        className="flex cursor-pointer items-start rounded-lg pr-1 transition-colors hover:bg-hover"
+        style={{ paddingLeft: nivel * 22 }}
       >
-        <Checkbox
-          marcado={concluida}
-          onChange={() => alternarConclusao(task)}
-          rotulo={`Concluir ${task.titulo}`}
-        />
-        <div className="min-w-0 flex-1 py-2.5">
+        {aninhar && filhas.length > 0 ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setAberto((v) => !v)
+            }}
+            aria-label={aberto ? 'Recolher subtarefas' : 'Expandir subtarefas'}
+            className="mt-2 flex size-6 shrink-0 items-center justify-center rounded text-muted transition-colors hover:text-ink"
+          >
+            <IconChevron
+              width={14}
+              height={14}
+              style={{ transform: aberto ? 'none' : 'rotate(-90deg)' }}
+            />
+          </button>
+        ) : (
+          aninhar && <span className="w-6 shrink-0" />
+        )}
+
+        <CheckPrioridade task={task} />
+
+        <div className="min-w-0 flex-1 py-1.5">
           <p
-            className={`truncate text-[15px] leading-snug transition-colors ${
+            className={`text-[15px] leading-snug transition-colors ${
               concluida ? 'text-muted line-through' : ''
             }`}
           >
             {task.titulo}
           </p>
-          {task.nota && (
-            <p className="truncate text-[13px] text-muted">{task.nota}</p>
+          {task.descricao && !concluida && (
+            <p className="truncate text-[13px] text-muted">{task.descricao}</p>
+          )}
+
+          {!concluida && (
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px] text-muted">
+              {task.data && (!ocultarData || atrasada) && (
+                <span className={`flex items-center gap-1 ${atrasada ? 'text-danger' : ''}`}>
+                  <IconCalendario width={12} height={12} />
+                  {rotuloData(task.data)}
+                  {task.horario && ` ${task.horario}`}
+                </span>
+              )}
+              {task.horario && (!task.data || ocultarData) && (
+                <span className="flex items-center gap-1">
+                  <IconRelogio width={12} height={12} />
+                  {task.horario}
+                </span>
+              )}
+              {task.recorrencia && <IconRepetir width={12} height={12} aria-label="Recorrente" />}
+              {cont.total > 0 && (
+                <span className="flex items-center gap-1">
+                  <IconCheck width={12} height={12} />
+                  {cont.feitas}/{cont.total}
+                </span>
+              )}
+              {task.labels?.map((l) => (
+                <span key={l} className="rounded bg-hover px-1.5 py-px text-[11px] text-muted">
+                  {l}
+                </span>
+              ))}
+              {mostrarProjeto && projeto && (
+                <span className="flex items-center gap-1">
+                  <span
+                    className="size-2 rounded-full"
+                    style={{ backgroundColor: projeto.cor ?? 'var(--vida-muted)' }}
+                  />
+                  {projeto.nome}
+                </span>
+              )}
+            </div>
           )}
         </div>
-        {task.data && !ocultarData && !concluida && (
-          <span
-            className={`mr-2 flex shrink-0 items-center gap-1 text-[13px] ${
-              atrasada ? 'text-danger' : 'text-muted'
-            }`}
-          >
-            <IconCalendario width={14} height={14} />
-            {rotuloData(task.data)}
-          </span>
-        )}
-        {atrasada && ocultarData && (
-          <span className="mr-2 shrink-0 text-[13px] text-danger">
-            {rotuloData(task.data!)}
-          </span>
-        )}
       </div>
+
+      {aninhar && aberto && filhas.length > 0 && (
+        <ul>
+          {filhas.map((f) => (
+            <TaskItem
+              key={f.id}
+              task={f}
+              todas={todas}
+              projetos={projetos}
+              onAbrir={onAbrir}
+              aninhar
+              nivel={nivel + 1}
+              ocultarData={ocultarData}
+              mostrarProjeto={false}
+            />
+          ))}
+        </ul>
+      )}
     </li>
   )
 }

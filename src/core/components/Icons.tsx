@@ -450,3 +450,52 @@ export function IconRaio(props: IconProps) {
     </svg>
   )
 }
+
+export function IconBandeira(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M5 21V4" />
+      <path d="M5 4.5h11l-1.5 3.5L16 11.5H5" />
+    </svg>
+  )
+}
+
+export function IconRepetir(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M17 3l3 3-3 3" />
+      <path d="M20 6H8a4 4 0 0 0-4 4v1" />
+      <path d="M7 21l-3-3 3-3" />
+      <path d="M4 18h12a4 4 0 0 0 4-4v-1" />
+    </svg>
+  )
+}
+
+export function IconEtiqueta(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9z" />
+      <circle cx="7.5" cy="7.5" r="1.3" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+export function IconRelogio(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  )
+}
+
+export function IconLista(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M8 6h13M8 12h13M8 18h13" />
+      <circle cx="3.5" cy="6" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="3.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="3.5" cy="18" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}

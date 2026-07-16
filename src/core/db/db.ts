@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie'
-import type { Task } from '../../modules/tarefas/types'
+import type { Projeto, Task } from '../../modules/tarefas/types'
 import type { Grupo, Pagina } from '../../modules/notas/types'
 import type { CategoriaHabito, Habito, HabitoRegistro } from '../../modules/habitos/types'
 import type { Movimento } from '../../modules/financas/types'
@@ -32,6 +32,7 @@ export interface ArquivoDados {
  */
 class VidaDB extends Dexie {
   tasks!: Table<Task, string>
+  projetos!: Table<Projeto, string>
   paginas!: Table<Pagina, string>
   grupos!: Table<Grupo, string>
   habitos!: Table<Habito, string>
@@ -128,6 +129,23 @@ class VidaDB extends Dexie {
             if (h.frequencia == null) h.frequencia = { tipo: 'diario' }
           })
       })
+    // v14: redesenho de Tarefas (Todoist) — projetos + prioridade/subtarefas.
+    this.version(14)
+      .stores({
+        projetos: 'id, ordem',
+        tasks: 'id, data, concluidaEm, criadaEm, projetoId, paiId, atualizadoEm',
+      })
+      .upgrade(async (tx) => {
+        // Tarefas antigas: prioridade P4, ordem = criação, `nota` → `descricao`.
+        await tx
+          .table('tasks')
+          .toCollection()
+          .modify((t: Record<string, unknown>) => {
+            if (t.prioridade == null) t.prioridade = 4
+            if (t.ordem == null) t.ordem = (t.criadaEm as number) ?? Date.now()
+            if (t.descricao == null && t.nota != null) t.descricao = t.nota
+          })
+      })
   }
 }
 
@@ -180,6 +198,7 @@ export async function exportarBackup() {
     versao: 8,
     exportadoEm: new Date().toISOString(),
     tasks: await db.tasks.toArray(),
+    projetos: await db.projetos.toArray(),
     paginas: await db.paginas.toArray(),
     grupos: await db.grupos.toArray(),
     habitos: await db.habitos.toArray(),
@@ -211,6 +230,7 @@ export async function importarBackup(json: unknown) {
   const dados = json as {
     app?: string
     tasks?: Task[]
+    projetos?: Projeto[]
     paginas?: Pagina[]
     grupos?: Grupo[]
     habitos?: Habito[]
@@ -234,6 +254,7 @@ export async function importarBackup(json: unknown) {
     throw new Error('Arquivo de backup inválido')
   }
   if (temTasks) await db.tasks.bulkPut(dados.tasks!)
+  if (Array.isArray(dados.projetos)) await db.projetos.bulkPut(dados.projetos)
   if (temPaginas) await db.paginas.bulkPut(dados.paginas!)
   if (Array.isArray(dados.grupos)) await db.grupos.bulkPut(dados.grupos)
   if (temHabitos) await db.habitos.bulkPut(dados.habitos!)

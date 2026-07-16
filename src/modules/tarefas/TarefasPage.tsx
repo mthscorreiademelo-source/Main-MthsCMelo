@@ -1,96 +1,243 @@
 import { useMemo, useState } from 'react'
 import { EmptyState } from '../../core/components/EmptyState'
-import { IconCaixaEntrada, IconCheckCircle } from '../../core/components/Icons'
-import { hojeISO } from '../../core/dates'
+import {
+  IconCaixaEntrada,
+  IconCalendario,
+  IconCheckCircle,
+  IconMais,
+  IconSol,
+} from '../../core/components/Icons'
+import { hojeISO, rotuloData } from '../../core/dates'
 import { QuickAdd } from './components/QuickAdd'
 import { TaskEditorSheet } from './components/TaskEditorSheet'
 import { TaskList } from './components/TaskList'
+import { EditorProjeto } from './components/EditorProjeto'
 import {
   filtrarConcluidas,
+  filtrarEntrada,
   filtrarHoje,
-  filtrarPendentes,
+  filtrarProjeto,
   filtrarProximas,
 } from './db'
-import { useTarefas } from './hooks'
-import type { Task } from './types'
+import { useProjetos, useTarefas } from './hooks'
+import type { Projeto, Task } from './types'
 
-type Aba = 'hoje' | 'proximas' | 'todas' | 'concluidas'
+type Visao = 'hoje' | 'proximas' | 'entrada' | 'concluidas' | { projeto: string }
 
-const ABAS: { id: Aba; rotulo: string }[] = [
-  { id: 'hoje', rotulo: 'Hoje' },
-  { id: 'proximas', rotulo: 'Próximas' },
-  { id: 'todas', rotulo: 'Todas' },
-  { id: 'concluidas', rotulo: 'Concluídas' },
-]
+function chaveVisao(v: Visao): string {
+  return typeof v === 'string' ? v : `projeto:${v.projeto}`
+}
 
 export function TarefasPage() {
   const tarefas = useTarefas()
-  const [aba, setAba] = useState<Aba>('hoje')
+  const projetos = useProjetos()
+  const [visao, setVisao] = useState<Visao>('hoje')
   const [selecionada, setSelecionada] = useState<Task | null>(null)
+  const [editorProjeto, setEditorProjeto] = useState<Projeto | null | undefined>(undefined)
 
-  const listas = useMemo(() => {
-    const todas = tarefas ?? []
-    return {
+  const todas = useMemo(() => tarefas ?? [], [tarefas])
+  const ps = projetos ?? []
+
+  const listas = useMemo(
+    () => ({
       hoje: filtrarHoje(todas),
       proximas: filtrarProximas(todas),
-      todas: filtrarPendentes(todas),
+      entrada: filtrarEntrada(todas),
       concluidas: filtrarConcluidas(todas),
-    }
-  }, [tarefas])
+    }),
+    [todas],
+  )
 
-  const vazios: Record<Aba, { titulo: string; descricao: string }> = {
-    hoje: { titulo: 'Nada para hoje', descricao: 'Adicione uma tarefa ou aproveite o dia livre.' },
-    proximas: { titulo: 'Nada agendado', descricao: 'Tarefas com data futura aparecem aqui.' },
-    todas: { titulo: 'Tudo limpo', descricao: 'Nenhuma tarefa pendente no momento.' },
-    concluidas: { titulo: 'Nada concluído ainda', descricao: 'As tarefas finalizadas ficam guardadas aqui.' },
-  }
+  const projetoAtual = typeof visao === 'object' ? ps.find((p) => p.id === visao.projeto) : undefined
+  const listaProjeto = projetoAtual ? filtrarProjeto(todas, projetoAtual.id) : []
+
+  const contagem = (p: Projeto) => todas.filter((t) => !t.concluidaEm && t.projetoId === p.id && !t.paiId).length
+
+  const smart: { id: Visao; rotulo: string; Icone: typeof IconSol; qtd: number }[] = [
+    { id: 'hoje', rotulo: 'Hoje', Icone: IconSol, qtd: listas.hoje.length },
+    { id: 'proximas', rotulo: 'Próximas', Icone: IconCalendario, qtd: listas.proximas.length },
+    { id: 'entrada', rotulo: 'Entrada', Icone: IconCaixaEntrada, qtd: listas.entrada.length },
+    { id: 'concluidas', rotulo: 'Concluídas', Icone: IconCheckCircle, qtd: 0 },
+  ]
+
+  const vKey = chaveVisao(visao)
+  const ehProjeto = typeof visao === 'object'
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-      <QuickAdd
-        dataPadrao={aba === 'hoje' ? hojeISO() : undefined}
-        placeholder={aba === 'hoje' ? 'Adicionar tarefa para hoje…' : 'Adicionar tarefa…'}
-      />
-
-      <nav className="flex gap-1 overflow-x-auto" aria-label="Filtros de tarefas">
-        {ABAS.map((a) => {
-          const ativa = aba === a.id
-          const qtd = listas[a.id].length
+      {/* Navegação de visões */}
+      <nav className="flex flex-wrap gap-1.5" aria-label="Visões de tarefas">
+        {smart.map((s) => {
+          const ativa = vKey === chaveVisao(s.id)
           return (
             <button
-              key={a.id}
-              onClick={() => setAba(a.id)}
-              className={`flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3.5 text-sm font-medium transition-colors ${
-                ativa ? 'bg-hover text-ink' : 'text-muted hover:bg-hover/60'
+              key={chaveVisao(s.id)}
+              onClick={() => setVisao(s.id)}
+              className={`flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[14px] font-medium transition-colors ${
+                ativa ? 'bg-ink text-surface' : 'bg-hover text-muted hover:text-ink'
               }`}
             >
-              {a.rotulo}
-              {qtd > 0 && (
-                <span className={`text-xs ${ativa ? 'text-muted' : 'text-muted/60'}`}>
-                  {qtd}
-                </span>
-              )}
+              <s.Icone width={15} height={15} />
+              {s.rotulo}
+              {s.qtd > 0 && <span className={ativa ? 'opacity-70' : 'text-muted/70'}>{s.qtd}</span>}
             </button>
           )
         })}
       </nav>
 
-      {tarefas && (
-        <TaskList
-          tarefas={listas[aba]}
-          onAbrir={setSelecionada}
-          ocultarData={aba === 'hoje'}
-          vazio={
-            <EmptyState
-              icone={aba === 'concluidas' ? <IconCheckCircle /> : <IconCaixaEntrada />}
-              titulo={vazios[aba].titulo}
-              descricao={vazios[aba].descricao}
-            />
-          }
+      {/* Projetos */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {ps.map((p) => {
+          const ativa = ehProjeto && (visao as { projeto: string }).projeto === p.id
+          return (
+            <button
+              key={p.id}
+              onClick={() => setVisao({ projeto: p.id })}
+              onDoubleClick={() => setEditorProjeto(p)}
+              className={`flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[14px] font-medium transition-colors ${
+                ativa ? 'bg-ink text-surface' : 'bg-hover text-muted hover:text-ink'
+              }`}
+            >
+              <span className="size-2.5 rounded-full" style={{ backgroundColor: p.cor ?? 'var(--vida-muted)' }} />
+              {p.nome}
+              {contagem(p) > 0 && <span className={ativa ? 'opacity-70' : 'text-muted/70'}>{contagem(p)}</span>}
+            </button>
+          )
+        })}
+        <button
+          onClick={() => setEditorProjeto(null)}
+          className="flex min-h-9 items-center gap-1 rounded-full border border-dashed border-line px-3 text-[13px] text-muted transition-colors hover:text-ink"
+        >
+          <IconMais width={14} height={14} /> Projeto
+        </button>
+      </div>
+
+      {/* Cabeçalho do projeto (com editar) */}
+      {ehProjeto && projetoAtual && (
+        <div className="flex items-center justify-between">
+          <h1 className="flex items-center gap-2 text-xl font-bold">
+            <span className="size-3 rounded-full" style={{ backgroundColor: projetoAtual.cor ?? 'var(--vida-muted)' }} />
+            {projetoAtual.nome}
+          </h1>
+          <button onClick={() => setEditorProjeto(projetoAtual)} className="text-[13px] text-muted hover:text-ink">
+            Editar
+          </button>
+        </div>
+      )}
+
+      {/* Quick add (some na visão Concluídas) */}
+      {visao !== 'concluidas' && (
+        <QuickAdd
+          projetos={ps}
+          dataPadrao={visao === 'hoje' ? hojeISO() : undefined}
+          projetoPadrao={ehProjeto ? (visao as { projeto: string }).projeto : undefined}
+          placeholder={visao === 'hoje' ? 'Adicionar tarefa para hoje…' : 'Adicionar tarefa…'}
         />
       )}
 
-      <TaskEditorSheet task={selecionada} onFechar={() => setSelecionada(null)} />
+      {/* Conteúdo */}
+      {tarefas && (
+        <Conteudo
+          visao={visao}
+          listas={listas}
+          listaProjeto={listaProjeto}
+          todas={todas}
+          projetos={ps}
+          onAbrir={setSelecionada}
+        />
+      )}
+
+      <TaskEditorSheet task={selecionada} projetos={ps} todas={todas} onFechar={() => setSelecionada(null)} />
+      <EditorProjeto
+        projeto={editorProjeto}
+        onFechar={() => setEditorProjeto(undefined)}
+        onCriado={(id) => setVisao({ projeto: id })}
+      />
     </div>
+  )
+}
+
+function Conteudo({
+  visao,
+  listas,
+  listaProjeto,
+  todas,
+  projetos,
+  onAbrir,
+}: {
+  visao: Visao
+  listas: { hoje: Task[]; proximas: Task[]; entrada: Task[]; concluidas: Task[] }
+  listaProjeto: Task[]
+  todas: Task[]
+  projetos: Projeto[]
+  onAbrir: (t: Task) => void
+}) {
+  const comum = { todas, projetos, onAbrir }
+
+  if (typeof visao === 'object') {
+    return (
+      <TaskList
+        {...comum}
+        tarefas={listaProjeto}
+        aninhar
+        vazio={<EmptyState icone={<IconCheckCircle />} titulo="Projeto vazio" descricao="Adicione a primeira tarefa deste projeto." />}
+      />
+    )
+  }
+
+  if (visao === 'proximas') {
+    // Agrupado por dia.
+    const grupos = new Map<string, Task[]>()
+    for (const t of listas.proximas) {
+      const arr = grupos.get(t.data!) ?? []
+      arr.push(t)
+      grupos.set(t.data!, arr)
+    }
+    if (grupos.size === 0) {
+      return <EmptyState icone={<IconCalendario />} titulo="Nada agendado" descricao="Tarefas com data futura aparecem aqui." />
+    }
+    return (
+      <div className="flex flex-col gap-4">
+        {[...grupos.entries()].map(([dia, tks]) => (
+          <section key={dia} className="flex flex-col gap-1">
+            <h2 className="px-1 text-[13px] font-semibold text-muted">{rotuloData(dia)}</h2>
+            <TaskList {...comum} tarefas={tks} ocultarData mostrarProjeto vazio={null} />
+          </section>
+        ))}
+      </div>
+    )
+  }
+
+  if (visao === 'concluidas') {
+    return (
+      <TaskList
+        {...comum}
+        tarefas={listas.concluidas}
+        mostrarProjeto
+        vazio={<EmptyState icone={<IconCheckCircle />} titulo="Nada concluído ainda" descricao="As tarefas finalizadas ficam guardadas aqui." />}
+      />
+    )
+  }
+
+  if (visao === 'entrada') {
+    return (
+      <TaskList
+        {...comum}
+        tarefas={listas.entrada}
+        aninhar
+        vazio={<EmptyState icone={<IconCaixaEntrada />} titulo="Entrada vazia" descricao="Tarefas sem projeto aparecem aqui." />}
+      />
+    )
+  }
+
+  // hoje
+  return (
+    <TaskList
+      {...comum}
+      tarefas={listas.hoje}
+      ocultarData
+      mostrarProjeto
+      vazio={<EmptyState icone={<IconSol />} titulo="Nada para hoje" descricao="Adicione uma tarefa ou aproveite o dia livre." />}
+    />
   )
 }

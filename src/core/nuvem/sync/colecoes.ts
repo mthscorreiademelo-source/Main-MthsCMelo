@@ -9,6 +9,7 @@ export interface ColecaoSync {
 
 export const COLECOES: ColecaoSync[] = [
   { colecao: 'tasks', chave: 'id' },
+  { colecao: 'projetos', chave: 'id' },
   { colecao: 'paginas', chave: 'id' },
   { colecao: 'grupos', chave: 'id' },
   { colecao: 'habitos', chave: 'id' },

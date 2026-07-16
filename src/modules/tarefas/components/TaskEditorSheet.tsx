@@ -1,49 +1,101 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../../../core/components/Button'
 import { Sheet } from '../../../core/components/Sheet'
-import { IconLixeira } from '../../../core/components/Icons'
-import { atualizarTarefa, excluirTarefa } from '../db'
-import type { Task } from '../types'
+import { IconLixeira, IconMais } from '../../../core/components/Icons'
+import {
+  alternarConclusao,
+  atualizarTarefa,
+  corPrioridade,
+  criarTarefa,
+  excluirTarefa,
+  PRIORIDADES,
+  subtarefas,
+} from '../db'
+import type { Projeto, Task, TipoRecorrencia } from '../types'
 
 interface Props {
   task: Task | null
+  projetos: Projeto[]
+  todas: Task[]
   onFechar: () => void
 }
 
-/** Edição em sheet lateral com salvamento automático (estilo Notion). */
-export function TaskEditorSheet({ task, onFechar }: Props) {
+const CAMPO =
+  'min-h-11 rounded-lg border border-line bg-transparent px-3 text-[15px] outline-none focus:border-muted/50'
+const ROTULO = 'text-[13px] font-medium text-muted'
+
+const RECORRENCIAS: { valor: TipoRecorrencia | ''; rotulo: string }[] = [
+  { valor: '', rotulo: 'Não repete' },
+  { valor: 'diaria', rotulo: 'Diariamente' },
+  { valor: 'semanal', rotulo: 'Semanalmente' },
+  { valor: 'mensal', rotulo: 'Mensalmente' },
+  { valor: 'anual', rotulo: 'Anualmente' },
+]
+
+export function TaskEditorSheet({ task, projetos, todas, onFechar }: Props) {
   const [titulo, setTitulo] = useState('')
-  const [nota, setNota] = useState('')
+  const [descricao, setDescricao] = useState('')
   const [data, setData] = useState('')
+  const [horario, setHorario] = useState('')
+  const [novaSub, setNovaSub] = useState('')
+  const [novaLabel, setNovaLabel] = useState('')
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
 
   useEffect(() => {
     if (task) {
       setTitulo(task.titulo)
-      setNota(task.nota ?? '')
+      setDescricao(task.descricao ?? '')
       setData(task.data ?? '')
+      setHorario(task.horario ?? '')
+      setNovaSub('')
+      setNovaLabel('')
       setConfirmandoExclusao(false)
     }
-    // Ressincroniza somente ao trocar de tarefa, não a cada tecla
   }, [task?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function salvarTitulo(valor: string) {
-    setTitulo(valor)
-    if (task && valor.trim()) {
-      atualizarTarefa(task.id, { titulo: valor.trim() })
-    }
-  }
+  if (!task) return <Sheet aberto={false} titulo="Tarefa" onFechar={onFechar}><div /></Sheet>
 
-  function salvarNota(valor: string) {
-    setNota(valor)
-    if (task) atualizarTarefa(task.id, { nota: valor.trim() || undefined })
-  }
+  const filhas = subtarefas(todas, task.id)
+  const labels = task.labels ?? []
 
-  function salvarData(valor: string) {
-    setData(valor)
-    if (task) atualizarTarefa(task.id, { data: valor || undefined })
+  function salvarTitulo(v: string) {
+    setTitulo(v)
+    if (task && v.trim()) atualizarTarefa(task.id, { titulo: v.trim() })
   }
-
+  function salvarDescricao(v: string) {
+    setDescricao(v)
+    if (task) atualizarTarefa(task.id, { descricao: v.trim() || undefined })
+  }
+  function salvarData(v: string) {
+    setData(v)
+    if (task) atualizarTarefa(task.id, { data: v || undefined })
+  }
+  function salvarHorario(v: string) {
+    setHorario(v)
+    if (task) atualizarTarefa(task.id, { horario: v || undefined })
+  }
+  function definirRecorrencia(tipo: TipoRecorrencia | '') {
+    if (!task) return
+    atualizarTarefa(task.id, { recorrencia: tipo ? { tipo } : undefined })
+  }
+  function adicionarLabel(e: FormEvent) {
+    e.preventDefault()
+    const l = novaLabel.trim()
+    if (!task || !l || labels.includes(l)) return
+    atualizarTarefa(task.id, { labels: [...labels, l] })
+    setNovaLabel('')
+  }
+  function removerLabel(l: string) {
+    if (!task) return
+    const rest = labels.filter((x) => x !== l)
+    atualizarTarefa(task.id, { labels: rest.length ? rest : undefined })
+  }
+  async function adicionarSub(e: FormEvent) {
+    e.preventDefault()
+    if (!task || !novaSub.trim()) return
+    await criarTarefa({ titulo: novaSub, paiId: task.id, projetoId: task.projetoId })
+    setNovaSub('')
+  }
   async function aoExcluir() {
     if (!task) return
     if (!confirmandoExclusao) {
@@ -56,7 +108,7 @@ export function TaskEditorSheet({ task, onFechar }: Props) {
 
   return (
     <Sheet aberto={!!task} titulo="Tarefa" onFechar={onFechar}>
-      <div className="flex h-full flex-col gap-5">
+      <div className="flex flex-col gap-5">
         <input
           value={titulo}
           onChange={(e) => salvarTitulo(e.target.value)}
@@ -64,33 +116,149 @@ export function TaskEditorSheet({ task, onFechar }: Props) {
           className="w-full bg-transparent text-xl font-semibold outline-none placeholder:text-muted/60"
         />
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium text-muted">Data</span>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={data}
-              onChange={(e) => salvarData(e.target.value)}
-              className="min-h-11 rounded-lg border border-line bg-transparent px-3 text-[15px] outline-none focus:border-muted/50"
-            />
-            {data && (
-              <Button onClick={() => salvarData('')} className="text-muted">
-                Remover
-              </Button>
-            )}
+        {/* Prioridade */}
+        <div className="flex flex-col gap-1.5">
+          <span className={ROTULO}>Prioridade</span>
+          <div className="flex gap-1.5">
+            {PRIORIDADES.map((p) => {
+              const ativo = task.prioridade === p.valor
+              return (
+                <button
+                  key={p.valor}
+                  onClick={() => atualizarTarefa(task.id, { prioridade: p.valor })}
+                  className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border text-[14px] font-semibold transition-colors"
+                  style={{
+                    borderColor: ativo ? p.cor : 'var(--vida-line)',
+                    backgroundColor: ativo ? `${p.cor}1a` : 'transparent',
+                    color: ativo ? p.cor : 'var(--vida-muted)',
+                  }}
+                >
+                  <span className="size-2.5 rounded-full" style={{ backgroundColor: p.cor }} />P
+                  {p.valor}
+                </button>
+              )
+            })}
           </div>
-        </label>
+        </div>
 
-        <label className="flex flex-1 flex-col gap-1.5">
-          <span className="text-[13px] font-medium text-muted">Nota</span>
+        {/* Data + hora */}
+        <div className="flex gap-3">
+          <label className="flex flex-1 flex-col gap-1.5">
+            <span className={ROTULO}>Data</span>
+            <input type="date" value={data} onChange={(e) => salvarData(e.target.value)} className={CAMPO} />
+          </label>
+          <label className="flex w-32 flex-col gap-1.5">
+            <span className={ROTULO}>Hora</span>
+            <input type="time" value={horario} onChange={(e) => salvarHorario(e.target.value)} className={CAMPO} />
+          </label>
+        </div>
+
+        {/* Projeto + recorrência */}
+        <div className="flex gap-3">
+          <label className="flex flex-1 flex-col gap-1.5">
+            <span className={ROTULO}>Projeto</span>
+            <select
+              value={task.projetoId ?? ''}
+              onChange={(e) => atualizarTarefa(task.id, { projetoId: e.target.value || undefined })}
+              className={CAMPO}
+            >
+              <option value="">Entrada</option>
+              {projetos.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-1 flex-col gap-1.5">
+            <span className={ROTULO}>Repetir</span>
+            <select
+              value={task.recorrencia?.tipo ?? ''}
+              onChange={(e) => definirRecorrencia(e.target.value as TipoRecorrencia | '')}
+              className={CAMPO}
+            >
+              {RECORRENCIAS.map((r) => (
+                <option key={r.valor} value={r.valor}>
+                  {r.rotulo}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {/* Labels */}
+        <div className="flex flex-col gap-1.5">
+          <span className={ROTULO}>Etiquetas</span>
+          {labels.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {labels.map((l) => (
+                <span key={l} className="flex items-center gap-1 rounded-full bg-hover px-2.5 py-1 text-[13px]">
+                  {l}
+                  <button onClick={() => removerLabel(l)} className="text-muted hover:text-ink" aria-label={`Remover ${l}`}>
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <form onSubmit={adicionarLabel}>
+            <input
+              value={novaLabel}
+              onChange={(e) => setNovaLabel(e.target.value)}
+              placeholder="Adicionar etiqueta e Enter"
+              className={`${CAMPO} w-full`}
+            />
+          </form>
+        </div>
+
+        {/* Descrição */}
+        <label className="flex flex-col gap-1.5">
+          <span className={ROTULO}>Descrição</span>
           <textarea
-            value={nota}
-            onChange={(e) => salvarNota(e.target.value)}
+            value={descricao}
+            onChange={(e) => salvarDescricao(e.target.value)}
             placeholder="Detalhes, links, contexto…"
-            rows={6}
-            className="w-full flex-1 resize-none rounded-lg border border-line bg-transparent px-3 py-2.5 text-[15px] leading-relaxed outline-none placeholder:text-muted/60 focus:border-muted/50"
+            rows={4}
+            className="w-full resize-none rounded-lg border border-line bg-transparent px-3 py-2.5 text-[15px] leading-relaxed outline-none placeholder:text-muted/60 focus:border-muted/50"
           />
         </label>
+
+        {/* Subtarefas */}
+        <div className="flex flex-col gap-1.5">
+          <span className={ROTULO}>
+            Subtarefas {filhas.length > 0 && `· ${filhas.filter((f) => f.concluidaEm).length}/${filhas.length}`}
+          </span>
+          <ul className="flex flex-col">
+            {filhas.map((f) => (
+              <li key={f.id} className="flex items-center gap-2 py-1">
+                <button
+                  role="checkbox"
+                  aria-checked={!!f.concluidaEm}
+                  onClick={() => alternarConclusao(f)}
+                  className="flex size-6 shrink-0 items-center justify-center rounded-full border-[1.5px]"
+                  style={{
+                    borderColor: corPrioridade(f.prioridade),
+                    backgroundColor: f.concluidaEm ? corPrioridade(f.prioridade) : 'transparent',
+                  }}
+                >
+                  {f.concluidaEm && <span className="text-[10px] text-white">✓</span>}
+                </button>
+                <span className={`text-[14px] ${f.concluidaEm ? 'text-muted line-through' : ''}`}>{f.titulo}</span>
+              </li>
+            ))}
+          </ul>
+          <form onSubmit={adicionarSub} className="flex items-center gap-1">
+            <span className="flex size-6 items-center justify-center text-muted">
+              <IconMais width={15} height={15} />
+            </span>
+            <input
+              value={novaSub}
+              onChange={(e) => setNovaSub(e.target.value)}
+              placeholder="Adicionar subtarefa"
+              className="min-w-0 flex-1 bg-transparent py-1.5 text-[14px] outline-none placeholder:text-muted/60"
+            />
+          </form>
+        </div>
 
         <Button variante="perigo" onClick={aoExcluir} className="self-start">
           <IconLixeira width={16} height={16} />
