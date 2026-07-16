@@ -3,7 +3,15 @@ import type { ResumoDia } from '../progresso'
 import { AnelProgresso } from './AnelProgresso'
 
 /** Cabeçalho do dia: anel de progresso + porcentagem, feitos/total e streak. */
-export function CabecalhoProgresso({ resumo, streak }: { resumo: ResumoDia; streak: number }) {
+export function CabecalhoProgresso({
+  resumo,
+  streak,
+  ehHoje = true,
+}: {
+  resumo: ResumoDia
+  streak: number
+  ehHoje?: boolean
+}) {
   const pct = Math.round(resumo.fracao * 100)
   const tudoFeito = resumo.total > 0 && resumo.feitos === resumo.total
   return (
@@ -14,10 +22,14 @@ export function CabecalhoProgresso({ resumo, streak }: { resumo: ResumoDia; stre
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <p className="text-[15px] font-semibold">
           {resumo.total === 0
-            ? 'Nada previsto para hoje'
+            ? ehHoje
+              ? 'Nada previsto para hoje'
+              : 'Nada previsto neste dia'
             : tudoFeito
               ? 'Dia completo! 🎉'
-              : 'Progresso de hoje'}
+              : ehHoje
+                ? 'Progresso de hoje'
+                : 'Progresso do dia'}
         </p>
         <p className="text-[13px] text-muted">
           <span className="font-semibold text-ink">{resumo.feitos}</span> de {resumo.total} hábito

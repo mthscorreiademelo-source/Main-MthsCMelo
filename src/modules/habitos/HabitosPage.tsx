@@ -8,6 +8,7 @@ import { CartaoHabito } from './components/CartaoHabito'
 import { CategoriaSecao } from './components/CategoriaSecao'
 import { EditorHabito } from './components/EditorHabito'
 import { GerenciarCategorias } from './components/GerenciarCategorias'
+import { NavegadorData } from './components/NavegadorData'
 import { alternarRecolhida, garantirSeedsHabitos, ordenarHabitos } from './db'
 import { sincronizarIntegracoes } from './integracoes'
 import { agendarLembretes } from './lembretes'
@@ -37,7 +38,8 @@ export function HabitosPage() {
   const habitos = useHabitos()
   const registros = useRegistros()
   const categorias = useCategoriasHabito()
-  const data = hojeISO()
+  const [data, setData] = useState(hojeISO())
+  const ehHoje = data === hojeISO()
 
   const nSaude = useContagemSaude()
 
@@ -128,7 +130,11 @@ export function HabitosPage() {
         </div>
       </div>
 
-      {!vazio && ativos.length > 0 && <CabecalhoProgresso resumo={resumo} streak={streak} />}
+      {!vazio && ativos.length > 0 && <NavegadorData data={data} onData={setData} />}
+
+      {!vazio && ativos.length > 0 && (
+        <CabecalhoProgresso resumo={resumo} streak={streak} ehHoje={ehHoje} />
+      )}
 
       {vazio ? (
         <EmptyState
