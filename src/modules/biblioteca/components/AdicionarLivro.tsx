@@ -11,6 +11,7 @@ const CAMPO =
 export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
   const inputArquivo = useRef<HTMLInputElement>(null)
   const inputCapa = useRef<HTMLInputElement>(null)
+  const inputTitulo = useRef<HTMLInputElement>(null)
   const [titulo, setTitulo] = useState('')
   const [autor, setAutor] = useState('')
   const [tipo, setTipo] = useState<TipoObra>('livro')
@@ -55,7 +56,9 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
 
   async function salvar() {
     if (!titulo.trim()) {
-      setErro('Dê um título ao livro.')
+      setErro('Dê um título ao livro para adicionar.')
+      inputTitulo.current?.focus()
+      inputTitulo.current?.scrollIntoView({ block: 'center' })
       return
     }
     const livro = novoLivro({
@@ -155,7 +158,13 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
 
       <label className="flex flex-col gap-1">
         <span className="text-[13px] font-medium text-muted">Título</span>
-        <input className={CAMPO} value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+        <input
+          ref={inputTitulo}
+          className={CAMPO}
+          value={titulo}
+          onChange={(e) => setTitulo(e.target.value)}
+          placeholder="Nome do livro"
+        />
       </label>
       <label className="flex flex-col gap-1">
         <span className="text-[13px] font-medium text-muted">Autor</span>
