@@ -1,4 +1,5 @@
 import {
+  addDays,
   format,
   isSameMonth,
   parseISO,
@@ -9,6 +10,42 @@ import { hojeISO } from '../../core/dates'
 import { ehMedido } from './db'
 import { devidoNoDia } from './freq'
 import type { Habito, HabitoRegistro } from './types'
+
+/** Nº de dias "feitos" (concluídos) na semana que contém `data`. */
+export function contagemSemana(
+  h: Habito,
+  registros: HabitoRegistro[] | Map<string, HabitoRegistro>,
+  data: string,
+): number {
+  const mapa =
+    registros instanceof Map ? registros : mapaPorData(registros, h.id)
+  const ini = startOfWeek(parseISO(data), { weekStartsOn: 0 })
+  let n = 0
+  for (let i = 0; i < 7; i++) {
+    const d = format(addDays(ini, i), 'yyyy-MM-dd')
+    if (estaCompleto(h, mapa.get(d))) n++
+  }
+  return n
+}
+
+/**
+ * O hábito está "cumprido" nesse dia? Para frequência semanal (X vezes/semana),
+ * conta como cumprido quando a meta da semana já foi atingida — assim ele para
+ * de cobrar depois que você bate o alvo. Nos demais tipos, é a conclusão do dia.
+ */
+export function diaConcluido(
+  h: Habito,
+  registros: HabitoRegistro[] | Map<string, HabitoRegistro>,
+  data: string,
+): boolean {
+  if (h.frequencia?.tipo === 'semanal') {
+    const alvo = Math.max(1, h.frequencia.vezes ?? 1)
+    return contagemSemana(h, registros, data) >= alvo
+  }
+  const mapa =
+    registros instanceof Map ? registros : mapaPorData(registros, h.id)
+  return estaCompleto(h, mapa.get(data))
+}
 
 /** Meta efetiva do hábito (medido = meta||1; checklist = nº de itens). */
 export function metaHabito(h: Habito): number {
@@ -73,9 +110,8 @@ export function resumoDoDia(
   registros: HabitoRegistro[],
   data: string,
 ): ResumoDia {
-  const doDia = registrosDoDia(registros, data)
   const devidos = habitos.filter((h) => !h.arquivado && devidoNoDia(h, data))
-  const feitos = devidos.filter((h) => estaCompleto(h, doDia.get(h.id))).length
+  const feitos = devidos.filter((h) => diaConcluido(h, registros, data)).length
   const total = devidos.length
   return { total, feitos, fracao: total ? feitos / total : 0 }
 }
@@ -236,4 +272,115 @@ export function estatisticasHabito(
     feitosMes,
     media: nValor > 0 ? somaValor / nValor : null,
   }
+}
+
+// ---------- Estatísticas globais (aba de estatísticas) ----------
+
+export interface DiaSerie {
+  data: string
+  feitos: number
+  total: number
+  fracao: number
+}
+
+/** Série diária (mais antigo → hoje) com o resumo de cada dia. */
+export function serieUltimosDias(
+  habitos: Habito[],
+  registros: HabitoRegistro[],
+  n: number,
+): DiaSerie[] {
+  const hoje = parseISO(hojeISO())
+  const ativos = habitos.filter((h) => !h.arquivado)
+  return Array.from({ length: n }, (_, i) => {
+    const d = format(subDays(hoje, n - 1 - i), 'yyyy-MM-dd')
+    const r = resumoDoDia(ativos, registros, d)
+    return { data: d, feitos: r.feitos, total: r.total, fracao: r.fracao }
+  })
+}
+
+/** Série para o mapa de calor global (estado por fração do dia). */
+export function heatmapGlobal(
+  habitos: Habito[],
+  registros: HabitoRegistro[],
+  dias: number,
+): DiaHeatmap[] {
+  return serieUltimosDias(habitos, registros, dias).map((s) => ({
+    data: s.data,
+    fracao: s.fracao,
+    estado: s.total === 0 ? 'pendente' : s.fracao >= 1 ? 'feito' : s.fracao > 0 ? 'parcial' : 'pendente',
+    devido: s.total > 0,
+  }))
+}
+
+export interface EstatGlobais {
+  ativos: number
+  taxa: number
+  diasPerfeitos: number
+  melhorDia: number
+  concluidosHoje: number
+  totalHoje: number
+  registrosTotais: number
+}
+
+/** Panorama geral considerando os últimos `janela` dias (padrão 30). */
+export function estatGlobais(
+  habitos: Habito[],
+  registros: HabitoRegistro[],
+  janela = 30,
+): EstatGlobais {
+  const ativos = habitos.filter((h) => !h.arquivado)
+  const serie = serieUltimosDias(ativos, registros, janela)
+  let somaFeitos = 0
+  let somaDevidos = 0
+  let diasPerfeitos = 0
+  let melhorDia = 0
+  for (const s of serie) {
+    somaFeitos += s.feitos
+    somaDevidos += s.total
+    if (s.total > 0 && s.feitos === s.total) diasPerfeitos++
+    melhorDia = Math.max(melhorDia, s.fracao)
+  }
+  const hoje = serie[serie.length - 1]
+  return {
+    ativos: ativos.length,
+    taxa: somaDevidos > 0 ? somaFeitos / somaDevidos : 0,
+    diasPerfeitos,
+    melhorDia,
+    concluidosHoje: hoje?.feitos ?? 0,
+    totalHoje: hoje?.total ?? 0,
+    registrosTotais: registros.length,
+  }
+}
+
+export interface LinhaRanking {
+  habito: Habito
+  taxa: number
+  feitos: number
+  devidos: number
+  streak: number
+}
+
+/** Ranking dos hábitos por taxa de conclusão nos últimos `janela` dias. */
+export function rankingHabitos(
+  habitos: Habito[],
+  registros: HabitoRegistro[],
+  janela = 30,
+): LinhaRanking[] {
+  const hoje = parseISO(hojeISO())
+  return habitos
+    .filter((h) => !h.arquivado)
+    .map((h) => {
+      const mapa = mapaPorData(registros, h.id)
+      let feitos = 0
+      let devidos = 0
+      for (let i = 0; i < janela; i++) {
+        const ds = format(subDays(hoje, i), 'yyyy-MM-dd')
+        if (!devidoNoDia(h, ds)) continue
+        devidos++
+        if (estadoDia(h, mapa.get(ds)) === 'feito') feitos++
+      }
+      const st = estatisticasHabito(h, registros).streak
+      return { habito: h, taxa: devidos > 0 ? feitos / devidos : 0, feitos, devidos, streak: st }
+    })
+    .sort((a, b) => b.taxa - a.taxa || b.streak - a.streak)
 }

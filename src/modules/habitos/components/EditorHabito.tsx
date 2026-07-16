@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
 import { FolhaInferior } from '../../../core/components/FolhaInferior'
-import { IconCheck, IconLixeira, IconMais } from '../../../core/components/Icons'
+import { IconCheck, IconFechar, IconLixeira, IconMais, IconSino } from '../../../core/components/Icons'
 import { CHAVES_ICONE, IconeFator } from '../../../core/components/icones'
 import {
   atualizarHabito,
@@ -12,6 +12,8 @@ import {
   TIPOS,
 } from '../db'
 import { NOMES_DIA } from '../freq'
+import { FONTES, fonteDe } from '../integracoes'
+import { estadoNotificacoes, pedirPermissaoNotificacoes, type EstadoNotif } from '../lembretes'
 import type {
   CategoriaHabito,
   Frequencia,
@@ -55,9 +57,17 @@ export function EditorHabito({
   const [categoriaId, setCategoriaId] = useState(habito?.categoriaId ?? categoriaInicial ?? '')
   const [cor, setCor] = useState(habito?.cor ?? PALETA[3])
   const [icone, setIcone] = useState(habito?.icone ?? 'folha')
-  const [horario, setHorario] = useState(habito?.horario ?? '')
+  const horario = habito?.horario ?? ''
   const [prioridade, setPrioridade] = useState<number | undefined>(habito?.prioridade)
+  const [fonteId, setFonteId] = useState(habito?.fonteId ?? '')
+  const [lembretes, setLembretes] = useState<string[]>(
+    habito?.lembretes ?? (habito?.horario ? [habito.horario] : []),
+  )
+  const [novoLembrete, setNovoLembrete] = useState('08:00')
+  const [permNotif, setPermNotif] = useState<EstadoNotif>(estadoNotificacoes())
   const [erro, setErro] = useState<string | null>(null)
+
+  const fonte = fonteDe(fonteId)
 
   const f0 = habito?.frequencia ?? { tipo: 'diario' as TipoFrequencia }
   const [freqTipo, setFreqTipo] = useState<TipoFrequencia>(f0.tipo)
@@ -73,6 +83,28 @@ export function EditorHabito({
     setTipo(t)
     const nova = tipoInfo(t)
     if (nova.medido && !unidade) setUnidade(nova.unidade)
+  }
+
+  function trocarFonte(id: string) {
+    setFonteId(id)
+    const f = fonteDe(id)
+    if (f) {
+      setTipo(f.tipoSugerido)
+      setUnidade(f.unidade)
+      if (!habito) {
+        setIcone(f.icone)
+        setCor(f.cor)
+      }
+    }
+  }
+
+  function adicionarLembrete() {
+    if (!/^\d{1,2}:\d{2}$/.test(novoLembrete)) return
+    setLembretes((s) => (s.includes(novoLembrete) ? s : [...s, novoLembrete].sort()))
+  }
+
+  async function ativarNotificacoes() {
+    setPermNotif(await pedirPermissaoNotificacoes())
   }
 
   function toggleDia(d: number) {
@@ -110,12 +142,14 @@ export function EditorHabito({
       icone,
       categoriaId: categoriaId || undefined,
       frequencia: montarFrequencia(),
-      horario: horario || undefined,
+      horario: lembretes[0] ?? (horario || undefined),
+      lembretes: lembretes.length ? lembretes : undefined,
+      fonteId: fonteId || undefined,
       prioridade,
       unidade: medido ? unidade.trim() || undefined : undefined,
       meta: medido ? Math.max(1, Number(meta) || 1) : undefined,
       passo: medido ? Math.max(1, Number(passo) || 1) : undefined,
-      itens: tipo === 'checklist' ? itens.filter((i) => i.texto.trim()) : undefined,
+      itens: tipo === 'checklist' && !fonteId ? itens.filter((i) => i.texto.trim()) : undefined,
     }
     if (editando && habito) await atualizarHabito(habito.id, dados)
     else await criarHabito(dados)
@@ -176,21 +210,57 @@ export function EditorHabito({
         </div>
       </div>
 
-      {/* Tipo de medição */}
+      {/* Integração automática (preenche o valor a partir de outro módulo) */}
       <div className="flex flex-col gap-2">
-        <span className={ROTULO}>Tipo</span>
+        <span className={ROTULO}>Preenchimento automático</span>
         <div className="flex flex-wrap gap-1.5">
-          {TIPOS.map((t) => (
+          <button
+            onClick={() => trocarFonte('')}
+            className={`min-h-8 cursor-pointer rounded-full px-3 text-[13px] font-medium transition-colors ${!fonteId ? 'bg-ink text-surface' : 'bg-hover text-muted hover:text-ink'}`}
+          >
+            Manual
+          </button>
+          {FONTES.map((f) => (
             <button
-              key={t.tipo}
-              onClick={() => trocarTipo(t.tipo)}
-              className={`min-h-8 cursor-pointer rounded-full px-3 text-[13px] font-medium transition-colors ${tipo === t.tipo ? 'bg-ink text-surface' : 'bg-hover text-muted hover:text-ink'}`}
+              key={f.id}
+              onClick={() => trocarFonte(f.id)}
+              className="flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-colors"
+              style={
+                fonteId === f.id
+                  ? { backgroundColor: f.cor, color: '#fff' }
+                  : { backgroundColor: 'var(--vida-hover)', color: 'var(--vida-muted)' }
+              }
             >
-              {t.rotulo}
+              <IconeFator nome={f.icone} width={14} height={14} />
+              {f.rotulo}
             </button>
           ))}
         </div>
+        {fonte && (
+          <p className="text-[12px] text-muted">
+            O valor do dia vem de <strong>{fonte.modulo}</strong> ({fonte.rotulo}). Defina só a meta
+            diária abaixo — o progresso é preenchido sozinho.
+          </p>
+        )}
       </div>
+
+      {/* Tipo de medição (oculto quando há integração — a fonte define o tipo) */}
+      {!fonte && (
+        <div className="flex flex-col gap-2">
+          <span className={ROTULO}>Tipo</span>
+          <div className="flex flex-wrap gap-1.5">
+            {TIPOS.map((t) => (
+              <button
+                key={t.tipo}
+                onClick={() => trocarTipo(t.tipo)}
+                className={`min-h-8 cursor-pointer rounded-full px-3 text-[13px] font-medium transition-colors ${tipo === t.tipo ? 'bg-ink text-surface' : 'bg-hover text-muted hover:text-ink'}`}
+              >
+                {t.rotulo}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Campos do tipo medido */}
       {medido && (
@@ -211,7 +281,7 @@ export function EditorHabito({
       )}
 
       {/* Itens do checklist */}
-      {tipo === 'checklist' && (
+      {tipo === 'checklist' && !fonte && (
         <div className="flex flex-col gap-2">
           <span className={ROTULO}>Itens</span>
           {itens.map((it, i) => (
@@ -310,26 +380,76 @@ export function EditorHabito({
         )}
       </div>
 
-      {/* Horário + prioridade */}
-      <div className="flex gap-3">
-        <label className="flex flex-1 flex-col gap-1">
-          <span className={ROTULO}>Horário (opcional)</span>
-          <input className={CAMPO} type="time" value={horario} onChange={(e) => setHorario(e.target.value)} />
-        </label>
-        <div className="flex flex-1 flex-col gap-1">
-          <span className={ROTULO}>Prioridade</span>
-          <div className="flex gap-1.5">
-            {[1, 2, 3, 4].map((p) => (
-              <button
-                key={p}
-                onClick={() => setPrioridade((v) => (v === p ? undefined : p))}
-                className={`min-h-10 flex-1 cursor-pointer rounded-lg border text-[13px] font-semibold transition-colors ${prioridade === p ? 'border-ink bg-ink text-surface' : 'border-line text-muted'}`}
+      {/* Prioridade */}
+      <div className="flex flex-col gap-1">
+        <span className={ROTULO}>Prioridade</span>
+        <div className="flex gap-1.5">
+          {[1, 2, 3, 4].map((p) => (
+            <button
+              key={p}
+              onClick={() => setPrioridade((v) => (v === p ? undefined : p))}
+              className={`min-h-10 flex-1 cursor-pointer rounded-lg border text-[13px] font-semibold transition-colors ${prioridade === p ? 'border-ink bg-ink text-surface' : 'border-line text-muted'}`}
+            >
+              P{p}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Lembretes */}
+      <div className="flex flex-col gap-2">
+        <span className={ROTULO}>Lembretes</span>
+        {lembretes.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {lembretes.map((hh) => (
+              <span
+                key={hh}
+                className="flex items-center gap-1.5 rounded-full bg-hover px-3 py-1 text-[13px] font-medium text-ink"
               >
-                P{p}
-              </button>
+                <IconSino width={13} height={13} className="text-muted" />
+                {hh}
+                <button
+                  onClick={() => setLembretes((s) => s.filter((x) => x !== hh))}
+                  className="text-muted hover:text-ink"
+                  aria-label={`Remover lembrete ${hh}`}
+                >
+                  <IconFechar width={13} height={13} />
+                </button>
+              </span>
             ))}
           </div>
+        )}
+        <div className="flex gap-2">
+          <input
+            className={`${CAMPO} w-32`}
+            type="time"
+            value={novoLembrete}
+            onChange={(e) => setNovoLembrete(e.target.value)}
+          />
+          <button
+            onClick={adicionarLembrete}
+            className="flex min-h-10 items-center gap-1 rounded-lg border border-line px-3 text-[13px] font-medium text-muted transition-colors hover:text-ink"
+          >
+            <IconMais width={15} height={15} /> Adicionar
+          </button>
         </div>
+        {lembretes.length > 0 && permNotif !== 'granted' && (
+          <div className="flex flex-col gap-1 rounded-lg bg-hover/60 px-3 py-2 text-[12px] text-muted">
+            {permNotif === 'indisponivel' ? (
+              <span>Este dispositivo não suporta notificações.</span>
+            ) : permNotif === 'denied' ? (
+              <span>Notificações bloqueadas — libere nas configurações do navegador.</span>
+            ) : (
+              <button
+                onClick={ativarNotificacoes}
+                className="self-start rounded-md bg-ink px-3 py-1.5 text-[12px] font-medium text-surface"
+              >
+                Ativar notificações
+              </button>
+            )}
+            <span>Os avisos chegam enquanto o app está aberto (PWA local, sem servidor).</span>
+          </div>
+        )}
       </div>
 
       {erro && <p className="text-[13px] text-red-500">{erro}</p>}

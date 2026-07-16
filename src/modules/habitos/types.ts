@@ -43,6 +43,10 @@ export interface Habito {
   frequencia: Frequencia
   /** horário sugerido HH:mm. */
   horario?: string
+  /** horários de lembrete no dia (HH:mm). Notificações locais. */
+  lembretes?: string[]
+  /** id de uma fonte de integração (ex.: 'saude:passos') — valor automático. */
+  fonteId?: string
   /** 1 (alta) … 4 (baixa). */
   prioridade?: number
   ordem: number

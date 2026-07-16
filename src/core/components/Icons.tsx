@@ -421,3 +421,32 @@ export function IconEstrela(props: IconProps) {
     </svg>
   )
 }
+
+export function IconGrafico(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 20V4" />
+      <path d="M4 20h16" />
+      <rect x="7" y="12" width="3" height="5" rx="0.6" />
+      <rect x="12" y="8" width="3" height="9" rx="0.6" />
+      <rect x="17" y="5" width="3" height="12" rx="0.6" />
+    </svg>
+  )
+}
+
+export function IconSino(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M18 9a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6" />
+      <path d="M10.5 20a2 2 0 0 0 3 0" />
+    </svg>
+  )
+}
+
+export function IconRaio(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M13 2 4 14h7l-1 8 9-12h-7z" />
+    </svg>
+  )
+}

@@ -70,6 +70,62 @@ body {
   }
 }
 
+/* Animações do módulo Hábitos */
+@keyframes lume-pop {
+  0% {
+    transform: scale(0.35);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.14);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.lume-pop {
+  animation: lume-pop 0.34s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes lume-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.lume-entrada {
+  animation: lume-entrada 0.24s ease-out both;
+}
+
+/* Colapso suave (categorias) via grid-template-rows 1fr↔0fr */
+.lume-colapso {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.lume-colapso[data-recolhido='true'] {
+  grid-template-rows: 0fr;
+}
+.lume-colapso > .lume-colapso-conteudo {
+  overflow: hidden;
+  min-height: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lume-pop,
+  .lume-entrada {
+    animation: none;
+  }
+  .lume-colapso {
+    transition: none;
+  }
+}
+
 /* Barra de rolagem discreta */
 * {
   scrollbar-width: thin;

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconCheck, IconFechar, IconLapis } from '../../../core/components/Icons'
+import { IconCheck, IconFechar, IconLapis, IconRaio } from '../../../core/components/Icons'
 import { IconeFator } from '../../../core/components/icones'
 import { ajustarValor, alternarItem, cicloSimNao, ehMedido } from '../db'
 import { rotuloFrequencia } from '../freq'
@@ -14,56 +14,68 @@ export function CartaoHabito({
   habito,
   registro,
   data,
+  semana,
   onEditar,
 }: {
   habito: Habito
   registro: HabitoRegistro | undefined
   data: string
+  /** Progresso da semana (só para frequência "X vezes por semana"). */
+  semana?: { feitos: number; meta: number }
   onEditar: (h: Habito) => void
 }) {
   const navigate = useNavigate()
   const [aberto, setAberto] = useState(false)
   const cor = habito.cor ?? 'var(--vida-ink)'
-  const completo = estaCompleto(habito, registro)
-  const frac = fracao(habito, registro)
   const atual = valorDoDia(habito, registro)
   const medido = ehMedido(habito.tipo)
+  const auto = !!habito.fonteId
   const passo = habito.passo && habito.passo > 0 ? habito.passo : 1
   const feitosItens = registro?.itens ?? []
   const estado = habito.tipo === 'sim_nao' ? estadoDia(habito, registro) : undefined
   const falhou = estado === 'falhou'
 
+  const ehSemanal = !!semana
+  const semanalCompleto = ehSemanal && semana.feitos >= semana.meta
+  const completo = ehSemanal ? semanalCompleto : estaCompleto(habito, registro)
+  const frac = ehSemanal ? Math.min(1, semana.feitos / Math.max(1, semana.meta)) : fracao(habito, registro)
+  const checkSimNao = estado === 'feito' || semanalCompleto
+  const falhouVisual = falhou && !ehSemanal
+
   function primaria() {
-    if (habito.tipo === 'sim_nao') cicloSimNao(habito.id, data)
+    if (auto) navigate(`/habitos/${habito.id}`)
+    else if (habito.tipo === 'sim_nao') cicloSimNao(habito.id, data)
     else if (medido) ajustarValor(habito, data, passo)
     else if (habito.tipo === 'checklist') setAberto((v) => !v)
   }
 
-  const sub = medido
-    ? `${atual % 1 ? atual : Math.round(atual)} / ${metaHabito(habito)}${habito.unidade ? ' ' + habito.unidade : ''} · ${rotuloFrequencia(habito.frequencia)}`
-    : habito.tipo === 'checklist'
-      ? `${feitosItens.length} / ${habito.itens?.length ?? 0} · ${rotuloFrequencia(habito.frequencia)}`
-      : falhou
-        ? `Não feito · ${rotuloFrequencia(habito.frequencia)}`
-        : habito.descricao || rotuloFrequencia(habito.frequencia)
+  const sub = ehSemanal
+    ? `${semana.feitos} / ${semana.meta} nesta semana`
+    : medido
+      ? `${atual % 1 ? atual : Math.round(atual)} / ${metaHabito(habito)}${habito.unidade ? ' ' + habito.unidade : ''} · ${rotuloFrequencia(habito.frequencia)}`
+      : habito.tipo === 'checklist'
+        ? `${feitosItens.length} / ${habito.itens?.length ?? 0} · ${rotuloFrequencia(habito.frequencia)}`
+        : falhou
+          ? `Não feito · ${rotuloFrequencia(habito.frequencia)}`
+          : habito.descricao || rotuloFrequencia(habito.frequencia)
 
   const bordaEstilo = completo
     ? { borderColor: `${cor}66`, backgroundColor: `${cor}0f` }
-    : falhou
+    : falhouVisual
       ? { borderColor: `${VERMELHO}55`, backgroundColor: `${VERMELHO}0d` }
       : undefined
 
   function miolo() {
     if (habito.tipo === 'sim_nao') {
-      if (estado === 'feito')
+      if (checkSimNao)
         return (
-          <span className="flex size-8 items-center justify-center rounded-full" style={{ backgroundColor: cor, color: '#fff' }}>
+          <span className="lume-pop flex size-8 items-center justify-center rounded-full" style={{ backgroundColor: cor, color: '#fff' }}>
             <IconCheck width={18} height={18} />
           </span>
         )
       if (estado === 'falhou')
         return (
-          <span className="flex size-8 items-center justify-center rounded-full" style={{ backgroundColor: VERMELHO, color: '#fff' }}>
+          <span className="lume-pop flex size-8 items-center justify-center rounded-full" style={{ backgroundColor: VERMELHO, color: '#fff' }}>
             <IconFechar width={16} height={16} />
           </span>
         )
@@ -94,7 +106,7 @@ export function CartaoHabito({
           aria-label="Alternar estado"
           className="shrink-0 rounded-full transition-transform active:scale-90"
         >
-          <AnelProgresso fracao={falhou ? 0 : frac} tamanho={44} espessura={4} cor={falhou ? VERMELHO : cor}>
+          <AnelProgresso fracao={falhouVisual ? 0 : frac} tamanho={44} espessura={4} cor={falhouVisual ? VERMELHO : cor}>
             {miolo()}
           </AnelProgresso>
         </button>
@@ -102,12 +114,15 @@ export function CartaoHabito({
         <button onClick={() => navigate(`/habitos/${habito.id}`)} className="min-w-0 flex-1 py-1 text-left">
           <span className="flex items-center gap-1.5">
             <span className="truncate text-[15px] font-semibold">{habito.nome}</span>
+            {auto && (
+              <IconRaio width={12} height={12} className="shrink-0 text-muted/70" aria-label="Automático" />
+            )}
             {habito.horario && <span className="shrink-0 text-[11px] text-muted/80">{habito.horario}</span>}
           </span>
           <span className="block truncate text-[12px] text-muted">{sub}</span>
         </button>
 
-        {medido && atual > 0 && (
+        {medido && atual > 0 && !auto && (
           <button
             onClick={() => ajustarValor(habito, data, -passo)}
             aria-label="Diminuir"

@@ -27,6 +27,11 @@ export function useCategoriasHabito(): CategoriaHabito[] | undefined {
   return useLiveQuery(() => db.categoriasHabito.toArray(), [])
 }
 
+/** Contagem de dias de Saúde — dispara a re-sincronização das integrações. */
+export function useContagemSaude(): number | undefined {
+  return useLiveQuery(() => db.saude.count(), [])
+}
+
 export function useHabito(id: string | undefined): Habito | undefined {
   return useLiveQuery(async () => {
     if (!id) return undefined

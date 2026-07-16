@@ -5,7 +5,7 @@ import { hojeISO } from '../../../core/dates'
 import { ordenarHabitos } from '../db'
 import { devidoNoDia } from '../freq'
 import { useHabitos, useRegistros } from '../hooks'
-import { registrosDoDia, resumoDoDia } from '../progresso'
+import { contagemSemana, registrosDoDia, resumoDoDia } from '../progresso'
 import { CartaoHabito } from './CartaoHabito'
 
 /** Seção de hábitos para o dashboard Hoje: os hábitos devidos hoje, com um-toque. */
@@ -34,6 +34,14 @@ export function HabitosHoje() {
             habito={h}
             registro={regs.get(h.id)}
             data={data}
+            semana={
+              h.frequencia?.tipo === 'semanal'
+                ? {
+                    feitos: contagemSemana(h, registros ?? [], data),
+                    meta: Math.max(1, h.frequencia.vezes ?? 1),
+                  }
+                : undefined
+            }
             onEditar={() => navigate('/habitos')}
           />
         ))}

@@ -12,6 +12,7 @@ export function CategoriaSecao({
   recolhida,
   habitos,
   registros,
+  semanaInfo,
   data,
   onToggle,
   onEditar,
@@ -22,14 +23,20 @@ export function CategoriaSecao({
   recolhida: boolean
   habitos: Habito[]
   registros: Map<string, HabitoRegistro>
+  semanaInfo?: Map<string, { feitos: number; meta: number }>
   data: string
   onToggle: () => void
   onEditar: (h: Habito) => void
 }) {
   if (habitos.length === 0) return null
   const c = cor ?? 'var(--vida-muted)'
+  const concluido = (h: Habito) => {
+    const s = semanaInfo?.get(h.id)
+    if (s) return s.feitos >= s.meta
+    return estaCompleto(h, registros.get(h.id))
+  }
   const devidos = habitos.filter((h) => devidoNoDia(h, data))
-  const feitos = devidos.filter((h) => estaCompleto(h, registros.get(h.id))).length
+  const feitos = devidos.filter(concluido).length
 
   return (
     <section className="flex flex-col gap-2">
@@ -55,19 +62,22 @@ export function CategoriaSecao({
         </span>
       </button>
 
-      {!recolhida && (
-        <div className="flex flex-col gap-2 pl-1">
-          {habitos.map((h) => (
-            <CartaoHabito
-              key={h.id}
-              habito={h}
-              registro={registros.get(h.id)}
-              data={data}
-              onEditar={onEditar}
-            />
-          ))}
+      <div className="lume-colapso" data-recolhido={recolhida}>
+        <div className="lume-colapso-conteudo">
+          <div className="flex flex-col gap-2 pl-1">
+            {habitos.map((h) => (
+              <CartaoHabito
+                key={h.id}
+                habito={h}
+                registro={registros.get(h.id)}
+                data={data}
+                semana={semanaInfo?.get(h.id)}
+                onEditar={onEditar}
+              />
+            ))}
+          </div>
         </div>
-      )}
+      </div>
     </section>
   )
 }
