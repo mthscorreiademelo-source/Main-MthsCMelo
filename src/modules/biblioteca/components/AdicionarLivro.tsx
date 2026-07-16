@@ -16,6 +16,8 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
   const [autor, setAutor] = useState('')
   const [tipo, setTipo] = useState<TipoObra>('livro')
   const [status, setStatus] = useState<StatusLeitura>('quero_ler')
+  const [colecao, setColecao] = useState('')
+  const [numero, setNumero] = useState('')
   const [capa, setCapa] = useState<string | undefined>()
   const [paginas, setPaginas] = useState<number | undefined>()
   const [arquivo, setArquivo] = useState<File | null>(null)
@@ -66,6 +68,8 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
       autor: autor.trim() || undefined,
       tipo,
       status,
+      colecao: colecao.trim() || undefined,
+      numero: numero.trim() ? Number(numero) : undefined,
       capa,
       paginasTotais: paginas,
       temArquivo: !!arquivo,
@@ -170,6 +174,29 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
         <span className="text-[13px] font-medium text-muted">Autor</span>
         <input className={CAMPO} value={autor} onChange={(e) => setAutor(e.target.value)} />
       </label>
+
+      <div className="flex gap-3">
+        <label className="flex flex-1 flex-col gap-1">
+          <span className="text-[13px] font-medium text-muted">Coleção / série</span>
+          <input
+            className={CAMPO}
+            value={colecao}
+            onChange={(e) => setColecao(e.target.value)}
+            placeholder="ex.: Senhor dos Anéis"
+          />
+        </label>
+        <label className="flex w-20 flex-col gap-1">
+          <span className="text-[13px] font-medium text-muted">Nº</span>
+          <input
+            className={CAMPO}
+            type="number"
+            min={1}
+            value={numero}
+            onChange={(e) => setNumero(e.target.value)}
+            placeholder="1"
+          />
+        </label>
+      </div>
 
       <div className="flex gap-3">
         <label className="flex flex-1 flex-col gap-1">

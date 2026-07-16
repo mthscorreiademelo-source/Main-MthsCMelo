@@ -13,6 +13,10 @@ export interface Livro {
   autor?: string
   tipo: TipoObra
   status: StatusLeitura
+  /** Nome da coleção/série (ex.: "Harry Potter"). */
+  colecao?: string
+  /** Número do volume dentro da coleção (1, 2, 3…). */
+  numero?: number
   /** Miniatura da capa (data URL pequeno) — sincroniza junto. */
   capa?: string
   /** Nota de 0 a 5 (0 = sem nota). */

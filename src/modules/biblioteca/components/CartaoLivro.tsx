@@ -21,6 +21,11 @@ export function CartaoLivro({ livro }: { livro: Livro }) {
             <span className="line-clamp-3 text-[12px] font-medium text-muted">{livro.titulo}</span>
           </div>
         )}
+        {livro.numero != null && (
+          <span className="absolute left-1.5 top-1.5 rounded-md bg-black/65 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white">
+            #{livro.numero}
+          </span>
+        )}
         {progresso > 0 && progresso < 100 && (
           <div className="absolute inset-x-0 bottom-0 h-1 bg-black/20">
             <div className="h-full bg-ink" style={{ width: `${progresso}%` }} />
@@ -30,7 +35,7 @@ export function CartaoLivro({ livro }: { livro: Livro }) {
       <div className="min-w-0">
         <p className="truncate text-[13px] font-medium leading-tight">{livro.titulo}</p>
         <p className="truncate text-[11px] text-muted">
-          {livro.autor || rotuloStatus(livro.status)}
+          {livro.autor || livro.colecao || rotuloStatus(livro.status)}
         </p>
       </div>
     </Link>

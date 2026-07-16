@@ -26,6 +26,7 @@ export function LivroPage() {
   const [autor, setAutor] = useState('')
   const [resenha, setResenha] = useState('')
   const [generos, setGeneros] = useState('')
+  const [colecao, setColecao] = useState('')
   const inputCapa = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -34,6 +35,7 @@ export function LivroPage() {
     setAutor(livro.autor ?? '')
     setResenha(livro.resenha ?? '')
     setGeneros((livro.generos ?? []).join(', '))
+    setColecao(livro.colecao ?? '')
   }, [livro?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (livro === undefined) {
@@ -168,6 +170,31 @@ export function LivroPage() {
           className={CAMPO}
         />
       </label>
+
+      {/* Coleção / série */}
+      <div className="flex gap-3">
+        <label className="flex flex-1 flex-col gap-1.5">
+          <span className="text-[13px] font-medium text-muted">Coleção / série</span>
+          <input
+            value={colecao}
+            onChange={(e) => setColecao(e.target.value)}
+            onBlur={() => salvar({ colecao: colecao.trim() || undefined })}
+            placeholder="ex.: Senhor dos Anéis"
+            className={CAMPO}
+          />
+        </label>
+        <label className="flex w-24 flex-col gap-1.5">
+          <span className="text-[13px] font-medium text-muted">Nº</span>
+          <input
+            type="number"
+            min={1}
+            value={livro.numero ?? ''}
+            onChange={(e) => salvar({ numero: e.target.value ? Number(e.target.value) : undefined })}
+            placeholder="1"
+            className={CAMPO}
+          />
+        </label>
+      </div>
 
       {/* Gêneros */}
       <label className="flex flex-col gap-1.5">
