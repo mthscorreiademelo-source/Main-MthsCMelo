@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { IconLivro, IconLixeira, IconSetaEsquerda } from '../../core/components/Icons'
+import { IconAbrir, IconLivro, IconLixeira, IconSetaEsquerda } from '../../core/components/Icons'
 import { rotuloData } from '../../core/dates'
 import { EstrelasNota } from './components/EstrelasNota'
 import { removerLivro, rotuloTipo, salvarLivro, STATUS } from './db'
@@ -159,9 +159,18 @@ export function LivroPage() {
       </label>
 
       {livro.temArquivo && (
-        <p className="text-[12px] text-muted/80">
-          Arquivo: {livro.arquivoNome} ({livro.formato?.toUpperCase()} · {tamanhoLegivel(livro.arquivoTamanho)}) — leitor na próxima atualização.
-        </p>
+        <div className="flex flex-col gap-2">
+          <Link
+            to={`/biblioteca/${livro.id}/ler`}
+            className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-ink text-[15px] font-medium text-surface transition-opacity hover:opacity-90"
+          >
+            <IconAbrir width={18} height={18} />
+            {(livro.progresso ?? 0) > 0 ? 'Continuar lendo' : 'Ler'}
+          </Link>
+          <p className="text-[12px] text-muted/80">
+            Arquivo: {livro.arquivoNome} ({livro.formato?.toUpperCase()} · {tamanhoLegivel(livro.arquivoTamanho)})
+          </p>
+        </div>
       )}
 
       <button

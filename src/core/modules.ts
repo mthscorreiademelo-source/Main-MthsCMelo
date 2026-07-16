@@ -21,6 +21,7 @@ import { SaudePage } from '../modules/saude/SaudePage'
 import { FinancasPage } from '../modules/financas/FinancasPage'
 import { BibliotecaPage } from '../modules/biblioteca/BibliotecaPage'
 import { LivroPage } from '../modules/biblioteca/LivroPage'
+import { LeitorPage } from '../modules/biblioteca/leitor/LeitorPage'
 import { SecaoHoje as TarefasHoje } from '../modules/tarefas/SecaoHoje'
 import { SecaoHoje as HumorHoje } from '../modules/humor/SecaoHoje'
 import { SecaoHoje as SaudeHoje } from '../modules/saude/SecaoHoje'
@@ -110,7 +111,10 @@ export const MODULOS: ModuloDef[] = [
     rota: '/biblioteca',
     Icone: IconLivro,
     Pagina: BibliotecaPage,
-    subRotas: [{ caminho: '/biblioteca/:id', Pagina: LivroPage }],
+    subRotas: [
+      { caminho: '/biblioteca/:id/ler', Pagina: LeitorPage },
+      { caminho: '/biblioteca/:id', Pagina: LivroPage },
+    ],
     SecaoHoje: BibliotecaHoje,
   },
 ]
