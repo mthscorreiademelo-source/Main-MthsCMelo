@@ -190,7 +190,7 @@ class MainActivity : ComponentActivity() {
   private fun mostrarUltimaSync() {
     val t = prefs.ultimaSync
     if (t > 0) {
-      val fmt = SimpleDateFormat("dd/MM 'às' HH:mm", Locale("pt", "BR"))
+      val fmt = SimpleDateFormat("dd/MM 'às' HH:mm", Locale.forLanguageTag("pt-BR"))
       setStatus("Última sincronização: ${fmt.format(Date(t))}")
     }
   }
