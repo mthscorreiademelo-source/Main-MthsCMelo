@@ -404,3 +404,20 @@ export function IconSaude(props: IconProps) {
     </svg>
   )
 }
+
+export function IconLivro(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H19a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6.5A2.5 2.5 0 0 0 4 21.5z" />
+      <path d="M4 18.5A2.5 2.5 0 0 1 6.5 16H20" />
+    </svg>
+  )
+}
+
+export function IconEstrela(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 3.5l2.6 5.27 5.82.85-4.21 4.1.99 5.8L12 16.77 6.8 19.5l.99-5.8-4.21-4.1 5.82-.85z" />
+    </svg>
+  )
+}

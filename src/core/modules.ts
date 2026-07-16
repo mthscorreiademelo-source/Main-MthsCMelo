@@ -5,6 +5,7 @@ import {
   IconCifrao,
   IconDocumento,
   IconHumor,
+  IconLivro,
   IconSaude,
   IconSol,
 } from './components/Icons'
@@ -18,10 +19,13 @@ import { HabitosHoje } from '../modules/habitos/components/HabitosHoje'
 import { HumorPage } from '../modules/humor/HumorPage'
 import { SaudePage } from '../modules/saude/SaudePage'
 import { FinancasPage } from '../modules/financas/FinancasPage'
+import { BibliotecaPage } from '../modules/biblioteca/BibliotecaPage'
+import { LivroPage } from '../modules/biblioteca/LivroPage'
 import { SecaoHoje as TarefasHoje } from '../modules/tarefas/SecaoHoje'
 import { SecaoHoje as HumorHoje } from '../modules/humor/SecaoHoje'
 import { SecaoHoje as SaudeHoje } from '../modules/saude/SecaoHoje'
 import { SecaoHoje as FinancasHoje } from '../modules/financas/SecaoHoje'
+import { SecaoHoje as BibliotecaHoje } from '../modules/biblioteca/SecaoHoje'
 
 export interface ModuloDef {
   id: string
@@ -99,5 +103,14 @@ export const MODULOS: ModuloDef[] = [
     Icone: IconCifrao,
     Pagina: FinancasPage,
     SecaoHoje: FinancasHoje,
+  },
+  {
+    id: 'biblioteca',
+    nome: 'Biblioteca',
+    rota: '/biblioteca',
+    Icone: IconLivro,
+    Pagina: BibliotecaPage,
+    subRotas: [{ caminho: '/biblioteca/:id', Pagina: LivroPage }],
+    SecaoHoje: BibliotecaHoje,
   },
 ]

@@ -13,6 +13,7 @@ import type {
   Registro,
 } from '../../modules/humor/types'
 import type { SaudeDia } from '../../modules/saude/types'
+import type { ArquivoLivro, Livro } from '../../modules/biblioteca/types'
 
 /** Conteúdo binário de um arquivo anexado a uma nota do tipo 'arquivos'. */
 export interface ArquivoDados {
@@ -43,6 +44,9 @@ class VidaDB extends Dexie {
   categorias!: Table<Categoria, string>
   fatores!: Table<Fator, string>
   saude!: Table<SaudeDia, string>
+  livros!: Table<Livro, string>
+  /** Arquivos dos livros (blobs) — locais, não sincronizam. */
+  arquivosLivros!: Table<ArquivoLivro, string>
   /** Espelho do último estado sincronizado (chave → atualizadoEm). */
   espelho!: Table<{ chave: string; atualizadoEm: number }, string>
 
@@ -93,6 +97,11 @@ class VidaDB extends Dexie {
       })
     this.version(10).stores({
       saude: 'id, data',
+    })
+    // v11: biblioteca. `livros` (metadados) sincroniza; `arquivosLivros` (blobs) é local.
+    this.version(11).stores({
+      livros: 'id, status, tipo, atualizadoEm',
+      arquivosLivros: 'id',
     })
   }
 }
@@ -158,6 +167,7 @@ export async function exportarBackup() {
     categorias: await db.categorias.toArray(),
     fatores: await db.fatores.toArray(),
     saude: await db.saude.toArray(),
+    livros: await db.livros.toArray(),
   }
 }
 
@@ -187,6 +197,7 @@ export async function importarBackup(json: unknown) {
     categorias?: Categoria[]
     fatores?: Fator[]
     saude?: SaudeDia[]
+    livros?: Livro[]
   }
   const temTasks = Array.isArray(dados?.tasks)
   const temPaginas = Array.isArray(dados?.paginas)
@@ -221,6 +232,7 @@ export async function importarBackup(json: unknown) {
   if (Array.isArray(dados.categorias)) await db.categorias.bulkPut(dados.categorias)
   if (Array.isArray(dados.fatores)) await db.fatores.bulkPut(dados.fatores)
   if (Array.isArray(dados.saude)) await db.saude.bulkPut(dados.saude)
+  if (Array.isArray(dados.livros)) await db.livros.bulkPut(dados.livros)
   return {
     tasks: dados.tasks?.length ?? 0,
     paginas: dados.paginas?.length ?? 0,
