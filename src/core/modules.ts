@@ -1,5 +1,6 @@
 import type { ComponentType, SVGProps } from 'react'
 import {
+  IconCalendario,
   IconChama,
   IconCheckCircle,
   IconCifrao,
@@ -14,6 +15,7 @@ import { TarefasPage } from '../modules/tarefas/TarefasPage'
 import { NotasPage } from '../modules/notas/NotasPage'
 import { EditorNotaPage } from '../modules/notas/EditorNotaPage'
 import { GrupoPage } from '../modules/notas/GrupoPage'
+import { AgendaPage } from '../modules/agenda/AgendaPage'
 import { HabitosPage } from '../modules/habitos/HabitosPage'
 import { HabitoDetalhePage } from '../modules/habitos/HabitoDetalhePage'
 import { HabitosEstatisticasPage } from '../modules/habitos/HabitosEstatisticasPage'
@@ -30,7 +32,9 @@ import { SecaoHoje as HumorHoje } from '../modules/humor/SecaoHoje'
 import { SecaoHoje as SaudeHoje } from '../modules/saude/SecaoHoje'
 import { SecaoHoje as FinancasHoje } from '../modules/financas/SecaoHoje'
 import { SecaoHoje as BibliotecaHoje } from '../modules/biblioteca/SecaoHoje'
+import { SecaoHoje as AgendaHoje } from '../modules/agenda/SecaoHoje'
 import { HojeResumo as TarefasResumo } from '../modules/tarefas/HojeResumo'
+import { HojeResumo as AgendaResumo } from '../modules/agenda/HojeResumo'
 import { HojeResumo as HabitosResumo } from '../modules/habitos/HojeResumo'
 import { HojeResumo as HumorResumo } from '../modules/humor/HojeResumo'
 import { HojeResumo as SaudeResumo } from '../modules/saude/HojeResumo'
@@ -73,6 +77,16 @@ export const MODULOS: ModuloDef[] = [
     SecaoHoje: TarefasHoje,
     HojeResumo: TarefasResumo,
     hojeTamanho: 'destaque',
+  },
+  {
+    id: 'agenda',
+    nome: 'Agenda',
+    rota: '/agenda',
+    Icone: IconCalendario,
+    Pagina: AgendaPage,
+    SecaoHoje: AgendaHoje,
+    HojeResumo: AgendaResumo,
+    hojeTamanho: 'compacto',
   },
   {
     id: 'notas',

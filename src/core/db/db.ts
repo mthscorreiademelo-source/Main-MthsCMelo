@@ -14,6 +14,7 @@ import type {
 } from '../../modules/humor/types'
 import type { SaudeDia } from '../../modules/saude/types'
 import type { ArquivoLivro, Livro } from '../../modules/biblioteca/types'
+import type { Evento } from '../../modules/agenda/types'
 
 /** Conteúdo binário de um arquivo anexado a uma nota do tipo 'arquivos'. */
 export interface ArquivoDados {
@@ -33,6 +34,7 @@ export interface ArquivoDados {
 class VidaDB extends Dexie {
   tasks!: Table<Task, string>
   projetos!: Table<Projeto, string>
+  eventos!: Table<Evento, string>
   paginas!: Table<Pagina, string>
   grupos!: Table<Grupo, string>
   habitos!: Table<Habito, string>
@@ -146,6 +148,10 @@ class VidaDB extends Dexie {
             if (t.descricao == null && t.nota != null) t.descricao = t.nota
           })
       })
+    // v15: módulo Agenda (eventos com blocos de tempo).
+    this.version(15).stores({
+      eventos: 'id, data, atualizadoEm',
+    })
   }
 }
 
@@ -199,6 +205,7 @@ export async function exportarBackup() {
     exportadoEm: new Date().toISOString(),
     tasks: await db.tasks.toArray(),
     projetos: await db.projetos.toArray(),
+    eventos: await db.eventos.toArray(),
     paginas: await db.paginas.toArray(),
     grupos: await db.grupos.toArray(),
     habitos: await db.habitos.toArray(),
@@ -231,6 +238,7 @@ export async function importarBackup(json: unknown) {
     app?: string
     tasks?: Task[]
     projetos?: Projeto[]
+    eventos?: Evento[]
     paginas?: Pagina[]
     grupos?: Grupo[]
     habitos?: Habito[]
@@ -255,6 +263,7 @@ export async function importarBackup(json: unknown) {
   }
   if (temTasks) await db.tasks.bulkPut(dados.tasks!)
   if (Array.isArray(dados.projetos)) await db.projetos.bulkPut(dados.projetos)
+  if (Array.isArray(dados.eventos)) await db.eventos.bulkPut(dados.eventos)
   if (temPaginas) await db.paginas.bulkPut(dados.paginas!)
   if (Array.isArray(dados.grupos)) await db.grupos.bulkPut(dados.grupos)
   if (temHabitos) await db.habitos.bulkPut(dados.habitos!)

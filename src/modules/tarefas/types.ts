@@ -20,6 +20,8 @@ export interface Task {
   data?: string
   /** Horário opcional HH:mm. */
   horario?: string
+  /** Duração em minutos quando agendada num bloco de tempo (time-blocking). */
+  duracaoMin?: number
   /** 1 (P1) … 4 (P4). Padrão 4. */
   prioridade: Prioridade
   /** Projeto ao qual pertence; ausente = Entrada (Inbox). */
