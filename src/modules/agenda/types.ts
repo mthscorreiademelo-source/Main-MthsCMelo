@@ -1,3 +1,13 @@
+/** Um cronograma agrupa eventos numa linha do tempo (Gantt): Trabalho, Exercícios… */
+export interface Cronograma {
+  id: string
+  nome: string
+  cor?: string
+  ordem: number
+  criadoEm: number
+  atualizadoEm?: number
+}
+
 export type TipoRecorrenciaEvento = 'diaria' | 'semanal' | 'mensal' | 'anual'
 
 export interface RecorrenciaEvento {
@@ -21,6 +31,10 @@ export interface Evento {
   inicio: string
   /** Fim HH:mm (ignorado se diaInteiro). */
   fim: string
+  /** Fim do evento em dias (ISO). Ausente = evento de um único dia. */
+  dataFim?: string
+  /** Cronograma ao qual o evento pertence (opcional). */
+  cronogramaId?: string
   diaInteiro?: boolean
   cor?: string
   local?: string

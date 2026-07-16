@@ -1,7 +1,7 @@
 import { differenceInCalendarDays, differenceInCalendarMonths, getDate, getDay, parseISO } from 'date-fns'
 import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
-import type { Evento, RecorrenciaEvento } from './types'
+import type { Cronograma, Evento, RecorrenciaEvento } from './types'
 
 /** Paleta de cores dos eventos (estilo Google Calendar). */
 export const CORES_EVENTO = [
@@ -66,6 +66,33 @@ export async function atualizarEvento(id: string, mudancas: Partial<Evento>) {
 
 export async function excluirEvento(id: string) {
   await db.eventos.delete(id)
+}
+
+/* ---------- cronogramas ---------- */
+
+export async function criarCronograma(dados: Partial<Cronograma> & { nome: string }): Promise<string> {
+  const id = dados.id ?? nanoid()
+  const max = await db.cronogramas.orderBy('ordem').last()
+  await db.cronogramas.add({
+    id,
+    nome: dados.nome.trim() || 'Cronograma',
+    cor: dados.cor ?? CORES_EVENTO[3],
+    ordem: dados.ordem ?? (max?.ordem ?? 0) + 1,
+    criadoEm: Date.now(),
+  })
+  return id
+}
+
+export async function atualizarCronograma(id: string, mudancas: Partial<Cronograma>) {
+  await db.cronogramas.update(id, mudancas)
+}
+
+/** Exclui o cronograma e desvincula seus eventos (não apaga os eventos). */
+export async function excluirCronograma(id: string) {
+  await db.transaction('rw', db.cronogramas, db.eventos, async () => {
+    await db.eventos.where('cronogramaId').equals(id).modify({ cronogramaId: undefined })
+    await db.cronogramas.delete(id)
+  })
 }
 
 /* ---------- seleção ---------- */

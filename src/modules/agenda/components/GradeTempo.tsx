@@ -216,22 +216,26 @@ export function GradeTempo({
     <div className="flex border-t border-line bg-bg">
       <div className="flex w-12 shrink-0 items-center justify-center text-[9px] uppercase text-muted/70">dia</div>
       {dias.map((dia) => {
-        const evs = ocorrencias.filter((o) => o.data === dia && o.evento.diaInteiro)
+        // Dia inteiro (single, com recorrência) + eventos de vários dias que cruzam este dia.
+        const evsBanda: Evento[] = [
+          ...ocorrencias.filter((o) => o.data === dia && o.evento.diaInteiro && !o.evento.dataFim).map((o) => o.evento),
+          ...eventos.filter((e) => e.dataFim && e.dataFim > e.data && e.data <= dia && dia <= e.dataFim),
+        ]
         const tks = tarefas.filter((t) => t.data === dia && !t.horario && !t.concluidaEm)
         return (
           <div key={dia} className="flex min-h-8 flex-1 flex-col gap-0.5 border-l border-line p-1">
-            {evs.map((o) => {
-              const cor = o.evento.cor ?? '#4073ff'
-              const recusado = o.evento.presenca === 'recusado'
+            {evsBanda.map((ev) => {
+              const cor = ev.cor ?? '#4073ff'
+              const recusado = ev.presenca === 'recusado'
               return (
                 <button
-                  key={o.evento.id + dia}
-                  onClick={() => onAbrirEvento(o.evento)}
-                  title={o.evento.titulo}
+                  key={ev.id + dia}
+                  onClick={() => onAbrirEvento(ev)}
+                  title={ev.titulo}
                   className="truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium"
-                  style={estiloEvento(cor, o.evento.presenca)}
+                  style={estiloEvento(cor, ev.presenca)}
                 >
-                  <span className={recusado ? 'line-through' : ''}>{o.evento.titulo}</span>
+                  <span className={recusado ? 'line-through' : ''}>{ev.titulo}</span>
                 </button>
               )
             })}

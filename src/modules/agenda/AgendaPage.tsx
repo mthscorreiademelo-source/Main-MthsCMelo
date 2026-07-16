@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { addDays, addMonths, addYears, format, parseISO, startOfWeek } from 'date-fns'
+import { addDays, addMonths, addYears, endOfMonth, format, parseISO, startOfMonth, startOfWeek } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { IconMais, IconSetaEsquerda } from '../../core/components/Icons'
 import { hojeISO, rotuloMes } from '../../core/dates'
@@ -7,15 +7,17 @@ import { TaskEditorSheet } from '../tarefas/components/TaskEditorSheet'
 import { useProjetos, useTarefas } from '../tarefas/hooks'
 import type { Task } from '../tarefas/types'
 import { EditorEvento } from './components/EditorEvento'
+import { GanttCronogramas } from './components/GanttCronogramas'
+import { GerenciarCronogramas } from './components/GerenciarCronogramas'
 import { GradeTempo } from './components/GradeTempo'
 import { VistaDia } from './components/VistaDia'
 import { VistaMes } from './components/VistaMes'
 import { VistaMultiMes } from './components/VistaMultiMes'
 import { criarEvento, paraHHMM } from './db'
-import { useEventos } from './hooks'
+import { useCronogramas, useEventos } from './hooks'
 import type { Evento } from './types'
 
-type Modo = 'dia' | '3dias' | '4dias' | 'semana' | 'mes' | 'trimestre' | 'ano'
+type Modo = 'dia' | '3dias' | '4dias' | 'semana' | 'mes' | 'trimestre' | 'ano' | 'cronogramas'
 
 const OPCOES: { modo: Modo; rotulo: string }[] = [
   { modo: 'dia', rotulo: 'Dia' },
@@ -25,6 +27,7 @@ const OPCOES: { modo: Modo; rotulo: string }[] = [
   { modo: 'mes', rotulo: 'Mês' },
   { modo: 'trimestre', rotulo: 'Trimestre' },
   { modo: 'ano', rotulo: 'Ano' },
+  { modo: 'cronogramas', rotulo: 'Cronogramas' },
 ]
 
 const N_DIAS: Partial<Record<Modo, number>> = { dia: 1, '3dias': 3, '4dias': 4, semana: 7 }
@@ -33,15 +36,27 @@ export function AgendaPage() {
   const eventos = useEventos()
   const tarefas = useTarefas()
   const projetos = useProjetos()
+  const cronogramas = useCronogramas()
   const [modo, setModo] = useState<Modo>('3dias')
   const [ancora, setAncora] = useState(hojeISO())
   const [editorEvento, setEditorEvento] = useState<Evento | null>(null)
   const [editorTarefa, setEditorTarefa] = useState<Task | null>(null)
+  const [gerCron, setGerCron] = useState(false)
   const [abrirId, setAbrirId] = useState<string | null>(null)
 
   const evs = useMemo(() => eventos ?? [], [eventos])
   const tks = useMemo(() => tarefas ?? [], [tarefas])
   const ps = projetos ?? []
+  const crs = cronogramas ?? []
+
+  const diasMes = useMemo(() => {
+    if (modo !== 'cronogramas') return []
+    const ini = startOfMonth(parseISO(ancora))
+    const fim = endOfMonth(ini)
+    const out: string[] = []
+    for (let d = ini; d <= fim; d = addDays(d, 1)) out.push(format(d, 'yyyy-MM-dd'))
+    return out
+  }, [ancora, modo])
 
   const dias = useMemo(() => {
     const n = N_DIAS[modo]
@@ -77,7 +92,7 @@ export function AgendaPage() {
   function navegar(dir: number) {
     const d = parseISO(ancora)
     let novo = d
-    if (modo === 'mes') novo = addMonths(d, dir)
+    if (modo === 'mes' || modo === 'cronogramas') novo = addMonths(d, dir)
     else if (modo === 'trimestre') novo = addMonths(d, dir * 3)
     else if (modo === 'ano') novo = addYears(d, dir)
     else novo = addDays(d, dir * (N_DIAS[modo] ?? 1))
@@ -95,7 +110,7 @@ export function AgendaPage() {
   }
 
   const rotulo = (() => {
-    if (modo === 'mes') return rotuloMes(ancora.slice(0, 7))
+    if (modo === 'mes' || modo === 'cronogramas') return rotuloMes(ancora.slice(0, 7))
     if (modo === 'ano') return ancora.slice(0, 4)
     if (modo === 'trimestre') {
       const a = parseISO(`${meses[0]}-01`)
@@ -161,9 +176,13 @@ export function AgendaPage() {
       {pronto && (modo === 'trimestre' || modo === 'ano') && (
         <VistaMultiMes meses={meses} eventos={evs} onIrParaDia={irParaDia} />
       )}
+      {pronto && modo === 'cronogramas' && (
+        <GanttCronogramas dias={diasMes} eventos={evs} cronogramas={crs} onAbrirEvento={setEditorEvento} onGerenciar={() => setGerCron(true)} />
+      )}
 
-      {eventoAtual && <EditorEvento evento={eventoAtual} onFechar={() => setEditorEvento(null)} />}
+      {eventoAtual && <EditorEvento evento={eventoAtual} cronogramas={crs} onFechar={() => setEditorEvento(null)} />}
       <TaskEditorSheet task={tarefaAtual} projetos={ps} todas={tks} onFechar={() => setEditorTarefa(null)} />
+      {gerCron && <GerenciarCronogramas cronogramas={crs} onFechar={() => setGerCron(false)} />}
     </div>
   )
 }

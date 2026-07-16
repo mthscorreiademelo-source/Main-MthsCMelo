@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { FolhaInferior } from '../../../core/components/FolhaInferior'
 import { IconCheck, IconLixeira } from '../../../core/components/Icons'
 import { atualizarEvento, CORES_EVENTO, excluirEvento } from '../db'
-import type { Evento, Presenca, TipoRecorrenciaEvento } from '../types'
+import type { Cronograma, Evento, Presenca, TipoRecorrenciaEvento } from '../types'
 
 const PRESENCAS: { valor: Presenca | undefined; rotulo: string }[] = [
   { valor: 'confirmado', rotulo: 'Vou' },
@@ -22,9 +22,18 @@ const CAMPO =
   'min-h-10 rounded-lg border border-line bg-surface px-3 text-[15px] outline-none focus:border-muted/60'
 const ROTULO = 'text-[13px] font-medium text-muted'
 
-export function EditorEvento({ evento, onFechar }: { evento: Evento; onFechar: () => void }) {
+export function EditorEvento({
+  evento,
+  cronogramas,
+  onFechar,
+}: {
+  evento: Evento
+  cronogramas: Cronograma[]
+  onFechar: () => void
+}) {
   const [titulo, setTitulo] = useState(evento.titulo)
   const [data, setData] = useState(evento.data)
+  const [dataFim, setDataFim] = useState(evento.dataFim ?? '')
   const [inicio, setInicio] = useState(evento.inicio)
   const [fim, setFim] = useState(evento.fim)
   const [diaInteiro, setDiaInteiro] = useState(!!evento.diaInteiro)
@@ -37,6 +46,7 @@ export function EditorEvento({ evento, onFechar }: { evento: Evento; onFechar: (
   useEffect(() => {
     setTitulo(evento.titulo)
     setData(evento.data)
+    setDataFim(evento.dataFim ?? '')
     setInicio(evento.inicio)
     setFim(evento.fim)
     setDiaInteiro(!!evento.diaInteiro)
@@ -84,18 +94,34 @@ export function EditorEvento({ evento, onFechar }: { evento: Evento; onFechar: (
         </button>
       </label>
 
-      <label className="flex flex-col gap-1">
-        <span className={ROTULO}>Data</span>
-        <input
-          type="date"
-          value={data}
-          onChange={(e) => {
-            setData(e.target.value)
-            if (e.target.value) salvar({ data: e.target.value })
-          }}
-          className={CAMPO}
-        />
-      </label>
+      <div className="flex gap-3">
+        <label className="flex flex-1 flex-col gap-1">
+          <span className={ROTULO}>Data</span>
+          <input
+            type="date"
+            value={data}
+            onChange={(e) => {
+              setData(e.target.value)
+              if (e.target.value) salvar({ data: e.target.value })
+            }}
+            className={CAMPO}
+          />
+        </label>
+        <label className="flex flex-1 flex-col gap-1">
+          <span className={ROTULO}>Termina em (opcional)</span>
+          <input
+            type="date"
+            value={dataFim}
+            min={data}
+            onChange={(e) => {
+              const v = e.target.value && e.target.value > data ? e.target.value : ''
+              setDataFim(v)
+              salvar({ dataFim: v || undefined })
+            }}
+            className={CAMPO}
+          />
+        </label>
+      </div>
 
       {!diaInteiro && (
         <div className="flex gap-3">
@@ -187,6 +213,24 @@ export function EditorEvento({ evento, onFechar }: { evento: Evento; onFechar: (
           ))}
         </select>
       </label>
+
+      {cronogramas.length > 0 && (
+        <label className="flex flex-col gap-1">
+          <span className={ROTULO}>Cronograma</span>
+          <select
+            value={evento.cronogramaId ?? ''}
+            onChange={(e) => salvar({ cronogramaId: e.target.value || undefined })}
+            className={CAMPO}
+          >
+            <option value="">Nenhum</option>
+            {cronogramas.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nome}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <label className="flex flex-col gap-1">
         <span className={ROTULO}>Local (opcional)</span>
