@@ -10,6 +10,7 @@ import {
 } from '../components/Icons'
 import { exportarBackup, importarBackup } from '../db/db'
 import { MODULOS } from '../modules'
+import { ContaSidebar } from '../nuvem/ContaSidebar'
 import { useTheme } from '../theme/useTheme'
 
 const CHAVE_SIDEBAR = 'vida:sidebar'
@@ -148,6 +149,7 @@ function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
       </nav>
 
       <footer className="flex flex-col gap-0.5 border-t border-line px-2 py-3">
+        <ContaSidebar />
         <button
           onClick={alternar}
           className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm font-medium text-muted transition-colors hover:bg-hover/70"

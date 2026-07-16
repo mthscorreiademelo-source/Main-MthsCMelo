@@ -2,13 +2,14 @@
 
 App pessoal minimalista, inspirado no Notion, para centralizar e administrar todas as áreas da sua vida — feito para ser usado principalmente no tablet.
 
-É um **PWA local-first**: instala como app, funciona 100% offline e todos os dados ficam no seu dispositivo (IndexedDB). Sem conta, sem servidor, sem custo.
+É um **PWA local-first**: instala como app, funciona 100% offline e todos os dados ficam no seu dispositivo (IndexedDB). A sincronização em nuvem (conta com login Google, dados acessíveis em qualquer aparelho) é **opcional** — enquanto não configurada, o app roda exatamente como acima. Veja [`SETUP-SUPABASE.md`](./SETUP-SUPABASE.md).
 
 ## Filosofia
 
 Mais do que um conjunto de módulos, o Lume é pensado como um **sistema operacional pessoal**: um lugar onde tudo se conecta. Ele responde a duas perguntas — *"o que precisa da minha atenção agora?"* (a tela **Hoje**, o cérebro que agrega tudo) e *"como eu gerencio esta área da minha vida?"* (os **módulos**, cada um especializado e alimentando o Hoje). A arquitetura é modular e integrada: módulo novo se apresenta ao dashboard sozinho, e um **motor de inteligência** compartilhado cruza os dados para revelar padrões.
 
-**v0.19 (atual)**
+**v0.20 (atual)**
+- ☁️ **Conta (opcional)** — fundação de sincronização em nuvem: login com Google (Supabase), para acessar seus dados em vários aparelhos. Gated: sem configuração, o app segue local-first e idêntico. A sincronização dos dados entra na sequência.
 - 🌤️ **Hoje** — **dashboard integrado** que compõe as contribuições de cada módulo automaticamente (tarefas do dia, hábitos, humor de hoje, resumo de finanças…); nenhum módulo é fixo no código — ao adicionar um novo, ele aparece aqui sozinho
 - ✅ **Tarefas** — adição rápida, data agendada, abas Hoje · Próximas · Todas · Concluídas, edição em painel lateral
 - 📄 **Notas** — galeria de **grupos com capa 4:5** (nome + imagem, recorte automático) e notas soltas abaixo; dentro do grupo, lista das notas dele; **três tipos de nota**: **texto** (editor de blocos simples — parágrafo, título, lista, to-do — com atalhos `# `, `- `, `[] `), **desenho** (quadro infinito) e **arquivos** (importe PDFs, imagens, vídeos, áudios, textos e outros; ficam **agrupados por tipo**, com miniatura de imagens e pré-visualização de texto/imagem/vídeo/áudio/PDF); seletor de grupo em qualquer uma

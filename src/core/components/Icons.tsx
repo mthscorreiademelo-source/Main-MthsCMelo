@@ -379,3 +379,20 @@ export function IconChevron(props: IconProps) {
     </svg>
   )
 }
+
+export function IconNuvem(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M7 18a4 4 0 0 1-.5-7.97 5 5 0 0 1 9.6-1.2A3.5 3.5 0 0 1 18 18H7Z" />
+    </svg>
+  )
+}
+
+export function IconSair(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M15 4h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3" />
+      <path d="M10 12H3m0 0 3.5-3.5M3 12l3.5 3.5" />
+    </svg>
+  )
+}

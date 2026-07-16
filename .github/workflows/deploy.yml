@@ -24,6 +24,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          # Ligam a nuvem quando os segredos existirem; sem eles, build local-first.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       # Publica o conteúdo de dist/ na branch gh-pages (o GitHub Pages serve a partir dela)
       - run: |
           touch dist/.nojekyll
