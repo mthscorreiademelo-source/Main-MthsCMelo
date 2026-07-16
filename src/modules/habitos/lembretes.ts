@@ -24,19 +24,21 @@ export async function pedirPermissaoNotificacoes(): Promise<EstadoNotif> {
   return r as EstadoNotif
 }
 
+const ICONE = `${import.meta.env.BASE_URL}favicon-96.png`
+
 async function mostrar(titulo: string, corpo: string) {
   try {
     if ('serviceWorker' in navigator) {
       const reg = await navigator.serviceWorker.ready
       if (reg) {
-        await reg.showNotification(titulo, { body: corpo, icon: '/favicon.svg', tag: 'lume-habito' })
+        await reg.showNotification(titulo, { body: corpo, icon: ICONE, tag: 'lume-habito' })
         return
       }
     }
   } catch {
     /* cai no fallback */
   }
-  new Notification(titulo, { body: corpo, icon: '/favicon.svg' })
+  new Notification(titulo, { body: corpo, icon: ICONE })
 }
 
 function minutosAgora(): number {
