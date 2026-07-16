@@ -14,8 +14,12 @@ export interface RecorrenciaEvento {
   tipo: TipoRecorrenciaEvento
   /** a cada N (dias/semanas/meses/anos). */
   intervalo?: number
-  /** repete até esta data (ISO), opcional. */
+  /** semanal: dias da semana 0–6 (dom–sáb). */
+  dias?: number[]
+  /** termina nesta data (ISO), inclusive. */
   ate?: string
+  /** OU termina após N ocorrências (contando a primeira). */
+  ocorrencias?: number
 }
 
 /** Presença no evento (estilo Google Calendar). Ausente = pendente (não respondi). */

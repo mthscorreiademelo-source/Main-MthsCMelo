@@ -1,21 +1,14 @@
 import { useEffect, useState } from 'react'
 import { FolhaInferior } from '../../../core/components/FolhaInferior'
 import { IconCheck, IconLixeira } from '../../../core/components/Icons'
-import { atualizarEvento, CORES_EVENTO, excluirEvento } from '../db'
-import type { Cronograma, Evento, Presenca, TipoRecorrenciaEvento } from '../types'
+import { atualizarEvento, CORES_EVENTO, excluirEvento, rotuloRecorrencia } from '../db'
+import { EditorRecorrencia } from './EditorRecorrencia'
+import type { Cronograma, Evento, Presenca } from '../types'
 
 const PRESENCAS: { valor: Presenca | undefined; rotulo: string }[] = [
   { valor: 'confirmado', rotulo: 'Vou' },
   { valor: undefined, rotulo: 'Talvez' },
   { valor: 'recusado', rotulo: 'Não vou' },
-]
-
-const RECS: { valor: TipoRecorrenciaEvento | ''; rotulo: string }[] = [
-  { valor: '', rotulo: 'Não repete' },
-  { valor: 'diaria', rotulo: 'Todo dia' },
-  { valor: 'semanal', rotulo: 'Toda semana' },
-  { valor: 'mensal', rotulo: 'Todo mês' },
-  { valor: 'anual', rotulo: 'Todo ano' },
 ]
 
 const CAMPO =
@@ -41,7 +34,6 @@ export function EditorEvento({
   const [local, setLocal] = useState(evento.local ?? '')
   const [descricao, setDescricao] = useState(evento.descricao ?? '')
   const [presenca, setPresenca] = useState<Presenca | undefined>(evento.presenca)
-  const [recorre, setRecorre] = useState<TipoRecorrenciaEvento | ''>(evento.recorrencia?.tipo ?? '')
 
   useEffect(() => {
     setTitulo(evento.titulo)
@@ -54,7 +46,6 @@ export function EditorEvento({
     setLocal(evento.local ?? '')
     setDescricao(evento.descricao ?? '')
     setPresenca(evento.presenca)
-    setRecorre(evento.recorrencia?.tipo ?? '')
   }, [evento.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const salvar = (m: Partial<Evento>) => atualizarEvento(evento.id, m)
@@ -195,24 +186,17 @@ export function EditorEvento({
       </div>
 
       {/* Repetir */}
-      <label className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1">
         <span className={ROTULO}>Repetir</span>
-        <select
-          value={recorre}
-          onChange={(e) => {
-            const v = e.target.value as TipoRecorrenciaEvento | ''
-            setRecorre(v)
-            salvar({ recorrencia: v ? { tipo: v, intervalo: 1 } : undefined })
-          }}
-          className={CAMPO}
-        >
-          {RECS.map((r) => (
-            <option key={r.valor} value={r.valor}>
-              {r.rotulo}
-            </option>
-          ))}
-        </select>
-      </label>
+        <EditorRecorrencia
+          recorrencia={evento.recorrencia}
+          dataBase={data}
+          onChange={(r) => salvar({ recorrencia: r })}
+        />
+        {evento.recorrencia && (
+          <span className="text-[12px] text-muted">{rotuloRecorrencia(evento.recorrencia)}</span>
+        )}
+      </div>
 
       {cronogramas.length > 0 && (
         <label className="flex flex-col gap-1">

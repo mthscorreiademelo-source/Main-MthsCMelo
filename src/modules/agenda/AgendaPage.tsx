@@ -13,9 +13,14 @@ import { GradeTempo } from './components/GradeTempo'
 import { VistaDia } from './components/VistaDia'
 import { VistaMes } from './components/VistaMes'
 import { VistaMultiMes } from './components/VistaMultiMes'
-import { criarEvento, paraHHMM } from './db'
+import { criarEvento, expandirEventos, paraHHMM, rotuloRecorrencia } from './db'
 import { useCronogramas, useEventos } from './hooks'
 import type { Evento } from './types'
+
+// Exposto para diagnóstico/teste da recorrência (inofensivo).
+if (typeof window !== 'undefined') {
+  ;(window as unknown as Record<string, unknown>).__lumeAgenda = { expandirEventos, rotuloRecorrencia }
+}
 
 type Modo = 'dia' | '3dias' | 'custom' | 'semana' | 'mes' | 'ano' | 'cronogramas'
 

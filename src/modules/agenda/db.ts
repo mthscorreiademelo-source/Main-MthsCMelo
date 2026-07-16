@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, differenceInCalendarMonths, getDate, getDay, parseISO } from 'date-fns'
+import { addDays, addMonths, addWeeks, addYears, format, parseISO, startOfWeek } from 'date-fns'
 import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
 import type { Cronograma, Evento, RecorrenciaEvento } from './types'
@@ -104,28 +104,48 @@ export interface OcorrenciaEvento {
   ehOcorrencia: boolean
 }
 
-/** A recorrência de `master` (que começa em D0) cai no dia `data`? */
-function recorreNoDia(master: Evento, rec: RecorrenciaEvento, data: string): boolean {
-  if (data <= master.data) return false
-  if (rec.ate && data > rec.ate) return false
-  const d0 = parseISO(master.data)
-  const d = parseISO(data)
+const CAP_OCORRENCIAS = 1000
+
+/**
+ * Gera as datas (ISO) das ocorrências da série, em ordem crescente, incluindo a
+ * primeira (a do master). Respeita intervalo, dias da semana, término por data
+ * ou por nº de ocorrências. Limitado por `ateISO` (fim da janela visível) e por
+ * um teto de segurança.
+ */
+function* gerarOcorrencias(master: Evento, rec: RecorrenciaEvento, ateISO: string): Generator<string> {
   const n = Math.max(1, rec.intervalo ?? 1)
-  switch (rec.tipo) {
-    case 'diaria':
-      return differenceInCalendarDays(d, d0) % n === 0
-    case 'semanal':
-      return getDay(d) === getDay(d0) && (differenceInCalendarDays(d, d0) / 7) % n === 0
-    case 'mensal':
-      return getDate(d) === getDate(d0) && differenceInCalendarMonths(d, d0) % n === 0
-    case 'anual':
-      return (
-        getDate(d) === getDate(d0) &&
-        d.getMonth() === d0.getMonth() &&
-        (d.getFullYear() - d0.getFullYear()) % n === 0
-      )
-    default:
-      return false
+  const base = parseISO(master.data)
+  const limite = rec.ocorrencias && rec.ocorrencias > 0 ? rec.ocorrencias : Infinity
+  const fim = rec.ate && rec.ate < ateISO ? rec.ate : ateISO
+  let count = 0
+
+  if (rec.tipo === 'semanal' && rec.dias?.length) {
+    const diasOrd = [...new Set(rec.dias)].sort((a, b) => a - b)
+    let semana = startOfWeek(base, { weekStartsOn: 0 })
+    for (let guarda = 0; guarda < CAP_OCORRENCIAS; guarda++) {
+      for (const wd of diasOrd) {
+        const iso = format(addDays(semana, wd), 'yyyy-MM-dd')
+        if (iso < master.data) continue
+        if (iso > fim || count >= limite) return
+        count++
+        yield iso
+      }
+      semana = addWeeks(semana, n)
+      if (format(semana, 'yyyy-MM-dd') > fim) return
+    }
+    return
+  }
+
+  const avancar = (d: Date) =>
+    rec.tipo === 'diaria' ? addDays(d, n) : rec.tipo === 'mensal' ? addMonths(d, n) : rec.tipo === 'anual' ? addYears(d, n) : addWeeks(d, n)
+
+  let d = base
+  for (let guarda = 0; guarda < CAP_OCORRENCIAS; guarda++) {
+    const iso = format(d, 'yyyy-MM-dd')
+    if (iso > fim || count >= limite) return
+    count++
+    yield iso
+    d = avancar(d)
   }
 }
 
@@ -135,18 +155,42 @@ function recorreNoDia(master: Evento, rec: RecorrenciaEvento, data: string): boo
  * ocorrências são geradas (abrir edita a série).
  */
 export function expandirEventos(eventos: Evento[], dias: string[]): OcorrenciaEvento[] {
+  if (dias.length === 0) return []
   const set = new Set(dias)
+  const ultimo = dias[dias.length - 1]
   const out: OcorrenciaEvento[] = []
   for (const e of eventos) {
     if (set.has(e.data)) out.push({ evento: e, data: e.data, ehOcorrencia: false })
-    if (e.recorrencia) {
-      for (const dia of dias) {
-        if (dia === e.data) continue
-        if (recorreNoDia(e, e.recorrencia, dia)) out.push({ evento: e, data: dia, ehOcorrencia: true })
-      }
+    if (!e.recorrencia) continue
+    for (const data of gerarOcorrencias(e, e.recorrencia, ultimo)) {
+      if (data === e.data) continue
+      if (set.has(data)) out.push({ evento: e, data, ehOcorrencia: true })
     }
   }
   return out
+}
+
+const NOMES_DIA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
+
+/** Resumo legível da recorrência (ex.: "A cada 2 semanas em seg, qua · 10×"). */
+export function rotuloRecorrencia(rec: RecorrenciaEvento | undefined): string {
+  if (!rec) return 'Não repete'
+  const n = Math.max(1, rec.intervalo ?? 1)
+  const unid = {
+    diaria: { art: 'Todo', s: 'dia', p: 'dias' },
+    semanal: { art: 'Toda', s: 'semana', p: 'semanas' },
+    mensal: { art: 'Todo', s: 'mês', p: 'meses' },
+    anual: { art: 'Todo', s: 'ano', p: 'anos' },
+  }[rec.tipo]
+  let s = n === 1 ? `${unid.art} ${unid.s}` : `A cada ${n} ${unid.p}`
+  if (rec.tipo === 'semanal' && rec.dias?.length) {
+    const dd = [...rec.dias].sort((a, b) => a - b)
+    const uteis = dd.length === 5 && dd.every((d) => d >= 1 && d <= 5)
+    s += uteis ? ' (dias úteis)' : ' em ' + dd.map((d) => NOMES_DIA[d]).join(', ')
+  }
+  if (rec.ocorrencias) s += ` · ${rec.ocorrencias}×`
+  else if (rec.ate) s += ` · até ${format(parseISO(rec.ate), 'dd/MM/yyyy')}`
+  return s
 }
 
 export function eventosDoDia(eventos: Evento[], data: string): Evento[] {
