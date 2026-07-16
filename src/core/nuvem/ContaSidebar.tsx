@@ -54,19 +54,25 @@ export function ContaSidebar() {
 }
 
 function StatusSync() {
-  const { estado } = useStatusSync()
+  const { estado, erro } = useStatusSync()
   const rotulo = ROTULO_SYNC[estado]
   if (!rotulo) return null
   return (
     <span
-      className={`flex items-center gap-1.5 px-3 pl-[30px] text-[11px] ${
+      className={`flex flex-col px-3 pl-[30px] text-[11px] ${
         estado === 'erro' ? 'text-danger' : 'text-muted/70'
       }`}
+      title={estado === 'erro' ? erro : undefined}
     >
-      {estado === 'sincronizando' && (
-        <span className="size-1.5 animate-pulse rounded-full bg-accent" />
+      <span className="flex items-center gap-1.5">
+        {estado === 'sincronizando' && (
+          <span className="size-1.5 animate-pulse rounded-full bg-accent" />
+        )}
+        {rotulo}
+      </span>
+      {estado === 'erro' && erro && (
+        <span className="line-clamp-2 max-w-[200px] text-[10px] opacity-80">{erro}</span>
       )}
-      {rotulo}
     </span>
   )
 }

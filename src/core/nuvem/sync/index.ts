@@ -35,6 +35,7 @@ function iniciar(clienteUid: { cliente: Awaited<ReturnType<typeof obterCliente>>
       await sincronizar(localDexie, transporte, cursor)
       definirStatus({ estado: 'ok', em: Date.now() })
     } catch (e) {
+      console.error('[lume sync] falha:', e)
       definirStatus({ estado: 'erro', em: Date.now(), erro: (e as Error)?.message ?? String(e) })
     } finally {
       rodando = false
