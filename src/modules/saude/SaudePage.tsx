@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { EmptyState } from '../../core/components/EmptyState'
 import { IconMais, IconSaude, IconUpload } from '../../core/components/Icons'
 import { hojeISO, rotuloData } from '../../core/dates'
@@ -7,12 +7,25 @@ import { EditorDia } from './components/EditorDia'
 import { ImportarSaude } from './components/ImportarSaude'
 import { exibir, METRICAS } from './db'
 import { useSaude } from './hooks'
+import { getUrlPlanilha, sincronizarPlanilha } from './planilha'
 import type { SaudeDia } from './types'
 
 export function SaudePage() {
   const dias = useSaude()
   const [editando, setEditando] = useState<string | null>(null)
   const [importando, setImportando] = useState(false)
+  const [statusPlan, setStatusPlan] = useState<string | null>(null)
+  const jaSincronizou = useRef(false)
+
+  // Ao abrir a Saúde, relê a planilha conectada (se houver) e importa.
+  useEffect(() => {
+    if (jaSincronizou.current || !getUrlPlanilha()) return
+    jaSincronizou.current = true
+    setStatusPlan('Sincronizando planilha…')
+    sincronizarPlanilha()
+      .then((r) => setStatusPlan(r.dias > 0 ? `Planilha: ${r.dias} dia(s) atualizado(s).` : null))
+      .catch(() => setStatusPlan('Não consegui ler a planilha agora.'))
+  }, [])
 
   const ordenados = useMemo(
     () => [...(dias ?? [])].sort((a, b) => (a.data < b.data ? 1 : -1)),
@@ -46,6 +59,8 @@ export function SaudePage() {
         <IconMais width={18} height={18} />
         Registrar hoje
       </button>
+
+      {statusPlan && <p className="px-1 text-[12px] text-muted">{statusPlan}</p>}
 
       {/* Cartões por métrica */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

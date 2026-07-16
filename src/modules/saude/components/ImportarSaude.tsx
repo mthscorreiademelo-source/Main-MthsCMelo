@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { FolhaInferior } from '../../../core/components/FolhaInferior'
-import { IconDownload, IconUpload } from '../../../core/components/Icons'
+import { IconDownload, IconNuvem, IconUpload } from '../../../core/components/Icons'
 import { importarSaude, type ResultadoImport } from '../importar'
+import { getUrlPlanilha, setUrlPlanilha, sincronizarPlanilha } from '../planilha'
 
 const MODELO = `data,sono,passos,calorias,fc_repouso,exercicio
 2026-07-14,7.5,8200,540,58,35
@@ -12,6 +13,22 @@ export function ImportarSaude({ onFechar }: { onFechar: () => void }) {
   const [res, setRes] = useState<ResultadoImport | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
+  const [urlPlan, setUrlPlan] = useState(getUrlPlanilha())
+
+  async function conectarPlanilha() {
+    setUrlPlanilha(urlPlan)
+    if (!urlPlan.trim()) return
+    setOcupado(true)
+    setErro(null)
+    setRes(null)
+    try {
+      setRes(await sincronizarPlanilha())
+    } catch (e) {
+      setErro((e as Error)?.message ?? 'Não foi possível ler a planilha.')
+    } finally {
+      setOcupado(false)
+    }
+  }
 
   async function importar(arquivo: File) {
     setOcupado(true)
@@ -94,9 +111,36 @@ export function ImportarSaude({ onFechar }: { onFechar: () => void }) {
       )}
       {erro && <p className="text-[13px] text-danger">{erro}</p>}
 
+      {/* Conectar planilha do Google (importação recorrente) */}
+      <div className="mt-1 flex flex-col gap-2 border-t border-line pt-4">
+        <p className="flex items-center gap-1.5 text-[14px] font-semibold">
+          <IconNuvem width={16} height={16} className="text-accent" />
+          Conectar planilha do Google
+        </p>
+        <p className="text-[12px] leading-relaxed text-muted">
+          Cole o link de uma Planilha Google com os mesmos tipos de coluna. Publique-a em{' '}
+          <strong>Arquivo → Compartilhar → Publicar na web → CSV</strong>. O Lume relê e importa a
+          cada vez que você abre a Saúde.
+        </p>
+        <input
+          value={urlPlan}
+          onChange={(e) => setUrlPlan(e.target.value)}
+          placeholder="https://docs.google.com/spreadsheets/…"
+          className="w-full rounded-xl border border-line bg-surface/60 px-3 py-2.5 text-[13px] outline-none transition-colors focus:border-muted/50 placeholder:text-muted/50"
+        />
+        <button
+          onClick={conectarPlanilha}
+          disabled={ocupado}
+          className="flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-full border border-line text-[14px] font-medium text-muted transition-colors hover:text-ink disabled:opacity-50"
+        >
+          {ocupado ? 'Lendo…' : getUrlPlanilha() ? 'Salvar e sincronizar' : 'Conectar e sincronizar'}
+        </button>
+      </div>
+
       <p className="text-[12px] text-muted/80">
-        Dica: no app Zepp dá para exportar seus dados; se as colunas não baterem, me diga quais
-        aparecem no seu arquivo que eu ajusto o reconhecimento.
+        Dica: um app-ponte no Android (que leva os dados do Amazfit/Health Connect para uma
+        Planilha) deixa isso quase automático. Se as colunas não baterem, me diga quais aparecem
+        que eu ajusto o reconhecimento.
       </p>
     </FolhaInferior>
   )
