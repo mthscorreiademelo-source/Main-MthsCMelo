@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { FolhaInferior } from '../../../core/components/FolhaInferior'
-import { IconLivro, IconUpload } from '../../../core/components/Icons'
+import { IconLivro, IconMais, IconUpload } from '../../../core/components/Icons'
 import { guardarArquivo, novoLivro, salvarLivro, STATUS, TIPOS } from '../db'
-import { detectarFormato, extrairMetadados } from '../importar'
+import { detectarFormato, extrairMetadados, gerarMiniatura } from '../importar'
 import type { FormatoArquivo, StatusLeitura, TipoObra } from '../types'
 
 const CAMPO =
@@ -10,6 +10,7 @@ const CAMPO =
 
 export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
   const inputArquivo = useRef<HTMLInputElement>(null)
+  const inputCapa = useRef<HTMLInputElement>(null)
   const [titulo, setTitulo] = useState('')
   const [autor, setAutor] = useState('')
   const [tipo, setTipo] = useState<TipoObra>('livro')
@@ -45,6 +46,13 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
     }
   }
 
+  async function escolherCapa(file: File) {
+    setErro(null)
+    const mini = await gerarMiniatura(file, 400)
+    if (mini) setCapa(mini)
+    else setErro('Não consegui ler essa imagem.')
+  }
+
   async function salvar() {
     if (!titulo.trim()) {
       setErro('Dê um título ao livro.')
@@ -74,22 +82,54 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
 
   return (
     <FolhaInferior titulo="Adicionar à biblioteca" onFechar={onFechar}>
-      <button
-        onClick={() => inputArquivo.current?.click()}
-        className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line bg-surface/60 px-4 text-center text-muted transition-colors hover:border-muted/50 hover:text-ink"
-      >
-        {capa ? (
-          <img src={capa} alt="" className="h-20 rounded shadow-sm" />
-        ) : lendo ? (
-          <span className="text-[14px]">Lendo o arquivo…</span>
-        ) : (
-          <>
-            <IconUpload width={20} height={20} />
-            <span className="text-[14px] font-medium">Escolher arquivo</span>
-            <span className="text-[12px] text-muted/70">EPUB · PDF · CBZ (ou adicione só o registro)</span>
-          </>
-        )}
-      </button>
+      <div className="flex gap-3">
+        {/* Capa (imagem) — pode ser definida mesmo sem o arquivo do livro */}
+        <button
+          onClick={() => inputCapa.current?.click()}
+          className="flex aspect-[2/3] w-24 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-line bg-surface transition-colors hover:border-muted/50"
+          aria-label="Escolher capa"
+        >
+          {capa ? (
+            <img src={capa} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="flex flex-col items-center gap-1 text-muted">
+              <IconMais width={18} height={18} />
+              <span className="text-[11px]">Capa</span>
+            </span>
+          )}
+        </button>
+
+        {/* Arquivo do livro (opcional) */}
+        <div className="flex flex-1 flex-col justify-center gap-2">
+          <button
+            onClick={() => inputArquivo.current?.click()}
+            className="flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line bg-surface/60 px-3 text-center text-muted transition-colors hover:border-muted/50 hover:text-ink"
+          >
+            {lendo ? (
+              <span className="text-[13px]">Lendo o arquivo…</span>
+            ) : arquivo ? (
+              <>
+                <span className="max-w-full truncate text-[13px] font-medium text-ink">{arquivo.name}</span>
+                <span className="text-[11px] text-muted/70">{formato?.toUpperCase()}</span>
+              </>
+            ) : (
+              <>
+                <IconUpload width={18} height={18} />
+                <span className="text-[13px] font-medium">Arquivo do livro</span>
+                <span className="text-[11px] text-muted/70">EPUB · PDF · CBZ (opcional)</span>
+              </>
+            )}
+          </button>
+          {capa && (
+            <button
+              onClick={() => setCapa(undefined)}
+              className="self-start text-[12px] text-muted transition-colors hover:text-ink"
+            >
+              remover capa
+            </button>
+          )}
+        </div>
+      </div>
       <input
         ref={inputArquivo}
         type="file"
@@ -98,6 +138,17 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
         onChange={(e) => {
           const f = e.target.files?.[0]
           if (f) escolher(f)
+          e.target.value = ''
+        }}
+      />
+      <input
+        ref={inputCapa}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) escolherCapa(f)
           e.target.value = ''
         }}
       />

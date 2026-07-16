@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { IconAbrir, IconLivro, IconLixeira, IconSetaEsquerda } from '../../core/components/Icons'
 import { rotuloData } from '../../core/dates'
 import { EstrelasNota } from './components/EstrelasNota'
 import { removerLivro, rotuloTipo, salvarLivro, STATUS } from './db'
 import { useLivro } from './hooks'
+import { gerarMiniatura } from './importar'
 import type { Livro, StatusLeitura } from './types'
 
 const CAMPO =
@@ -25,6 +26,7 @@ export function LivroPage() {
   const [autor, setAutor] = useState('')
   const [resenha, setResenha] = useState('')
   const [generos, setGeneros] = useState('')
+  const inputCapa = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!livro) return
@@ -64,14 +66,42 @@ export function LivroPage() {
       </Link>
 
       <div className="flex gap-4">
-        <div className="aspect-[2/3] w-28 shrink-0 overflow-hidden rounded-lg border border-line bg-surface shadow-sm">
-          {livro.capa ? (
-            <img src={livro.capa} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <IconLivro width={28} height={28} className="text-muted/50" />
-            </div>
+        <div className="flex w-28 shrink-0 flex-col gap-1.5">
+          <button
+            onClick={() => inputCapa.current?.click()}
+            className="flex aspect-[2/3] w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-line bg-surface shadow-sm transition-colors hover:border-muted/50"
+            aria-label={livro.capa ? 'Trocar capa' : 'Adicionar capa'}
+          >
+            {livro.capa ? (
+              <img src={livro.capa} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span className="flex flex-col items-center gap-1 text-muted/60">
+                <IconLivro width={26} height={26} />
+                <span className="text-[11px]">Adicionar capa</span>
+              </span>
+            )}
+          </button>
+          {livro.capa && (
+            <button
+              onClick={() => salvar({ capa: undefined })}
+              className="text-[11px] text-muted transition-colors hover:text-ink"
+            >
+              remover capa
+            </button>
           )}
+          <input
+            ref={inputCapa}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={async (e) => {
+              const f = e.target.files?.[0]
+              e.target.value = ''
+              if (!f) return
+              const mini = await gerarMiniatura(f, 400)
+              if (mini) salvar({ capa: mini })
+            }}
+          />
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <input

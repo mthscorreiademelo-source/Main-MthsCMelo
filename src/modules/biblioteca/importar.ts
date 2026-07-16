@@ -26,7 +26,7 @@ function semExtensao(nome: string): string {
 }
 
 /** Reduz uma imagem (blob) a uma miniatura JPEG (data URL). */
-async function gerarMiniatura(blob: Blob, maxLargura = 320): Promise<string | undefined> {
+export async function gerarMiniatura(blob: Blob, maxLargura = 320): Promise<string | undefined> {
   try {
     const bitmap = await createImageBitmap(blob)
     const escala = Math.min(1, maxLargura / bitmap.width)
