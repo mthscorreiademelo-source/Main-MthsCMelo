@@ -28,7 +28,8 @@ export function devidoNoDia(habito: Habito, data: string): boolean {
 }
 
 /** Rótulo curto e legível da frequência. */
-export function rotuloFrequencia(f: Frequencia): string {
+export function rotuloFrequencia(f?: Frequencia): string {
+  if (!f) return 'Todo dia'
   switch (f.tipo) {
     case 'diario':
       return 'Todo dia'
