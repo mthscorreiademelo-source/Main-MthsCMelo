@@ -55,17 +55,31 @@ export function VistaDia({
       ;(e.diaInteiro ? topo : timados).push(item)
     }
 
-    for (const t of tarefas.filter((t) => t.data === dia)) {
-      const item: Item = {
-        chave: 't' + t.id,
-        inicioMin: t.horario ? paraMin(t.horario) : -1,
-        rotuloHora: t.horario ? `${t.horario}–${paraHHMM(paraMin(t.horario) + (t.duracaoMin ?? 60))}` : 'sem horário',
+    // Bloco de tempo dedicado → item cronológico.
+    for (const t of tarefas.filter((t) => t.blocoData === dia && t.blocoInicio)) {
+      const ini = paraMin(t.blocoInicio!)
+      timados.push({
+        chave: 'tb' + t.id,
+        inicioMin: ini,
+        rotuloHora: `${t.blocoInicio}–${paraHHMM(ini + (t.duracaoMin ?? 60))}`,
         titulo: t.titulo,
         cor: corPrioridade(t.prioridade),
         riscado: !!t.concluidaEm,
         onAbrir: () => onAbrirTarefa(t),
-      }
-      ;(t.horario ? timados : topo).push(item)
+      })
+    }
+    // Tarefas com prazo hoje (sem bloco neste dia) → chip de limite no topo.
+    for (const t of tarefas.filter((t) => t.data === dia && t.blocoData !== dia)) {
+      topo.push({
+        chave: 'td' + t.id,
+        inicioMin: -1,
+        rotuloHora: t.horario ? `até ${t.horario}` : 'prazo hoje',
+        titulo: (t.horario ? '⚑ ' : '') + t.titulo,
+        cor: corPrioridade(t.prioridade),
+        vazado: true,
+        riscado: !!t.concluidaEm,
+        onAbrir: () => onAbrirTarefa(t),
+      })
     }
 
     timados.sort((a, b) => a.inicioMin - b.inicioMin)

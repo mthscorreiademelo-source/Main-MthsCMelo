@@ -18,10 +18,14 @@ export interface Task {
   descricao?: string
   /** Data agendada no formato ISO yyyy-MM-dd. */
   data?: string
-  /** Horário opcional HH:mm. */
+  /** Horário-limite (prazo) HH:mm no dia `data`. Aparece como marca no calendário. */
   horario?: string
-  /** Duração em minutos quando agendada num bloco de tempo (time-blocking). */
+  /** Quanto tempo a tarefa leva para ser feita (estimativa, em minutos). */
   duracaoMin?: number
+  /** Bloco de tempo dedicado — dia em que vou fazer a tarefa (ISO). */
+  blocoData?: string
+  /** Bloco de tempo dedicado — hora de início HH:mm. */
+  blocoInicio?: string
   /** 1 (P1) … 4 (P4). Padrão 4. */
   prioridade: Prioridade
   /** Projeto ao qual pertence; ausente = Entrada (Inbox). */

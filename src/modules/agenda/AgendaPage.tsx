@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { addDays, addMonths, addYears, endOfMonth, format, parseISO, startOfMonth, startOfWeek } from 'date-fns'
+import { addDays, addMonths, addYears, endOfMonth, format, parseISO, startOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { IconMais, IconSetaEsquerda } from '../../core/components/Icons'
 import { hojeISO, rotuloMes } from '../../core/dates'
@@ -17,20 +17,19 @@ import { criarEvento, paraHHMM } from './db'
 import { useCronogramas, useEventos } from './hooks'
 import type { Evento } from './types'
 
-type Modo = 'dia' | '3dias' | '4dias' | 'semana' | 'mes' | 'trimestre' | 'ano' | 'cronogramas'
+type Modo = 'dia' | '3dias' | 'custom' | 'semana' | 'mes' | 'ano' | 'cronogramas'
 
 const OPCOES: { modo: Modo; rotulo: string }[] = [
   { modo: 'dia', rotulo: 'Dia' },
   { modo: '3dias', rotulo: '3 dias' },
-  { modo: '4dias', rotulo: '4 dias' },
+  { modo: 'custom', rotulo: 'Personalizado' },
   { modo: 'semana', rotulo: 'Semana' },
   { modo: 'mes', rotulo: 'Mês' },
-  { modo: 'trimestre', rotulo: 'Trimestre' },
   { modo: 'ano', rotulo: 'Ano' },
   { modo: 'cronogramas', rotulo: 'Cronogramas' },
 ]
 
-const N_DIAS: Partial<Record<Modo, number>> = { dia: 1, '3dias': 3, '4dias': 4, semana: 7 }
+const MODOS_GRADE: Modo[] = ['dia', '3dias', 'custom', 'semana']
 
 export function AgendaPage() {
   const eventos = useEventos()
@@ -38,6 +37,7 @@ export function AgendaPage() {
   const projetos = useProjetos()
   const cronogramas = useCronogramas()
   const [modo, setModo] = useState<Modo>('3dias')
+  const [customN, setCustomN] = useState(5)
   const [ancora, setAncora] = useState(hojeISO())
   const [editorEvento, setEditorEvento] = useState<Evento | null>(null)
   const [editorTarefa, setEditorTarefa] = useState<Task | null>(null)
@@ -49,6 +49,9 @@ export function AgendaPage() {
   const ps = projetos ?? []
   const crs = cronogramas ?? []
 
+  const nDias =
+    modo === 'dia' ? 1 : modo === '3dias' ? 3 : modo === 'custom' ? Math.min(14, Math.max(2, customN)) : modo === 'semana' ? 7 : 0
+
   const diasMes = useMemo(() => {
     if (modo !== 'cronogramas') return []
     const ini = startOfMonth(parseISO(ancora))
@@ -59,22 +62,14 @@ export function AgendaPage() {
   }, [ancora, modo])
 
   const dias = useMemo(() => {
-    const n = N_DIAS[modo]
-    if (!n) return []
-    const inicio = modo === 'semana' ? startOfWeek(parseISO(ancora), { weekStartsOn: 0 }) : parseISO(ancora)
-    return Array.from({ length: n }, (_, i) => format(addDays(inicio, i), 'yyyy-MM-dd'))
-  }, [ancora, modo])
+    if (!nDias) return []
+    return Array.from({ length: nDias }, (_, i) => format(addDays(parseISO(ancora), i), 'yyyy-MM-dd'))
+  }, [ancora, nDias])
 
   const meses = useMemo(() => {
-    if (modo === 'trimestre') {
-      const base = parseISO(`${ancora.slice(0, 7)}-01`)
-      return [0, 1, 2].map((i) => format(addMonths(base, i), 'yyyy-MM'))
-    }
-    if (modo === 'ano') {
-      const ano = ancora.slice(0, 4)
-      return Array.from({ length: 12 }, (_, i) => `${ano}-${String(i + 1).padStart(2, '0')}`)
-    }
-    return []
+    if (modo !== 'ano') return []
+    const ano = ancora.slice(0, 4)
+    return Array.from({ length: 12 }, (_, i) => `${ano}-${String(i + 1).padStart(2, '0')}`)
   }, [ancora, modo])
 
   useEffect(() => {
@@ -93,10 +88,13 @@ export function AgendaPage() {
     const d = parseISO(ancora)
     let novo = d
     if (modo === 'mes' || modo === 'cronogramas') novo = addMonths(d, dir)
-    else if (modo === 'trimestre') novo = addMonths(d, dir * 3)
     else if (modo === 'ano') novo = addYears(d, dir)
-    else novo = addDays(d, dir * (N_DIAS[modo] ?? 1))
+    else novo = addDays(d, dir) // grades: 1 dia de cada vez (fluido)
     setAncora(format(novo, 'yyyy-MM-dd'))
+  }
+
+  function panDias(delta: number) {
+    setAncora((a) => format(addDays(parseISO(a), delta), 'yyyy-MM-dd'))
   }
 
   async function aoCriar(data: string, ini: number, fim: number) {
@@ -112,11 +110,6 @@ export function AgendaPage() {
   const rotulo = (() => {
     if (modo === 'mes' || modo === 'cronogramas') return rotuloMes(ancora.slice(0, 7))
     if (modo === 'ano') return ancora.slice(0, 4)
-    if (modo === 'trimestre') {
-      const a = parseISO(`${meses[0]}-01`)
-      const b = parseISO(`${meses[2]}-01`)
-      return `${format(a, 'MMM', { locale: ptBR })} – ${format(b, "MMM 'de' yyyy", { locale: ptBR })}`
-    }
     const a = parseISO(dias[0])
     const b = parseISO(dias[dias.length - 1])
     if (modo === 'dia') return format(a, "d 'de' MMMM", { locale: ptBR })
@@ -129,7 +122,7 @@ export function AgendaPage() {
   const pronto = eventos && tarefas
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-1">
           <button onClick={() => navegar(-1)} aria-label="Anterior" className="flex size-9 items-center justify-center rounded-full text-muted hover:bg-hover hover:text-ink">
@@ -158,6 +151,20 @@ export function AgendaPage() {
               </button>
             ))}
           </div>
+          {modo === 'custom' && (
+            <label className="flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-[13px] text-muted">
+              <input
+                type="number"
+                min={2}
+                max={14}
+                value={customN}
+                onChange={(e) => setCustomN(Math.min(14, Math.max(2, Number(e.target.value) || 2)))}
+                className="w-10 bg-transparent text-center text-ink outline-none"
+                aria-label="Quantos dias"
+              />
+              dias
+            </label>
+          )}
           <button onClick={() => aoCriar(dias[0] ?? ancora, 9 * 60, 10 * 60)} className="flex min-h-9 items-center gap-1.5 rounded-full bg-ink px-3.5 text-[14px] font-medium text-surface">
             <IconMais width={16} height={16} /> Evento
           </button>
@@ -167,15 +174,13 @@ export function AgendaPage() {
       {pronto && modo === 'dia' && (
         <VistaDia dia={ancora} eventos={evs} tarefas={tks} onAbrirEvento={setEditorEvento} onAbrirTarefa={setEditorTarefa} onCriar={aoCriar} />
       )}
-      {pronto && (modo === '3dias' || modo === '4dias' || modo === 'semana') && (
-        <GradeTempo dias={dias} eventos={evs} tarefas={tks} onAbrirEvento={setEditorEvento} onAbrirTarefa={setEditorTarefa} onCriar={aoCriar} />
+      {pronto && MODOS_GRADE.includes(modo) && modo !== 'dia' && (
+        <GradeTempo dias={dias} eventos={evs} tarefas={tks} onAbrirEvento={setEditorEvento} onAbrirTarefa={setEditorTarefa} onCriar={aoCriar} onPanDias={panDias} />
       )}
       {pronto && modo === 'mes' && (
         <VistaMes mesRef={ancora.slice(0, 7)} eventos={evs} onAbrirEvento={setEditorEvento} onIrParaDia={irParaDia} />
       )}
-      {pronto && (modo === 'trimestre' || modo === 'ano') && (
-        <VistaMultiMes meses={meses} eventos={evs} onIrParaDia={irParaDia} />
-      )}
+      {pronto && modo === 'ano' && <VistaMultiMes meses={meses} eventos={evs} onIrParaDia={irParaDia} />}
       {pronto && modo === 'cronogramas' && (
         <GanttCronogramas dias={diasMes} eventos={evs} cronogramas={crs} onAbrirEvento={setEditorEvento} onGerenciar={() => setGerCron(true)} />
       )}

@@ -37,6 +37,9 @@ export function TaskEditorSheet({ task, projetos, todas, onFechar }: Props) {
   const [descricao, setDescricao] = useState('')
   const [data, setData] = useState('')
   const [horario, setHorario] = useState('')
+  const [duracao, setDuracao] = useState('')
+  const [blocoData, setBlocoData] = useState('')
+  const [blocoInicio, setBlocoInicio] = useState('')
   const [novaSub, setNovaSub] = useState('')
   const [novaLabel, setNovaLabel] = useState('')
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
@@ -47,6 +50,9 @@ export function TaskEditorSheet({ task, projetos, todas, onFechar }: Props) {
       setDescricao(task.descricao ?? '')
       setData(task.data ?? '')
       setHorario(task.horario ?? '')
+      setDuracao(task.duracaoMin != null ? String(task.duracaoMin) : '')
+      setBlocoData(task.blocoData ?? '')
+      setBlocoInicio(task.blocoInicio ?? '')
       setNovaSub('')
       setNovaLabel('')
       setConfirmandoExclusao(false)
@@ -73,6 +79,18 @@ export function TaskEditorSheet({ task, projetos, todas, onFechar }: Props) {
   function salvarHorario(v: string) {
     setHorario(v)
     if (task) atualizarTarefa(task.id, { horario: v || undefined })
+  }
+  function salvarDuracao(v: string) {
+    setDuracao(v)
+    if (task) atualizarTarefa(task.id, { duracaoMin: v ? Math.max(5, Number(v) || 0) : undefined })
+  }
+  function salvarBlocoData(v: string) {
+    setBlocoData(v)
+    if (task) atualizarTarefa(task.id, { blocoData: v || undefined })
+  }
+  function salvarBlocoInicio(v: string) {
+    setBlocoInicio(v)
+    if (task) atualizarTarefa(task.id, { blocoInicio: v || undefined })
   }
   function definirRecorrencia(tipo: TipoRecorrencia | '') {
     if (!task) return
@@ -141,16 +159,46 @@ export function TaskEditorSheet({ task, projetos, todas, onFechar }: Props) {
           </div>
         </div>
 
-        {/* Data + hora */}
+        {/* Prazo (data + horário-limite) + duração */}
         <div className="flex gap-3">
           <label className="flex flex-1 flex-col gap-1.5">
-            <span className={ROTULO}>Data</span>
+            <span className={ROTULO}>Prazo (data)</span>
             <input type="date" value={data} onChange={(e) => salvarData(e.target.value)} className={CAMPO} />
           </label>
-          <label className="flex w-32 flex-col gap-1.5">
-            <span className={ROTULO}>Hora</span>
+          <label className="flex w-28 flex-col gap-1.5">
+            <span className={ROTULO}>Horário-limite</span>
             <input type="time" value={horario} onChange={(e) => salvarHorario(e.target.value)} className={CAMPO} />
           </label>
+          <label className="flex w-24 flex-col gap-1.5">
+            <span className={ROTULO}>Duração</span>
+            <input
+              type="number"
+              min={5}
+              step={5}
+              value={duracao}
+              onChange={(e) => salvarDuracao(e.target.value)}
+              placeholder="min"
+              className={CAMPO}
+            />
+          </label>
+        </div>
+
+        {/* Bloco de tempo dedicado (quando vou fazer) */}
+        <div className="flex flex-col gap-1.5 rounded-lg border border-line/70 bg-surface/40 p-2.5">
+          <span className="text-[13px] font-medium text-muted">Bloco de tempo dedicado</span>
+          <div className="flex gap-3">
+            <label className="flex flex-1 flex-col gap-1">
+              <span className="text-[12px] text-muted">Dia</span>
+              <input type="date" value={blocoData} onChange={(e) => salvarBlocoData(e.target.value)} className={CAMPO} />
+            </label>
+            <label className="flex w-28 flex-col gap-1">
+              <span className="text-[12px] text-muted">Início</span>
+              <input type="time" value={blocoInicio} onChange={(e) => salvarBlocoInicio(e.target.value)} className={CAMPO} />
+            </label>
+          </div>
+          <p className="text-[11px] text-muted/80">
+            Aparece como bloco na Agenda (arraste para reposicionar). O horário-limite vira uma marca no dia do prazo.
+          </p>
         </div>
 
         {/* Projeto + recorrência */}

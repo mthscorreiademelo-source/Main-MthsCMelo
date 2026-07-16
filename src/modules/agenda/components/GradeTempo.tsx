@@ -46,6 +46,7 @@ export function GradeTempo({
   onAbrirEvento,
   onAbrirTarefa,
   onCriar,
+  onPanDias,
 }: {
   dias: string[]
   eventos: Evento[]
@@ -53,6 +54,7 @@ export function GradeTempo({
   onAbrirEvento: (e: Evento) => void
   onAbrirTarefa: (t: Task) => void
   onCriar: (data: string, inicioMin: number, fimMin: number) => void
+  onPanDias: (delta: number) => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [arrasto, setArrasto] = useState<Arrasto | null>(null)
@@ -94,10 +96,11 @@ export function GradeTempo({
         presenca: o.evento.presenca,
         ehOcorrencia: o.ehOcorrencia,
       }))
+    // Bloco de tempo dedicado (Reclaim): quando/onde vou fazer a tarefa.
     const tks: Bloco[] = tarefas
-      .filter((t) => t.data === dia && t.horario)
+      .filter((t) => t.blocoData === dia && t.blocoInicio)
       .map((t) => {
-        const ini = paraMin(t.horario!)
+        const ini = paraMin(t.blocoInicio!)
         return {
           id: `ta:${t.id}`,
           tipo: 'tarefa',
@@ -121,8 +124,8 @@ export function GradeTempo({
     return (el?.closest('[data-dia]') as HTMLElement | null) ?? null
   }
 
-  function iniciarCriar(e: RPE, dia: string, colEl: HTMLElement) {
-    if (e.button != null && e.button !== 0) return
+  // Mouse: arrastar cria um intervalo (clique simples = 1h).
+  function criarComMouse(e: RPE, dia: string, colEl: HTMLElement) {
     const a = arredondar(minDoPonto(e.clientY, colEl))
     setCriando({ dia, a, b: a + DUR_PADRAO })
     const mover = (ev: PointerEvent) => setCriando({ dia, a, b: arredondar(minDoPonto(ev.clientY, colEl)) })
@@ -135,6 +138,48 @@ export function GradeTempo({
       const ini = Math.min(c.a, c.b)
       const fim = Math.max(c.a, c.b)
       onCriar(dia, ini, fim - ini < 15 ? ini + DUR_PADRAO : fim)
+    }
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
+  }
+
+  /**
+   * Toque na área vazia: distingue os gestos para não criar evento sem querer.
+   * - toque rápido (sem mover) → cria 1h
+   * - arrasto vertical → deixa a grade rolar (nativo)
+   * - arrasto horizontal → navega os dias ao soltar (fluido)
+   */
+  function apontarGrade(e: RPE, dia: string, colEl: HTMLElement) {
+    if (e.button != null && e.button !== 0) return
+    if (e.pointerType === 'mouse') {
+      criarComMouse(e, dia, colEl)
+      return
+    }
+    const x0 = e.clientX
+    const y0 = e.clientY
+    const t0 = e.timeStamp
+    let dir: 'scroll' | 'pan' | null = null
+    const mover = (ev: PointerEvent) => {
+      if (dir) return
+      const dx = ev.clientX - x0
+      const dy = ev.clientY - y0
+      if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.3) dir = 'pan'
+      else if (Math.abs(dy) > 10) dir = 'scroll'
+    }
+    const soltar = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
+      const dx = ev.clientX - x0
+      const dy = ev.clientY - y0
+      const dt = ev.timeStamp - t0
+      if (dir === 'pan') {
+        const colW = colEl.getBoundingClientRect().width || 1
+        const delta = -Math.round(dx / colW)
+        if (delta !== 0) onPanDias(delta)
+      } else if (!dir && Math.abs(dx) < 8 && Math.abs(dy) < 8 && dt < 600) {
+        const min = arredondar(minDoPonto(y0, colEl))
+        onCriar(dia, min, min + DUR_PADRAO)
+      }
     }
     window.addEventListener('pointermove', mover)
     window.addEventListener('pointerup', soltar)
@@ -183,7 +228,7 @@ export function GradeTempo({
         atualizarEvento(ev.id, { data: a.dia, inicio: paraHHMM(a.inicioMin), fim: paraHHMM(a.fimMin) })
       } else {
         const t = bloco.ref as Task
-        atualizarTarefa(t.id, { data: a.dia, horario: paraHHMM(a.inicioMin), duracaoMin: a.fimMin - a.inicioMin })
+        atualizarTarefa(t.id, { blocoData: a.dia, blocoInicio: paraHHMM(a.inicioMin), duracaoMin: a.fimMin - a.inicioMin })
       }
     }
     window.addEventListener('pointermove', mover)
@@ -221,7 +266,7 @@ export function GradeTempo({
           ...ocorrencias.filter((o) => o.data === dia && o.evento.diaInteiro && !o.evento.dataFim).map((o) => o.evento),
           ...eventos.filter((e) => e.dataFim && e.dataFim > e.data && e.data <= dia && dia <= e.dataFim),
         ]
-        const tks = tarefas.filter((t) => t.data === dia && !t.horario && !t.concluidaEm)
+        const tks = tarefas.filter((t) => t.data === dia && !t.horario && !t.blocoData && !t.concluidaEm)
         return (
           <div key={dia} className="flex min-h-8 flex-1 flex-col gap-0.5 border-l border-line p-1">
             {evsBanda.map((ev) => {
@@ -299,7 +344,7 @@ export function GradeTempo({
                 className="relative flex-1 border-l border-line"
                 style={{ height: ALTURA }}
                 onPointerDown={(e) => {
-                  if (e.target === e.currentTarget) iniciarCriar(e, dia, e.currentTarget as HTMLElement)
+                  if (e.target === e.currentTarget) apontarGrade(e, dia, e.currentTarget as HTMLElement)
                 }}
               >
                 {Array.from({ length: 24 }, (_, h) => (
@@ -366,6 +411,27 @@ export function GradeTempo({
                     </div>
                   )
                 })}
+
+                {/* Marcas de prazo (horário-limite das tarefas) */}
+                {tarefas
+                  .filter((t) => t.data === dia && t.horario && !t.concluidaEm)
+                  .map((t) => {
+                    const cor = corPrioridade(t.prioridade)
+                    return (
+                      <button
+                        key={'lim:' + t.id}
+                        onClick={() => onAbrirTarefa(t)}
+                        title={`Prazo ${t.horario} · ${t.titulo}`}
+                        className="absolute inset-x-0 z-[15] flex items-center gap-1"
+                        style={{ top: (paraMin(t.horario!) / 60) * HORA_PX - 7 }}
+                      >
+                        <span className="shrink-0 rounded px-1 text-[9px] font-bold text-white" style={{ backgroundColor: cor }}>
+                          ⚑ {t.horario}
+                        </span>
+                        <span className="h-0 flex-1 border-t border-dashed" style={{ borderColor: cor }} />
+                      </button>
+                    )
+                  })}
               </div>
             )
           })}
