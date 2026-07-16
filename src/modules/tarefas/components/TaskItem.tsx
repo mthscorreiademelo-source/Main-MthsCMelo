@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, type PointerEvent as ReactPointerEvent } from 'react'
 import {
+  IconArrastar,
   IconCalendario,
   IconChevron,
   IconCheck,
@@ -8,6 +9,7 @@ import {
 } from '../../../core/components/Icons'
 import { rotuloData } from '../../../core/dates'
 import { alternarConclusao, contarSubtarefas, corPrioridade, estaAtrasada, subtarefas } from '../db'
+import { MenuReagendar } from './MenuReagendar'
 import type { Projeto, Task } from '../types'
 
 interface Props {
@@ -21,6 +23,8 @@ interface Props {
   ocultarData?: boolean
   /** Mostra o ponto/nome do projeto (visões mistas: Hoje/Próximas/Entrada). */
   mostrarProjeto?: boolean
+  /** Quando definido, mostra a alça de arrastar (reordenar) na raiz. */
+  aoIniciarArrasto?: (e: ReactPointerEvent, id: string) => void
 }
 
 /** Checkbox redondo colorido pela prioridade (estilo Todoist). */
@@ -40,7 +44,7 @@ function CheckPrioridade({ task }: { task: Task }) {
       className="flex size-9 shrink-0 items-center justify-center"
     >
       <span
-        className="flex size-[19px] items-center justify-center rounded-full border-[1.5px] transition-all"
+        className={`flex size-[19px] items-center justify-center rounded-full border-[1.5px] transition-all ${concluida ? 'lume-pop' : ''}`}
         style={{
           borderColor: cor,
           backgroundColor: concluida ? cor : fundo,
@@ -67,6 +71,7 @@ export function TaskItem({
   nivel = 0,
   ocultarData,
   mostrarProjeto,
+  aoIniciarArrasto,
 }: Props) {
   const concluida = !!task.concluidaEm
   const atrasada = estaAtrasada(task)
@@ -74,14 +79,26 @@ export function TaskItem({
   const cont = contarSubtarefas(todas, task.id)
   const projeto = task.projetoId ? projetos.find((p) => p.id === task.projetoId) : undefined
   const [aberto, setAberto] = useState(true)
+  const [reagendando, setReagendando] = useState(false)
+  const arrastavel = !!aoIniciarArrasto && nivel === 0
 
   return (
-    <li className="group/task">
+    <li className="group/task" data-task-id={nivel === 0 ? task.id : undefined}>
       <div
         onClick={() => onAbrir(task)}
         className="flex cursor-pointer items-start rounded-lg pr-1 transition-colors hover:bg-hover"
         style={{ paddingLeft: nivel * 22 }}
       >
+        {arrastavel && (
+          <button
+            onPointerDown={(e) => aoIniciarArrasto!(e, task.id)}
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Arrastar para reordenar"
+            className="mt-1.5 flex size-6 shrink-0 cursor-grab touch-none items-center justify-center text-transparent transition-colors group-hover/task:text-muted/60 active:cursor-grabbing"
+          >
+            <IconArrastar width={14} height={14} />
+          </button>
+        )}
         {aninhar && filhas.length > 0 ? (
           <button
             onClick={(e) => {
@@ -154,7 +171,22 @@ export function TaskItem({
             </div>
           )}
         </div>
+
+        {!concluida && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setReagendando(true)
+            }}
+            aria-label="Reagendar"
+            className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full text-transparent transition-colors group-hover/task:text-muted hover:!text-ink hover:bg-hover"
+          >
+            <IconCalendario width={15} height={15} />
+          </button>
+        )}
       </div>
+
+      {reagendando && <MenuReagendar task={task} onFechar={() => setReagendando(false)} />}
 
       {aninhar && aberto && filhas.length > 0 && (
         <ul>

@@ -260,6 +260,11 @@ export function ordenar(tarefas: Task[]): Task[] {
   })
 }
 
+/** Ordem manual (para listas reordenáveis: Entrada e Projeto). */
+export function ordenarManual(tarefas: Task[]): Task[] {
+  return [...tarefas].sort((a, b) => a.ordem - b.ordem)
+}
+
 /** Só data primeiro (para as visões por data), depois prioridade. */
 export function ordenarPorData(tarefas: Task[]): Task[] {
   return [...tarefas].sort((a, b) => {
@@ -293,14 +298,14 @@ export function filtrarProximas(tarefas: Task[]): Task[] {
   return ordenarPorData(tarefas.filter((t) => estaPendente(t) && !!t.data && t.data > hoje))
 }
 
-/** Entrada: pendentes sem projeto. Só as raízes (subtarefas aninham na UI). */
+/** Entrada: pendentes sem projeto. Ordem manual (arrastável). */
 export function filtrarEntrada(tarefas: Task[]): Task[] {
-  return ordenar(tarefas.filter((t) => estaPendente(t) && !t.projetoId && !t.paiId))
+  return ordenarManual(tarefas.filter((t) => estaPendente(t) && !t.projetoId && !t.paiId))
 }
 
-/** Raízes pendentes de um projeto (subtarefas aninham na UI). */
+/** Raízes pendentes de um projeto. Ordem manual (arrastável). */
 export function filtrarProjeto(tarefas: Task[], projetoId: string): Task[] {
-  return ordenar(tarefas.filter((t) => estaPendente(t) && t.projetoId === projetoId && !t.paiId))
+  return ordenarManual(tarefas.filter((t) => estaPendente(t) && t.projetoId === projetoId && !t.paiId))
 }
 
 export function filtrarConcluidas(tarefas: Task[]): Task[] {
@@ -313,4 +318,90 @@ export function concluidasHoje(tarefas: Task[]): Task[] {
   const inicioDoDia = new Date()
   inicioDoDia.setHours(0, 0, 0, 0)
   return filtrarConcluidas(tarefas).filter((t) => (t.concluidaEm ?? 0) >= inicioDoDia.getTime())
+}
+
+/* ---------- etiquetas, busca e filtros ---------- */
+
+/** Todas as etiquetas em uso (pendentes) com contagem, ordenadas por nome. */
+export function todasLabels(tarefas: Task[]): { label: string; qtd: number }[] {
+  const mapa = new Map<string, number>()
+  for (const t of tarefas) {
+    if (!estaPendente(t)) continue
+    for (const l of t.labels ?? []) mapa.set(l, (mapa.get(l) ?? 0) + 1)
+  }
+  return [...mapa.entries()]
+    .map(([label, qtd]) => ({ label, qtd }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+}
+
+/** Pendentes (raízes) com determinada etiqueta. */
+export function filtrarLabel(tarefas: Task[], label: string): Task[] {
+  return ordenar(tarefas.filter((t) => estaPendente(t) && (t.labels ?? []).includes(label) && !t.paiId))
+}
+
+/** Pendentes (raízes) de uma prioridade. */
+export function filtrarPrioridade(tarefas: Task[], p: Prioridade): Task[] {
+  return ordenar(tarefas.filter((t) => estaPendente(t) && t.prioridade === p && !t.paiId))
+}
+
+const semAcentoLower = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+
+/** Busca por título, descrição e etiquetas (pendentes e concluídas). */
+export function buscar(tarefas: Task[], termo: string): Task[] {
+  const q = semAcentoLower(termo.trim())
+  if (!q) return []
+  return tarefas
+    .filter((t) => {
+      const alvo = semAcentoLower(
+        `${t.titulo} ${t.descricao ?? ''} ${(t.labels ?? []).join(' ')}`,
+      )
+      return alvo.includes(q)
+    })
+    .sort((a, b) => Number(estaPendente(b)) - Number(estaPendente(a)))
+    .slice(0, 50)
+}
+
+/* ---------- reordenar e reagendar ---------- */
+
+/** Persiste a nova ordem manual (índice = ordem). */
+export async function reordenar(ids: string[]): Promise<void> {
+  await db.transaction('rw', db.tasks, async () => {
+    for (let i = 0; i < ids.length; i++) {
+      await db.tasks.update(ids[i], { ordem: i })
+    }
+  })
+}
+
+/** Datas rápidas para o "planejar". */
+export function dataRelativa(quando: 'hoje' | 'amanha' | 'fim_semana' | 'prox_semana'): string {
+  const base = parseISO(hojeISO())
+  switch (quando) {
+    case 'hoje':
+      return hojeISO()
+    case 'amanha':
+      return format(addDays(base, 1), 'yyyy-MM-dd')
+    case 'fim_semana': {
+      // próximo sábado (ou hoje se já for sábado)
+      let d = base
+      for (let i = 0; i < 7; i++) {
+        if (getDay(d) === 6) break
+        d = addDays(d, 1)
+      }
+      return format(d, 'yyyy-MM-dd')
+    }
+    case 'prox_semana': {
+      // próxima segunda-feira
+      let d = addDays(base, 1)
+      for (let i = 0; i < 7; i++) {
+        if (getDay(d) === 1) break
+        d = addDays(d, 1)
+      }
+      return format(d, 'yyyy-MM-dd')
+    }
+  }
+}
+
+export async function reagendar(id: string, data: string | undefined) {
+  await atualizarTarefa(id, { data })
 }
