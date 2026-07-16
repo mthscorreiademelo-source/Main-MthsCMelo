@@ -1,6 +1,7 @@
+import { differenceInCalendarDays, differenceInCalendarMonths, getDate, getDay, parseISO } from 'date-fns'
 import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
-import type { Evento } from './types'
+import type { Evento, RecorrenciaEvento } from './types'
 
 /** Paleta de cores dos eventos (estilo Google Calendar). */
 export const CORES_EVENTO = [
@@ -52,6 +53,8 @@ export async function criarEvento(dados: Partial<Evento> & { titulo: string; dat
     cor: dados.cor ?? COR_PADRAO,
     local: dados.local,
     descricao: dados.descricao,
+    recorrencia: dados.recorrencia,
+    presenca: dados.presenca ?? 'confirmado',
     criadoEm: Date.now(),
   })
   return id
@@ -67,9 +70,61 @@ export async function excluirEvento(id: string) {
 
 /* ---------- seleção ---------- */
 
+/** Uma ocorrência de evento num dia (o master + a data efetiva). */
+export interface OcorrenciaEvento {
+  evento: Evento
+  data: string
+  ehOcorrencia: boolean
+}
+
+/** A recorrência de `master` (que começa em D0) cai no dia `data`? */
+function recorreNoDia(master: Evento, rec: RecorrenciaEvento, data: string): boolean {
+  if (data <= master.data) return false
+  if (rec.ate && data > rec.ate) return false
+  const d0 = parseISO(master.data)
+  const d = parseISO(data)
+  const n = Math.max(1, rec.intervalo ?? 1)
+  switch (rec.tipo) {
+    case 'diaria':
+      return differenceInCalendarDays(d, d0) % n === 0
+    case 'semanal':
+      return getDay(d) === getDay(d0) && (differenceInCalendarDays(d, d0) / 7) % n === 0
+    case 'mensal':
+      return getDate(d) === getDate(d0) && differenceInCalendarMonths(d, d0) % n === 0
+    case 'anual':
+      return (
+        getDate(d) === getDate(d0) &&
+        d.getMonth() === d0.getMonth() &&
+        (d.getFullYear() - d0.getFullYear()) % n === 0
+      )
+    default:
+      return false
+  }
+}
+
+/**
+ * Expande eventos recorrentes em ocorrências para os dias informados.
+ * O evento na sua própria data é o "master" (editável/arrastável); as demais
+ * ocorrências são geradas (abrir edita a série).
+ */
+export function expandirEventos(eventos: Evento[], dias: string[]): OcorrenciaEvento[] {
+  const set = new Set(dias)
+  const out: OcorrenciaEvento[] = []
+  for (const e of eventos) {
+    if (set.has(e.data)) out.push({ evento: e, data: e.data, ehOcorrencia: false })
+    if (e.recorrencia) {
+      for (const dia of dias) {
+        if (dia === e.data) continue
+        if (recorreNoDia(e, e.recorrencia, dia)) out.push({ evento: e, data: dia, ehOcorrencia: true })
+      }
+    }
+  }
+  return out
+}
+
 export function eventosDoDia(eventos: Evento[], data: string): Evento[] {
-  return eventos
-    .filter((e) => e.data === data)
+  return expandirEventos(eventos, [data])
+    .map((o) => (o.ehOcorrencia ? { ...o.evento, data } : o.evento))
     .sort((a, b) => paraMin(a.inicio) - paraMin(b.inicio))
 }
 

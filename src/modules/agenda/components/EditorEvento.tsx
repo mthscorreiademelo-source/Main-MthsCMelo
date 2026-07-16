@@ -2,7 +2,21 @@ import { useEffect, useState } from 'react'
 import { FolhaInferior } from '../../../core/components/FolhaInferior'
 import { IconCheck, IconLixeira } from '../../../core/components/Icons'
 import { atualizarEvento, CORES_EVENTO, excluirEvento } from '../db'
-import type { Evento } from '../types'
+import type { Evento, Presenca, TipoRecorrenciaEvento } from '../types'
+
+const PRESENCAS: { valor: Presenca | undefined; rotulo: string }[] = [
+  { valor: 'confirmado', rotulo: 'Vou' },
+  { valor: undefined, rotulo: 'Talvez' },
+  { valor: 'recusado', rotulo: 'Não vou' },
+]
+
+const RECS: { valor: TipoRecorrenciaEvento | ''; rotulo: string }[] = [
+  { valor: '', rotulo: 'Não repete' },
+  { valor: 'diaria', rotulo: 'Todo dia' },
+  { valor: 'semanal', rotulo: 'Toda semana' },
+  { valor: 'mensal', rotulo: 'Todo mês' },
+  { valor: 'anual', rotulo: 'Todo ano' },
+]
 
 const CAMPO =
   'min-h-10 rounded-lg border border-line bg-surface px-3 text-[15px] outline-none focus:border-muted/60'
@@ -17,6 +31,8 @@ export function EditorEvento({ evento, onFechar }: { evento: Evento; onFechar: (
   const [cor, setCor] = useState(evento.cor ?? CORES_EVENTO[0])
   const [local, setLocal] = useState(evento.local ?? '')
   const [descricao, setDescricao] = useState(evento.descricao ?? '')
+  const [presenca, setPresenca] = useState<Presenca | undefined>(evento.presenca)
+  const [recorre, setRecorre] = useState<TipoRecorrenciaEvento | ''>(evento.recorrencia?.tipo ?? '')
 
   useEffect(() => {
     setTitulo(evento.titulo)
@@ -27,6 +43,8 @@ export function EditorEvento({ evento, onFechar }: { evento: Evento; onFechar: (
     setCor(evento.cor ?? CORES_EVENTO[0])
     setLocal(evento.local ?? '')
     setDescricao(evento.descricao ?? '')
+    setPresenca(evento.presenca)
+    setRecorre(evento.recorrencia?.tipo ?? '')
   }, [evento.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const salvar = (m: Partial<Evento>) => atualizarEvento(evento.id, m)
@@ -125,6 +143,50 @@ export function EditorEvento({ evento, onFechar }: { evento: Evento; onFechar: (
           ))}
         </div>
       </div>
+
+      {/* Presença */}
+      <div className="flex flex-col gap-1.5">
+        <span className={ROTULO}>Presença</span>
+        <div className="flex gap-1.5">
+          {PRESENCAS.map((p) => {
+            const ativo = presenca === p.valor
+            return (
+              <button
+                key={p.rotulo}
+                onClick={() => {
+                  setPresenca(p.valor)
+                  salvar({ presenca: p.valor })
+                }}
+                className={`min-h-9 flex-1 rounded-lg border text-[13px] font-medium transition-colors ${
+                  ativo ? 'border-ink bg-ink text-surface' : 'border-line text-muted'
+                }`}
+              >
+                {p.rotulo}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Repetir */}
+      <label className="flex flex-col gap-1">
+        <span className={ROTULO}>Repetir</span>
+        <select
+          value={recorre}
+          onChange={(e) => {
+            const v = e.target.value as TipoRecorrenciaEvento | ''
+            setRecorre(v)
+            salvar({ recorrencia: v ? { tipo: v, intervalo: 1 } : undefined })
+          }}
+          className={CAMPO}
+        >
+          {RECS.map((r) => (
+            <option key={r.valor} value={r.valor}>
+              {r.rotulo}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <label className="flex flex-col gap-1">
         <span className={ROTULO}>Local (opcional)</span>
