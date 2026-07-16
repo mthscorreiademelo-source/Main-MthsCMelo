@@ -19,20 +19,19 @@ uma vez. Enquanto não estiver configurado, o app continua exatamente como hoje
    em **Run**. Isso cria a tabela de dados, as regras de segurança e o
    armazenamento de arquivos.
 
-## 3. Ligar o login com Google
+## 3. Ligar o login por e-mail
 
-1. Menu **Authentication → Providers → Google** → **Enable**.
-2. Você precisa de um _OAuth Client ID_ do Google:
-   - Vá em <https://console.cloud.google.com> → **APIs & Services →
-     Credentials → Create credentials → OAuth client ID → Web application**.
-   - Em **Authorized redirect URIs**, cole a URL que o Supabase mostra na
-     tela do provedor Google (algo como
-     `https://SEU-PROJETO.supabase.co/auth/v1/callback`).
-   - Copie o **Client ID** e o **Client secret** de volta para o Supabase e
-     salve.
-3. Menu **Authentication → URL Configuration → Redirect URLs**: adicione
-   - `https://mthscorreiademelo-source.github.io/Main-MthsCMelo/`
-   - `http://localhost:5173/Main-MthsCMelo/` (para desenvolvimento)
+O provedor de **e-mail já vem ligado** no Supabase — não precisa de Google
+Cloud Console nem de nada externo. Só um ajuste opcional para ficar instantâneo:
+
+1. Menu **Authentication → Providers → Email**: confirme que está **Enabled**.
+2. Para não precisar clicar num link de confirmação a cada cadastro (é seu
+   app pessoal), desligue **"Confirm email"** nesse mesmo painel. Assim, ao
+   criar a conta você já entra direto. _(Se preferir manter a confirmação
+   ligada, tudo bem — você só confirma o e-mail uma vez.)_
+
+> Login com Google pode ser adicionado depois, quando você quiser — aí sim
+> precisaria do passo do Google Cloud Console.
 
 ## 4. Pegar as chaves e me passar
 
