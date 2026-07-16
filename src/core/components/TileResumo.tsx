@@ -16,7 +16,7 @@ export function TileResumo({
   cor?: string
 }) {
   const conteudo = (
-    <span className="flex items-center gap-2.5">
+    <span className="flex min-w-0 flex-1 items-center gap-2.5">
       {icone && (
         <span
           className="flex size-9 shrink-0 items-center justify-center rounded-full"
@@ -25,7 +25,7 @@ export function TileResumo({
           {icone}
         </span>
       )}
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         <span className="block truncate text-[17px] font-bold leading-none tabular-nums">{valor}</span>
         <span className="mt-1 block truncate text-[11px] text-muted">{rotulo}</span>
       </span>
