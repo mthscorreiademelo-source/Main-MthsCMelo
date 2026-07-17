@@ -66,8 +66,15 @@ export function GradeTempo({
 
   const ocorrencias = useMemo(() => expandirEventos(eventos, dias), [eventos, dias])
 
+  // Ao abrir, foca no horário atual (com um pouco de folga antes, e os
+  // próximos eventos logo abaixo) em vez de começar no início do dia.
   useLayoutEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = 7 * HORA_PX
+    const el = scrollRef.current
+    if (!el) return
+    const d = new Date()
+    const nowMin = d.getHours() * 60 + d.getMinutes()
+    const alvo = (nowMin / 60) * HORA_PX - Math.max(el.clientHeight * 0.28, 90)
+    el.scrollTop = Math.max(0, Math.min(alvo, ALTURA - el.clientHeight))
   }, [])
 
   const [agoraMin, setAgoraMin] = useState(() => {
