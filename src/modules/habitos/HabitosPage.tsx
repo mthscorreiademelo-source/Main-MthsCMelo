@@ -17,9 +17,12 @@ import {
   contagemSemana,
   diaConcluido,
   estatGlobais,
+  fracao,
+  fracaoDoDia,
   registrosDoDia,
   resumoDoDia,
   streakGeral,
+  valorDoDia,
 } from './progresso'
 import type { Habito } from './types'
 
@@ -29,6 +32,9 @@ if (typeof window !== 'undefined') {
     contagemSemana,
     diaConcluido,
     resumoDoDia,
+    fracaoDoDia,
+    fracao,
+    valorDoDia,
     estatGlobais,
     sincronizarIntegracoes,
   }

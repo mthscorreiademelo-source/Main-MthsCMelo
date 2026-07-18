@@ -32,6 +32,7 @@ export function CartaoHabito({
   const auto = !!habito.fonteId
   const passo = habito.passo && habito.passo > 0 ? habito.passo : 1
   const feitosItens = registro?.itens ?? []
+  const falhouItens = registro?.itensFalhou ?? []
   const estado = habito.tipo === 'sim_nao' ? estadoDia(habito, registro) : undefined
   const falhou = estado === 'falhou'
 
@@ -145,6 +146,12 @@ export function CartaoHabito({
         <ul className="flex flex-col gap-0.5 border-t border-line/70 px-2.5 py-2">
           {(habito.itens ?? []).map((it) => {
             const feito = feitosItens.includes(it.id)
+            const naoFez = falhouItens.includes(it.id)
+            const marcaEstilo = feito
+              ? { backgroundColor: cor, borderColor: cor, color: '#fff' }
+              : naoFez
+                ? { backgroundColor: VERMELHO, borderColor: VERMELHO, color: '#fff' }
+                : { borderColor: 'var(--vida-line)' }
             return (
               <li key={it.id}>
                 <button
@@ -153,11 +160,12 @@ export function CartaoHabito({
                 >
                   <span
                     className="flex size-5 shrink-0 items-center justify-center rounded-md border"
-                    style={feito ? { backgroundColor: cor, borderColor: cor, color: '#fff' } : { borderColor: 'var(--vida-line)' }}
+                    style={marcaEstilo}
                   >
                     {feito && <IconCheck width={13} height={13} />}
+                    {naoFez && <IconFechar width={12} height={12} />}
                   </span>
-                  <span className={`text-[14px] ${feito ? 'text-muted line-through' : ''}`}>{it.texto}</span>
+                  <span className={`text-[14px] ${feito || naoFez ? 'text-muted line-through' : ''}`}>{it.texto}</span>
                 </button>
               </li>
             )

@@ -202,20 +202,29 @@ export async function definirValor(habito: Habito, data: string, valor: number) 
   else await db.habitoRegistros.add({ id, habitoId: habito.id, data, valor: novo })
 }
 
-/** Checklist: marca/desmarca um item no dia. */
+/** Checklist: cicla um item no dia — pendente → feito → não fez → pendente. */
 export async function alternarItem(habito: Habito, data: string, itemId: string) {
   const id = idReg(habito.id, data)
   const existe = await db.habitoRegistros.get(id)
   const feitos = new Set(existe?.itens ?? [])
-  if (feitos.has(itemId)) feitos.delete(itemId)
-  else feitos.add(itemId)
+  const falhou = new Set(existe?.itensFalhou ?? [])
+  if (feitos.has(itemId)) {
+    feitos.delete(itemId)
+    falhou.add(itemId)
+  } else if (falhou.has(itemId)) {
+    falhou.delete(itemId)
+  } else {
+    feitos.add(itemId)
+  }
   const itens = [...feitos]
-  if (itens.length === 0) {
+  const itensFalhou = [...falhou]
+  if (itens.length === 0 && itensFalhou.length === 0) {
     if (existe) await db.habitoRegistros.delete(id)
     return
   }
-  if (existe) await db.habitoRegistros.update(id, { itens })
-  else await db.habitoRegistros.add({ id, habitoId: habito.id, data, itens })
+  const doc = { itens: itens.length ? itens : undefined, itensFalhou: itensFalhou.length ? itensFalhou : undefined }
+  if (existe) await db.habitoRegistros.update(id, doc)
+  else await db.habitoRegistros.add({ id, habitoId: habito.id, data, ...doc })
 }
 
 /** Últimos n dias (mais antigo primeiro), terminando hoje. */

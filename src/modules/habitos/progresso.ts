@@ -104,16 +104,39 @@ export interface ResumoDia {
   fracao: number
 }
 
-/** Resumo do dia considerando só os hábitos devidos naquele dia. */
+/**
+ * Fração de conclusão do hábito no dia (0..1). Conta parciais: um checklist
+ * com 2 de 3 itens = 0.67; um medido com 5 de 8 = 0.625. Semanal usa a meta
+ * da semana.
+ */
+export function fracaoDoDia(h: Habito, registros: HabitoRegistro[], data: string): number {
+  if (h.frequencia?.tipo === 'semanal') {
+    const alvo = Math.max(1, h.frequencia.vezes ?? 1)
+    return Math.min(1, contagemSemana(h, registros, data) / alvo)
+  }
+  const mapa = mapaPorData(registros, h.id)
+  return fracao(h, mapa.get(data))
+}
+
+/**
+ * Resumo do dia (só hábitos devidos). O anel de progresso soma as frações
+ * (parciais contam), enquanto `feitos` é a contagem dos concluídos por inteiro.
+ */
 export function resumoDoDia(
   habitos: Habito[],
   registros: HabitoRegistro[],
   data: string,
 ): ResumoDia {
   const devidos = habitos.filter((h) => !h.arquivado && devidoNoDia(h, data))
-  const feitos = devidos.filter((h) => diaConcluido(h, registros, data)).length
+  let feitos = 0
+  let soma = 0
+  for (const h of devidos) {
+    const f = fracaoDoDia(h, registros, data)
+    soma += f
+    if (f >= 1) feitos++
+  }
   const total = devidos.length
-  return { total, feitos, fracao: total ? feitos / total : 0 }
+  return { total, feitos, fracao: total ? soma / total : 0 }
 }
 
 /**
