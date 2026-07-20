@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { FolhaInferior } from '../../../core/components/FolhaInferior'
 import { IconCheck, IconLixeira } from '../../../core/components/Icons'
 import { atualizarEvento, CORES_EVENTO, excluirEvento, rotuloRecorrencia } from '../db'
+import { CATEGORIAS_EVENTO, iniciais } from '../categorias'
 import { EditorRecorrencia } from './EditorRecorrencia'
 import type { Cronograma, Evento, Presenca } from '../types'
 
@@ -31,7 +32,9 @@ export function EditorEvento({
   const [fim, setFim] = useState(evento.fim)
   const [diaInteiro, setDiaInteiro] = useState(!!evento.diaInteiro)
   const [cor, setCor] = useState(evento.cor ?? CORES_EVENTO[0])
+  const [categoria, setCategoria] = useState<string | undefined>(evento.categoria)
   const [local, setLocal] = useState(evento.local ?? '')
+  const [participantes, setParticipantes] = useState((evento.participantes ?? []).join(', '))
   const [descricao, setDescricao] = useState(evento.descricao ?? '')
   const [presenca, setPresenca] = useState<Presenca | undefined>(evento.presenca)
 
@@ -43,7 +46,9 @@ export function EditorEvento({
     setFim(evento.fim)
     setDiaInteiro(!!evento.diaInteiro)
     setCor(evento.cor ?? CORES_EVENTO[0])
+    setCategoria(evento.categoria)
     setLocal(evento.local ?? '')
+    setParticipantes((evento.participantes ?? []).join(', '))
     setDescricao(evento.descricao ?? '')
     setPresenca(evento.presenca)
   }, [evento.id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -143,6 +148,38 @@ export function EditorEvento({
         </div>
       )}
 
+      {/* Categoria — define ícone e cor de destaque */}
+      <div className="flex flex-col gap-2">
+        <span className={ROTULO}>Categoria</span>
+        <div className="flex flex-wrap gap-1.5">
+          {CATEGORIAS_EVENTO.map((c) => {
+            const ativo = categoria === c.id
+            return (
+              <button
+                key={c.id}
+                onClick={() => {
+                  const novo = ativo ? undefined : c.id
+                  setCategoria(novo)
+                  if (novo) {
+                    setCor(c.cor)
+                    salvar({ categoria: novo, cor: c.cor })
+                  } else {
+                    salvar({ categoria: undefined })
+                  }
+                }}
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[13px] font-medium transition-colors ${
+                  ativo ? 'text-white' : 'border-line text-muted hover:text-ink'
+                }`}
+                style={ativo ? { backgroundColor: c.cor, borderColor: c.cor } : undefined}
+              >
+                <span>{c.icone}</span>
+                {c.nome}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       <div className="flex flex-col gap-2">
         <span className={ROTULO}>Cor</span>
         <div className="flex flex-wrap gap-2">
@@ -227,6 +264,40 @@ export function EditorEvento({
           placeholder="ex.: Sala 3, online…"
           className={CAMPO}
         />
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className={ROTULO}>Participantes (opcional)</span>
+        <input
+          value={participantes}
+          onChange={(e) => {
+            setParticipantes(e.target.value)
+            const lista = e.target.value
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
+            salvar({ participantes: lista.length ? lista : undefined })
+          }}
+          placeholder="ex.: Ana, João Silva…"
+          className={CAMPO}
+        />
+        {participantes.trim() && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {participantes
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
+              .map((nome, i) => (
+                <span
+                  key={i}
+                  className="flex size-6 items-center justify-center rounded-full bg-hover text-[10px] font-semibold text-muted"
+                  title={nome}
+                >
+                  {iniciais(nome)}
+                </span>
+              ))}
+          </div>
+        )}
       </label>
 
       <label className="flex flex-col gap-1">

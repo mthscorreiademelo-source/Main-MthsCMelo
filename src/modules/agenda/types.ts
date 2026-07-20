@@ -41,7 +41,11 @@ export interface Evento {
   cronogramaId?: string
   diaInteiro?: boolean
   cor?: string
+  /** Categoria (id de CATEGORIAS_EVENTO). Define ícone e cor de destaque. */
+  categoria?: string
   local?: string
+  /** Nomes dos participantes (avatares por iniciais nos blocos). */
+  participantes?: string[]
   descricao?: string
   /** Repetição do evento (gera ocorrências nas datas seguintes). */
   recorrencia?: RecorrenciaEvento

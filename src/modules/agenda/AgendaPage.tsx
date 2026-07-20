@@ -10,6 +10,7 @@ import { EditorEvento } from './components/EditorEvento'
 import { GanttCronogramas } from './components/GanttCronogramas'
 import { GerenciarCronogramas } from './components/GerenciarCronogramas'
 import { GradeTempo } from './components/GradeTempo'
+import { PlannerTresDias } from './components/PlannerTresDias'
 import { VistaDia } from './components/VistaDia'
 import { VistaMes } from './components/VistaMes'
 import { VistaMultiMes } from './components/VistaMultiMes'
@@ -127,7 +128,7 @@ export function AgendaPage() {
   const pronto = eventos && tarefas
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-3">
+    <div className={`mx-auto flex w-full flex-col gap-3 ${modo === '3dias' ? 'max-w-6xl' : 'max-w-4xl'}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-1">
           <button onClick={() => navegar(-1)} aria-label="Anterior" className="flex size-9 items-center justify-center rounded-full text-muted hover:bg-hover hover:text-ink">
@@ -179,7 +180,20 @@ export function AgendaPage() {
       {pronto && modo === 'dia' && (
         <VistaDia dia={ancora} eventos={evs} tarefas={tks} onAbrirEvento={setEditorEvento} onAbrirTarefa={setEditorTarefa} onCriar={aoCriar} />
       )}
-      {pronto && MODOS_GRADE.includes(modo) && modo !== 'dia' && (
+      {pronto && modo === '3dias' && (
+        <PlannerTresDias
+          dias={dias}
+          eventos={evs}
+          tarefas={tks}
+          hoje={hojeISO()}
+          onAbrirEvento={setEditorEvento}
+          onAbrirTarefa={setEditorTarefa}
+          onCriar={aoCriar}
+          onIrSemana={() => setModo('semana')}
+          onIrHoje={() => setAncora(hojeISO())}
+        />
+      )}
+      {pronto && MODOS_GRADE.includes(modo) && modo !== 'dia' && modo !== '3dias' && (
         <GradeTempo dias={dias} eventos={evs} tarefas={tks} onAbrirEvento={setEditorEvento} onAbrirTarefa={setEditorTarefa} onCriar={aoCriar} onPanDias={panDias} />
       )}
       {pronto && modo === 'mes' && (
