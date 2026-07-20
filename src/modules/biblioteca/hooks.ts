@@ -9,3 +9,11 @@ export function useLivros(): Livro[] | undefined {
 export function useLivro(id: string | undefined): Livro | undefined {
   return useLiveQuery(() => (id ? db.livros.get(id) : undefined), [id])
 }
+
+/** Volumes de um compilado (série de quadrinho/mangá). */
+export function useVolumes(compiladoId: string | undefined): Livro[] | undefined {
+  return useLiveQuery(
+    () => db.livros.filter((l) => !!compiladoId && l.compiladoId === compiladoId).toArray(),
+    [compiladoId],
+  )
+}

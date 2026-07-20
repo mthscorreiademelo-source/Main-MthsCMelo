@@ -29,6 +29,11 @@ export interface Livro {
   /** Localização no leitor (epubcfi / índice de página) — usado na Fase 2. */
   localizacao?: string
 
+  /** Este item é um COMPILADO (série de quadrinho/mangá) que agrupa volumes. */
+  ehCompilado?: boolean
+  /** Volume que pertence a um compilado (id do compilado-pai). */
+  compiladoId?: string
+
   // Arquivo local (opcional)
   temArquivo?: boolean
   formato?: FormatoArquivo

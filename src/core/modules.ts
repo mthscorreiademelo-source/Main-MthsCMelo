@@ -25,6 +25,7 @@ import { SaudePage } from '../modules/saude/SaudePage'
 import { FinancasPage } from '../modules/financas/FinancasPage'
 import { BibliotecaPage } from '../modules/biblioteca/BibliotecaPage'
 import { LivroPage } from '../modules/biblioteca/LivroPage'
+import { CompiladoPage } from '../modules/biblioteca/CompiladoPage'
 import { LeitorPage } from '../modules/biblioteca/leitor/LeitorPage'
 import { SecaoHoje as TarefasHoje } from '../modules/tarefas/SecaoHoje'
 import { SecaoHoje as NotasHoje } from '../modules/notas/SecaoHoje'
@@ -152,6 +153,7 @@ export const MODULOS: ModuloDef[] = [
     Icone: IconLivro,
     Pagina: BibliotecaPage,
     subRotas: [
+      { caminho: '/biblioteca/compilado/:id', Pagina: CompiladoPage },
       { caminho: '/biblioteca/:id/ler', Pagina: LeitorPage },
       { caminho: '/biblioteca/:id', Pagina: LivroPage },
     ],

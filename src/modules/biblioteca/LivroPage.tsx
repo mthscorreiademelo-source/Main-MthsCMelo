@@ -106,9 +106,12 @@ export function LivroPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-      <Link to="/biblioteca" className="flex items-center gap-1 text-[13px] text-muted hover:text-ink">
+      <Link
+        to={livro.compiladoId ? `/biblioteca/compilado/${livro.compiladoId}` : '/biblioteca'}
+        className="flex items-center gap-1 text-[13px] text-muted hover:text-ink"
+      >
         <IconSetaEsquerda width={16} height={16} />
-        Biblioteca
+        {livro.compiladoId ? 'Compilado' : 'Biblioteca'}
       </Link>
 
       <div className="flex gap-4">

@@ -51,6 +51,19 @@ export async function removerLivro(id: string): Promise<void> {
   await db.arquivosLivros.delete(id)
 }
 
+/** Remove um compilado e TODOS os seus volumes (e arquivos locais). */
+export async function removerCompilado(id: string): Promise<void> {
+  const volumes = await db.livros.filter((l) => l.compiladoId === id).toArray()
+  await db.transaction('rw', db.livros, db.arquivosLivros, async () => {
+    for (const v of volumes) {
+      await db.livros.delete(v.id)
+      await db.arquivosLivros.delete(v.id)
+    }
+    await db.livros.delete(id)
+    await db.arquivosLivros.delete(id)
+  })
+}
+
 /** Guarda o arquivo local (blob) e marca o livro como tendo arquivo. */
 export async function guardarArquivo(
   id: string,

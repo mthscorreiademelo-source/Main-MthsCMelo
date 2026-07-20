@@ -9,13 +9,21 @@ import { EditorTags } from './EditorTags'
 const CAMPO =
   'min-h-11 w-full rounded-lg border border-line bg-surface px-3 text-[15px] outline-none focus:border-muted/60'
 
-export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
+export function AdicionarLivro({
+  onFechar,
+  compiladoAlvo,
+}: {
+  onFechar: () => void
+  /** Quando presente, adiciona um VOLUME a este compilado (tipo fixo). */
+  compiladoAlvo?: { id: string; tipo: TipoObra; titulo: string }
+}) {
   const inputArquivo = useRef<HTMLInputElement>(null)
   const inputCapa = useRef<HTMLInputElement>(null)
   const inputTitulo = useRef<HTMLInputElement>(null)
   const [titulo, setTitulo] = useState('')
   const [autor, setAutor] = useState('')
-  const [tipo, setTipo] = useState<TipoObra>('livro')
+  const [tipo, setTipo] = useState<TipoObra>(compiladoAlvo?.tipo ?? 'livro')
+  const [modoCompilado, setModoCompilado] = useState(false)
   const [status, setStatus] = useState<StatusLeitura>('quero_ler')
   const [colecao, setColecao] = useState('')
   const [numero, setNumero] = useState('')
@@ -26,6 +34,10 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
   const [formato, setFormato] = useState<FormatoArquivo | undefined>()
   const [lendo, setLendo] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+
+  const souVolume = !!compiladoAlvo
+  const podeCompilar = !souVolume && (tipo === 'quadrinho' || tipo === 'manga')
+  const ehComp = podeCompilar && modoCompilado
 
   async function escolher(file: File) {
     setErro(null)
@@ -68,21 +80,23 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
     const livro = novoLivro({
       titulo: titulo.trim(),
       autor: autor.trim() || undefined,
-      tipo,
+      tipo: compiladoAlvo ? compiladoAlvo.tipo : tipo,
       status,
-      colecao: colecao.trim() || undefined,
-      numero: numero.trim() ? Number(numero) : undefined,
+      colecao: !ehComp && !souVolume ? colecao.trim() || undefined : undefined,
+      numero: !ehComp && numero.trim() ? Number(numero) : undefined,
       generos: generos.length ? generos : undefined,
       capa,
-      paginasTotais: paginas,
-      temArquivo: !!arquivo,
-      formato,
-      arquivoNome: arquivo?.name,
-      arquivoTamanho: arquivo?.size,
+      paginasTotais: ehComp ? undefined : paginas,
+      ehCompilado: ehComp || undefined,
+      compiladoId: compiladoAlvo?.id,
+      temArquivo: !ehComp && !!arquivo,
+      formato: ehComp ? undefined : formato,
+      arquivoNome: ehComp ? undefined : arquivo?.name,
+      arquivoTamanho: ehComp ? undefined : arquivo?.size,
     })
     try {
       await salvarLivro(livro)
-      if (arquivo && formato) await guardarArquivo(livro.id, arquivo, formato, arquivo.name)
+      if (!ehComp && arquivo && formato) await guardarArquivo(livro.id, arquivo, formato, arquivo.name)
     } catch (e) {
       setErro('Não consegui salvar: ' + (e as Error).message)
       return
@@ -90,8 +104,14 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
     onFechar()
   }
 
+  const tituloFolha = souVolume
+    ? `Novo volume · ${compiladoAlvo!.titulo}`
+    : ehComp
+      ? 'Novo compilado'
+      : 'Adicionar à biblioteca'
+
   return (
-    <FolhaInferior titulo="Adicionar à biblioteca" onFechar={onFechar}>
+    <FolhaInferior titulo={tituloFolha} onFechar={onFechar}>
       <div className="flex gap-3">
         {/* Capa (imagem) — pode ser definida mesmo sem o arquivo do livro */}
         <button
@@ -109,27 +129,33 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
           )}
         </button>
 
-        {/* Arquivo do livro (opcional) */}
+        {/* Arquivo do livro (compilado não tem arquivo próprio) */}
         <div className="flex flex-1 flex-col justify-center gap-2">
-          <button
-            onClick={() => inputArquivo.current?.click()}
-            className="flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line bg-surface/60 px-3 text-center text-muted transition-colors hover:border-muted/50 hover:text-ink"
-          >
-            {lendo ? (
-              <span className="text-[13px]">Lendo o arquivo…</span>
-            ) : arquivo ? (
-              <>
-                <span className="max-w-full truncate text-[13px] font-medium text-ink">{arquivo.name}</span>
-                <span className="text-[11px] text-muted/70">{formato?.toUpperCase()}</span>
-              </>
-            ) : (
-              <>
-                <IconUpload width={18} height={18} />
-                <span className="text-[13px] font-medium">Arquivo do livro</span>
-                <span className="text-[11px] text-muted/70">EPUB · PDF · CBZ (opcional)</span>
-              </>
-            )}
-          </button>
+          {ehComp ? (
+            <p className="rounded-xl border border-dashed border-line bg-surface/60 px-3 py-4 text-center text-[12px] text-muted">
+              Um compilado agrupa volumes. Crie-o e depois adicione os volumes (cada um com seu arquivo) dentro dele.
+            </p>
+          ) : (
+            <button
+              onClick={() => inputArquivo.current?.click()}
+              className="flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line bg-surface/60 px-3 text-center text-muted transition-colors hover:border-muted/50 hover:text-ink"
+            >
+              {lendo ? (
+                <span className="text-[13px]">Lendo o arquivo…</span>
+              ) : arquivo ? (
+                <>
+                  <span className="max-w-full truncate text-[13px] font-medium text-ink">{arquivo.name}</span>
+                  <span className="text-[11px] text-muted/70">{formato?.toUpperCase()}</span>
+                </>
+              ) : (
+                <>
+                  <IconUpload width={18} height={18} />
+                  <span className="text-[13px] font-medium">Arquivo do livro</span>
+                  <span className="text-[11px] text-muted/70">EPUB · PDF · CBZ (opcional)</span>
+                </>
+              )}
+            </button>
+          )}
           {capa && (
             <button
               onClick={() => setCapa(undefined)}
@@ -170,48 +196,37 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
           className={CAMPO}
           value={titulo}
           onChange={(e) => setTitulo(e.target.value)}
-          placeholder="Nome do livro"
+          placeholder={ehComp ? 'Nome da série (ex.: One Piece)' : 'Nome do livro'}
         />
       </label>
-      <label className="flex flex-col gap-1">
-        <span className="text-[13px] font-medium text-muted">Autor</span>
-        <input className={CAMPO} value={autor} onChange={(e) => setAutor(e.target.value)} />
-      </label>
+      {!ehComp && (
+        <label className="flex flex-col gap-1">
+          <span className="text-[13px] font-medium text-muted">Autor</span>
+          <input className={CAMPO} value={autor} onChange={(e) => setAutor(e.target.value)} />
+        </label>
+      )}
 
+      {/* Tipo (some quando é volume de um compilado — herda o tipo) */}
       <div className="flex gap-3">
-        <label className="flex flex-1 flex-col gap-1">
-          <span className="text-[13px] font-medium text-muted">Coleção / série</span>
-          <input
-            className={CAMPO}
-            value={colecao}
-            onChange={(e) => setColecao(e.target.value)}
-            placeholder="ex.: Senhor dos Anéis"
-          />
-        </label>
-        <label className="flex w-20 flex-col gap-1">
-          <span className="text-[13px] font-medium text-muted">Nº</span>
-          <input
-            className={CAMPO}
-            type="number"
-            min={1}
-            value={numero}
-            onChange={(e) => setNumero(e.target.value)}
-            placeholder="1"
-          />
-        </label>
-      </div>
-
-      <div className="flex gap-3">
-        <label className="flex flex-1 flex-col gap-1">
-          <span className="text-[13px] font-medium text-muted">Tipo</span>
-          <select className={CAMPO} value={tipo} onChange={(e) => setTipo(e.target.value as TipoObra)}>
-            {TIPOS.map((t) => (
-              <option key={t.valor} value={t.valor}>
-                {t.rotulo}
-              </option>
-            ))}
-          </select>
-        </label>
+        {!souVolume && (
+          <label className="flex flex-1 flex-col gap-1">
+            <span className="text-[13px] font-medium text-muted">Tipo</span>
+            <select
+              className={CAMPO}
+              value={tipo}
+              onChange={(e) => {
+                setTipo(e.target.value as TipoObra)
+                if (!(e.target.value === 'quadrinho' || e.target.value === 'manga')) setModoCompilado(false)
+              }}
+            >
+              {TIPOS.map((t) => (
+                <option key={t.valor} value={t.valor}>
+                  {t.rotulo}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="flex flex-1 flex-col gap-1">
           <span className="text-[13px] font-medium text-muted">Estante</span>
           <select
@@ -228,6 +243,57 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
         </label>
       </div>
 
+      {/* Volume avulso × Compilado (só quadrinho/mangá) */}
+      {podeCompilar && (
+        <div className="flex flex-col gap-1">
+          <span className="text-[13px] font-medium text-muted">Como adicionar</span>
+          <div className="flex overflow-hidden rounded-lg border border-line">
+            <button
+              onClick={() => setModoCompilado(false)}
+              aria-pressed={!modoCompilado}
+              className={`min-h-10 flex-1 cursor-pointer text-sm font-medium transition-colors ${!modoCompilado ? 'bg-hover text-ink' : 'text-muted hover:bg-hover/60'}`}
+            >
+              Volume avulso
+            </button>
+            <button
+              onClick={() => setModoCompilado(true)}
+              aria-pressed={modoCompilado}
+              className={`min-h-10 flex-1 cursor-pointer text-sm font-medium transition-colors ${modoCompilado ? 'bg-hover text-ink' : 'text-muted hover:bg-hover/60'}`}
+            >
+              Compilado (série)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Coleção (livros avulsos) / Nº do volume */}
+      {!ehComp && (
+        <div className="flex gap-3">
+          {!souVolume && (
+            <label className="flex flex-1 flex-col gap-1">
+              <span className="text-[13px] font-medium text-muted">Coleção / série</span>
+              <input
+                className={CAMPO}
+                value={colecao}
+                onChange={(e) => setColecao(e.target.value)}
+                placeholder="ex.: Senhor dos Anéis"
+              />
+            </label>
+          )}
+          <label className={`flex flex-col gap-1 ${souVolume ? 'flex-1' : 'w-20'}`}>
+            <span className="text-[13px] font-medium text-muted">{souVolume ? 'Volume nº' : 'Nº'}</span>
+            <input
+              className={CAMPO}
+              type="number"
+              min={1}
+              value={numero}
+              onChange={(e) => setNumero(e.target.value)}
+              placeholder="1"
+            />
+          </label>
+        </div>
+      )}
+
       <div className="flex flex-col gap-1">
         <span className="text-[13px] font-medium text-muted">Gêneros / tags</span>
         <EditorTags tags={generos} onChange={setGeneros} rotulo="Gêneros" placeholder="ex.: ficção, fantasia" />
@@ -241,7 +307,7 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
         className="flex min-h-12 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-ink text-[15px] font-medium text-surface transition-opacity hover:opacity-90 disabled:opacity-50"
       >
         <IconLivro width={18} height={18} />
-        Adicionar
+        {ehComp ? 'Criar compilado' : souVolume ? 'Adicionar volume' : 'Adicionar'}
       </button>
     </FolhaInferior>
   )
