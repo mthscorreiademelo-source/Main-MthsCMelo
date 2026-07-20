@@ -3,7 +3,7 @@ import { corPrioridade } from '../tarefas/db'
 import type { Task } from '../tarefas/types'
 import { corEfetiva, iconeEvento } from './categorias'
 import { expandirEventos, paraMin } from './db'
-import type { Evento, Presenca } from './types'
+import type { Contexto, Evento, Presenca } from './types'
 
 /** Janela de exibição do planner (o dia raramente começa às 00h). */
 export const JANELA_INI = 6 * 60 // 06:00
@@ -53,6 +53,7 @@ export interface FaixaContexto {
   inicioMin: number
   fimMin: number
   cor: string
+  opacidade: number
 }
 
 export interface PlanoDia {
@@ -127,30 +128,31 @@ function agrupar(itens: ItemPlano[]): GrupoSobreposto[] {
 }
 
 /**
- * Contextos derivados (sem novo modelo de dados): faixa de Sono (a partir do
- * horário do hábito de dormir, senão 23:00→07:00) e faixa de Trabalho em dias
- * úteis (09:00→18:00). São dicas suaves de fundo, não eventos.
+ * Faixas de contexto de um dia, a partir dos contextos editáveis do usuário.
+ * Respeita dias da semana e exceções; contextos que cruzam a meia-noite viram
+ * duas faixas (0→fim e início→24h).
  */
-function contextos(dia: string, bedtimeMin: number, wakeMin: number): FaixaContexto[] {
+function faixasDoDia(dia: string, contextos: Contexto[]): FaixaContexto[] {
   const wd = parseISO(dia).getDay()
   const out: FaixaContexto[] = []
-  const azul = '#5a6b8c'
-  // Sono da madrugada (0 → acordar) — sempre visível dentro da janela.
-  out.push({ id: `ctx:sono-m:${dia}`, rotulo: 'Sono', icone: '🌙', inicioMin: 0, fimMin: wakeMin, cor: azul })
-  // Sono da noite (deitar → 24h).
-  out.push({ id: `ctx:sono-n:${dia}`, rotulo: 'Sono', icone: '🌙', inicioMin: bedtimeMin, fimMin: JANELA_FIM, cor: azul })
-  // Trabalho em dias úteis.
-  if (wd >= 1 && wd <= 5) {
-    out.push({ id: `ctx:trab:${dia}`, rotulo: 'Trabalho', icone: '💼', inicioMin: 9 * 60, fimMin: 18 * 60, cor: '#299438' })
+  for (const c of contextos) {
+    if (c.dias?.length && !c.dias.includes(wd)) continue
+    if (c.excecoes?.includes(dia)) continue
+    const base = { rotulo: c.nome, icone: c.icone ?? '•', cor: c.cor, opacidade: c.opacidade ?? 0.08 }
+    if (c.fimMin > c.inicioMin) {
+      out.push({ id: `ctx:${c.id}:${dia}`, inicioMin: c.inicioMin, fimMin: c.fimMin, ...base })
+    } else {
+      // cruza a meia-noite
+      out.push({ id: `ctx:${c.id}a:${dia}`, inicioMin: 0, fimMin: c.fimMin, ...base })
+      out.push({ id: `ctx:${c.id}b:${dia}`, inicioMin: c.inicioMin, fimMin: JANELA_FIM, ...base })
+    }
   }
   return out
 }
 
 export interface OpcoesPlano {
-  /** minutos do horário de dormir (contexto de sono). Padrão 23:00. */
-  bedtimeMin?: number
-  /** minutos do horário de acordar. Padrão 07:00. */
-  wakeMin?: number
+  /** contextos de rotina editáveis (faixas de fundo). */
+  contextos?: Contexto[]
 }
 
 /** Monta o plano de um dia a partir dos eventos e tarefas. */
@@ -160,9 +162,6 @@ export function planoDoDia(
   tarefas: Task[],
   opts: OpcoesPlano = {},
 ): PlanoDia {
-  const bedtimeMin = opts.bedtimeMin ?? 23 * 60
-  const wakeMin = opts.wakeMin ?? 7 * 60
-
   const timados: ItemPlano[] = ocorrencias
     .filter((o) => o.data === dia && !o.evento.diaInteiro)
     .map((o) => itemDoEvento(o.evento, dia, o.ehOcorrencia))
@@ -198,7 +197,7 @@ export function planoDoDia(
     grupos: agrupar(itens),
     diaInteiro,
     deadlines,
-    contextos: contextos(dia, bedtimeMin, wakeMin),
+    contextos: faixasDoDia(dia, opts.contextos ?? []),
     ocupadoMin,
     nEventos: timados.length,
     nTarefas: blocosTarefa.length,

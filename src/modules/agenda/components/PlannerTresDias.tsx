@@ -3,7 +3,7 @@ import { format, isToday, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { IconMais } from '../../../core/components/Icons'
 import { useAgora, minutosDoDia } from '../../hoje/agora'
-import { useHabitos } from '../../habitos/hooks'
+import { useContextos } from '../hooks'
 import type { Task } from '../../tarefas/types'
 import { iniciais } from '../categorias'
 import { expandirEventos, paraHHMM } from '../db'
@@ -283,7 +283,7 @@ function Coluna({
             <div
               key={c.id}
               className="pointer-events-none absolute inset-x-0"
-              style={{ top: ((a - ini) / 60) * HORA_PX, height: ((b - a) / 60) * HORA_PX, backgroundColor: `color-mix(in srgb, ${c.cor} 7%, transparent)` }}
+              style={{ top: ((a - ini) / 60) * HORA_PX, height: ((b - a) / 60) * HORA_PX, backgroundColor: `color-mix(in srgb, ${c.cor} ${Math.round(c.opacidade * 100)}%, transparent)` }}
             >
               <span className="absolute left-1.5 top-1 text-[9px] font-medium uppercase tracking-wide text-muted/50">
                 {c.icone} {c.rotulo}
@@ -536,25 +536,14 @@ export function PlannerTresDias({
 }) {
   const agora = useAgora()
   const agoraMin = minutosDoDia(agora)
-  const habitos = useHabitos()
+  const contextos = useContextos()
   const [expandidoId, setExpandidoId] = useState<string | null>(null)
 
-  // Horário de dormir para o contexto de sono (hábito de sono, senão 23:00).
-  const bedtimeMin = useMemo(() => {
-    const h = (habitos ?? []).find(
-      (x) => x.horario && (x.icone === 'lua' || /dorm|sono|sleep/i.test(x.nome)),
-    )
-    if (h?.horario) {
-      const [hh, mm] = h.horario.split(':').map(Number)
-      return hh * 60 + (mm || 0)
-    }
-    return 23 * 60
-  }, [habitos])
-
+  const ctx = useMemo(() => contextos ?? [], [contextos])
   const ocorrencias = useMemo(() => expandirEventos(eventos, dias), [eventos, dias])
   const planos = useMemo(
-    () => dias.map((d) => planoDoDia(d, ocorrencias, tarefas, { bedtimeMin })),
-    [dias, ocorrencias, tarefas, bedtimeMin],
+    () => dias.map((d) => planoDoDia(d, ocorrencias, tarefas, { contextos: ctx })),
+    [dias, ocorrencias, tarefas, ctx],
   )
   const { ini, fim } = useMemo(() => faixaHoras(planos), [planos])
   const iniH = Math.floor(ini / 60)
@@ -564,22 +553,23 @@ export function PlannerTresDias({
     <div className="flex flex-col gap-3">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <div className="overflow-y-auto pb-1" style={{ maxHeight: 'calc(100vh - 210px)' }}>
+          <div className="overflow-auto pb-1" style={{ maxHeight: 'calc(100vh - 210px)' }}>
             <div className="flex gap-2.5">
               {planos.map((p) => (
-                <Coluna
-                  key={p.dia}
-                  plano={p}
-                  ini={ini}
-                  fim={fim}
-                  agoraMin={agoraMin}
-                  ehHoje={p.dia === hoje}
-                  expandidoId={expandidoId}
-                  setExpandidoId={setExpandidoId}
-                  onAbrirEvento={onAbrirEvento}
-                  onAbrirTarefa={onAbrirTarefa}
-                  onCriar={onCriar}
-                />
+                <div key={p.dia} className={`flex-1 ${planos.length === 1 ? 'sm:max-w-2xl' : ''}`} style={{ minWidth: planos.length > 4 ? 132 : planos.length > 1 ? 168 : undefined }}>
+                  <Coluna
+                    plano={p}
+                    ini={ini}
+                    fim={fim}
+                    agoraMin={agoraMin}
+                    ehHoje={p.dia === hoje}
+                    expandidoId={expandidoId}
+                    setExpandidoId={setExpandidoId}
+                    onAbrirEvento={onAbrirEvento}
+                    onAbrirTarefa={onAbrirTarefa}
+                    onCriar={onCriar}
+                  />
+                </div>
               ))}
             </div>
           </div>

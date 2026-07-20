@@ -35,7 +35,7 @@ import type {
   Vacina,
 } from '../../modules/saude/types'
 import type { ArquivoLivro, Livro } from '../../modules/biblioteca/types'
-import type { Cronograma, Evento } from '../../modules/agenda/types'
+import type { Contexto, Cronograma, Evento } from '../../modules/agenda/types'
 
 /** Conteúdo binário de um arquivo anexado a uma nota do tipo 'arquivos'. */
 export interface ArquivoDados {
@@ -57,6 +57,7 @@ class VidaDB extends Dexie {
   projetos!: Table<Projeto, string>
   eventos!: Table<Evento, string>
   cronogramas!: Table<Cronograma, string>
+  contextos!: Table<Contexto, string>
   paginas!: Table<Pagina, string>
   grupos!: Table<Grupo, string>
   habitos!: Table<Habito, string>
@@ -221,6 +222,10 @@ class VidaDB extends Dexie {
       doacoesSangue: 'id, data',
       saudeConfig: 'id',
     })
+    // v19: contextos de rotina editáveis (faixas de fundo da Agenda).
+    this.version(19).stores({
+      contextos: 'id, ordem',
+    })
   }
 }
 
@@ -276,6 +281,7 @@ export async function exportarBackup() {
     projetos: await db.projetos.toArray(),
     eventos: await db.eventos.toArray(),
     cronogramas: await db.cronogramas.toArray(),
+    contextos: await db.contextos.toArray(),
     paginas: await db.paginas.toArray(),
     grupos: await db.grupos.toArray(),
     habitos: await db.habitos.toArray(),
@@ -327,6 +333,7 @@ export async function importarBackup(json: unknown) {
     projetos?: Projeto[]
     eventos?: Evento[]
     cronogramas?: Cronograma[]
+    contextos?: Contexto[]
     paginas?: Pagina[]
     grupos?: Grupo[]
     habitos?: Habito[]
@@ -370,6 +377,7 @@ export async function importarBackup(json: unknown) {
   if (Array.isArray(dados.projetos)) await db.projetos.bulkPut(dados.projetos)
   if (Array.isArray(dados.eventos)) await db.eventos.bulkPut(dados.eventos)
   if (Array.isArray(dados.cronogramas)) await db.cronogramas.bulkPut(dados.cronogramas)
+  if (Array.isArray(dados.contextos)) await db.contextos.bulkPut(dados.contextos)
   if (temPaginas) await db.paginas.bulkPut(dados.paginas!)
   if (Array.isArray(dados.grupos)) await db.grupos.bulkPut(dados.grupos)
   if (temHabitos) await db.habitos.bulkPut(dados.habitos!)

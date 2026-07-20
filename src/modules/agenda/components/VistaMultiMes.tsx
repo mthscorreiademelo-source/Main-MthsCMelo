@@ -4,13 +4,22 @@ import { DIAS_SEMANA, rotuloMes } from '../../../core/dates'
 import { expandirEventos } from '../db'
 import type { Evento } from '../types'
 
+/** Cor de calor pela carga (nº de eventos no dia). */
+function corCalor(n: number): string {
+  if (n <= 0) return 'transparent'
+  const pct = Math.min(60, 14 + n * 16)
+  return `color-mix(in srgb, var(--vida-accent) ${pct}%, transparent)`
+}
+
 function MiniMes({
   mesRef,
-  comEvento,
+  carga,
+  total,
   onIrParaDia,
 }: {
   mesRef: string
-  comEvento: Set<string>
+  carga: Map<string, number>
+  total: number
   onIrParaDia: (dia: string) => void
 }) {
   const mesDate = parseISO(`${mesRef}-01`)
@@ -19,30 +28,32 @@ function MiniMes({
   const mm = format(mesDate, 'MM')
 
   return (
-    <div className="flex flex-col gap-1 rounded-xl border border-line p-2.5">
-      <div className="px-1 text-[13px] font-semibold capitalize">{rotuloMes(mesRef).split(' de ')[0]}</div>
-      <div className="grid grid-cols-7">
+    <div className="flex flex-col gap-1.5 rounded-2xl border border-line p-3">
+      <div className="flex items-baseline justify-between px-0.5">
+        <span className="text-[13px] font-semibold capitalize">{rotuloMes(mesRef).split(' de ')[0]}</span>
+        {total > 0 && <span className="text-[10.5px] text-muted">{total} ev</span>}
+      </div>
+      <div className="grid grid-cols-7 gap-[3px]">
         {DIAS_SEMANA.map((d, i) => (
-          <div key={i} className="pb-0.5 text-center text-[9px] text-muted/70">{d}</div>
+          <div key={i} className="pb-0.5 text-center text-[9px] text-muted/60">{d}</div>
         ))}
         {dias.map((dia) => {
           const noMes = format(parseISO(dia), 'MM') === mm
           const hoje = isToday(parseISO(dia))
-          const tem = comEvento.has(dia)
+          const n = noMes ? carga.get(dia) ?? 0 : 0
           return (
             <button
               key={dia}
               onClick={() => onIrParaDia(dia)}
-              className="flex aspect-square flex-col items-center justify-center rounded transition-colors hover:bg-hover"
+              title={n > 0 ? `${Number(dia.slice(8))}: ${n} evento(s)` : undefined}
+              className="flex aspect-square items-center justify-center rounded-[5px] text-[10px] transition-transform hover:scale-110"
+              style={{
+                backgroundColor: hoje ? 'var(--vida-accent)' : n > 0 ? corCalor(n) : noMes ? 'var(--vida-hover)' : 'transparent',
+                color: hoje ? '#fff' : noMes ? 'var(--vida-ink)' : 'var(--vida-muted)',
+                opacity: noMes ? 1 : 0.3,
+              }}
             >
-              <span
-                className={`flex size-5 items-center justify-center rounded-full text-[10px] ${
-                  hoje ? 'bg-accent font-semibold text-white' : noMes ? '' : 'text-muted/40'
-                }`}
-              >
-                {Number(dia.slice(8))}
-              </span>
-              <span className={`mt-px size-1 rounded-full ${tem && noMes ? 'bg-accent' : 'bg-transparent'}`} />
+              {Number(dia.slice(8))}
             </button>
           )
         })}
@@ -51,30 +62,36 @@ function MiniMes({
   )
 }
 
-/** Trimestre (3) ou ano (12) em mini-calendários. */
+/** Ano como mapa de calor da vida — meses e dias coloridos pela carga de eventos. */
 export function VistaMultiMes({
   meses,
   eventos,
   onIrParaDia,
 }: {
-  meses: string[] // yyyy-MM em ordem
+  meses: string[]
   eventos: Evento[]
   onIrParaDia: (dia: string) => void
 }) {
-  const comEvento = useMemo(() => {
-    const dias: string[] = []
+  const { cargaPorMes, totalPorMes } = useMemo(() => {
+    const cargaPorMes = new Map<string, Map<string, number>>()
+    const totalPorMes = new Map<string, number>()
     for (const m of meses) {
       const d0 = startOfMonth(parseISO(`${m}-01`))
       const dn = endOfMonth(d0)
+      const dias: string[] = []
       for (let d = d0; d <= dn; d = addDays(d, 1)) dias.push(format(d, 'yyyy-MM-dd'))
+      const carga = new Map<string, number>()
+      for (const o of expandirEventos(eventos, dias)) carga.set(o.data, (carga.get(o.data) ?? 0) + 1)
+      cargaPorMes.set(m, carga)
+      totalPorMes.set(m, [...carga.values()].reduce((a, b) => a + b, 0))
     }
-    return new Set(expandirEventos(eventos, dias).map((o) => o.data))
+    return { cargaPorMes, totalPorMes }
   }, [meses, eventos])
 
   return (
     <div className={`grid gap-3 ${meses.length > 3 ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
       {meses.map((m) => (
-        <MiniMes key={m} mesRef={m} comEvento={comEvento} onIrParaDia={onIrParaDia} />
+        <MiniMes key={m} mesRef={m} carga={cargaPorMes.get(m) ?? new Map()} total={totalPorMes.get(m) ?? 0} onIrParaDia={onIrParaDia} />
       ))}
     </div>
   )

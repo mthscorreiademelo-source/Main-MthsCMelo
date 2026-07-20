@@ -1,5 +1,6 @@
 import { differenceInCalendarDays, format, isToday, parseISO } from 'date-fns'
 import { IconMais } from '../../../core/components/Icons'
+import { hojeISO } from '../../../core/dates'
 import type { Cronograma, Evento } from '../types'
 
 const DAY_W = 34
@@ -65,6 +66,7 @@ export function GanttCronogramas({
   const grupoSem = semCron.length ? { cronograma: null, ...empacotar(semCron, dias) } : null
 
   const larguraTotal = NOME_W + dias.length * DAY_W
+  const todayIdx = dias.indexOf(hojeISO())
 
   const Cabecalho = (
     <div className="flex border-b border-line bg-surface/60" style={{ minWidth: larguraTotal }}>
@@ -98,6 +100,8 @@ export function GanttCronogramas({
             const fds = [0, 6].includes(parseISO(d).getDay())
             return <div key={d} className={`absolute top-0 bottom-0 border-l border-line/50 ${fds ? 'bg-hover/30' : ''}`} style={{ left: i * DAY_W, width: DAY_W }} />
           })}
+          {/* linha do hoje */}
+          {todayIdx >= 0 && <div className="pointer-events-none absolute inset-y-0 z-[2] w-px bg-accent/70" style={{ left: todayIdx * DAY_W + DAY_W / 2 }} />}
           {barras.length === 0 && (
             <span className="absolute left-2 top-2 text-[11px] text-muted/60">— sem eventos neste período —</span>
           )}
@@ -108,7 +112,7 @@ export function GanttCronogramas({
                 key={b.evento.id}
                 onClick={() => onAbrirEvento(b.evento)}
                 title={b.evento.titulo}
-                className="absolute z-[1] flex items-center overflow-hidden rounded-md px-2 text-left text-[11px] font-medium text-white shadow-sm"
+                className="lume-entrada absolute z-[1] flex items-center overflow-hidden rounded-lg px-2 text-left text-[11px] font-medium text-white shadow-sm ring-1 ring-black/5 transition-transform hover:scale-[1.02]"
                 style={{ left: b.offset * DAY_W + 2, width: b.span * DAY_W - 4, top: b.lane * BAR_H + 4, height: BAR_H - 4, backgroundColor: cbg }}
               >
                 <span className="truncate">{b.evento.titulo}</span>
@@ -139,7 +143,7 @@ export function GanttCronogramas({
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-line">
+        <div className="overflow-x-auto rounded-2xl border border-line">
           {Cabecalho}
           {grupos.map((g) => (
             <Linha key={g.cronograma.id} cor={g.cronograma.cor ?? '#4073ff'} nome={g.cronograma.nome} barras={g.barras} lanes={g.lanes} />

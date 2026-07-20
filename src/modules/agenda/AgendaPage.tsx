@@ -1,20 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { addDays, addMonths, addYears, endOfMonth, format, parseISO, startOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { IconMais, IconSetaEsquerda } from '../../core/components/Icons'
+import { IconMais, IconRegua, IconSetaEsquerda } from '../../core/components/Icons'
 import { hojeISO, rotuloMes } from '../../core/dates'
 import { TaskEditorSheet } from '../tarefas/components/TaskEditorSheet'
 import { useProjetos, useTarefas } from '../tarefas/hooks'
 import type { Task } from '../tarefas/types'
 import { EditorEvento } from './components/EditorEvento'
 import { GanttCronogramas } from './components/GanttCronogramas'
+import { GerenciarContextos } from './components/GerenciarContextos'
 import { GerenciarCronogramas } from './components/GerenciarCronogramas'
-import { GradeTempo } from './components/GradeTempo'
 import { PlannerTresDias } from './components/PlannerTresDias'
-import { VistaDia } from './components/VistaDia'
 import { VistaMes } from './components/VistaMes'
 import { VistaMultiMes } from './components/VistaMultiMes'
-import { criarEvento, expandirEventos, paraHHMM, rotuloRecorrencia } from './db'
+import { criarEvento, expandirEventos, paraHHMM, rotuloRecorrencia, semearContextosSePreciso } from './db'
 import { useCronogramas, useEventos } from './hooks'
 import type { Evento } from './types'
 
@@ -48,7 +47,12 @@ export function AgendaPage() {
   const [editorEvento, setEditorEvento] = useState<Evento | null>(null)
   const [editorTarefa, setEditorTarefa] = useState<Task | null>(null)
   const [gerCron, setGerCron] = useState(false)
+  const [gerContextos, setGerContextos] = useState(false)
   const [abrirId, setAbrirId] = useState<string | null>(null)
+
+  useEffect(() => {
+    semearContextosSePreciso()
+  }, [])
 
   const evs = useMemo(() => eventos ?? [], [eventos])
   const tks = useMemo(() => tarefas ?? [], [tarefas])
@@ -99,10 +103,6 @@ export function AgendaPage() {
     setAncora(format(novo, 'yyyy-MM-dd'))
   }
 
-  function panDias(delta: number) {
-    setAncora((a) => format(addDays(parseISO(a), delta), 'yyyy-MM-dd'))
-  }
-
   async function aoCriar(data: string, ini: number, fim: number) {
     const id = await criarEvento({ titulo: '', data, inicio: paraHHMM(ini), fim: paraHHMM(fim) })
     setAbrirId(id)
@@ -128,7 +128,7 @@ export function AgendaPage() {
   const pronto = eventos && tarefas
 
   return (
-    <div className={`mx-auto flex w-full flex-col gap-3 ${modo === '3dias' ? 'max-w-6xl' : 'max-w-4xl'}`}>
+    <div className={`mx-auto flex w-full flex-col gap-3 ${MODOS_GRADE.includes(modo) ? 'max-w-6xl' : 'max-w-4xl'}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-1">
           <button onClick={() => navegar(-1)} aria-label="Anterior" className="flex size-9 items-center justify-center rounded-full text-muted hover:bg-hover hover:text-ink">
@@ -171,16 +171,18 @@ export function AgendaPage() {
               dias
             </label>
           )}
+          {MODOS_GRADE.includes(modo) && (
+            <button onClick={() => setGerContextos(true)} title="Contextos de rotina" className="flex min-h-9 items-center gap-1.5 rounded-full border border-line px-3 text-[13px] font-medium text-muted hover:text-ink">
+              <IconRegua width={15} height={15} /> Contextos
+            </button>
+          )}
           <button onClick={() => aoCriar(dias[0] ?? ancora, 9 * 60, 10 * 60)} className="flex min-h-9 items-center gap-1.5 rounded-full bg-ink px-3.5 text-[14px] font-medium text-surface">
             <IconMais width={16} height={16} /> Evento
           </button>
         </div>
       </div>
 
-      {pronto && modo === 'dia' && (
-        <VistaDia dia={ancora} eventos={evs} tarefas={tks} onAbrirEvento={setEditorEvento} onAbrirTarefa={setEditorTarefa} onCriar={aoCriar} />
-      )}
-      {pronto && modo === '3dias' && (
+      {pronto && MODOS_GRADE.includes(modo) && (
         <PlannerTresDias
           dias={dias}
           eventos={evs}
@@ -193,9 +195,6 @@ export function AgendaPage() {
           onIrHoje={() => setAncora(hojeISO())}
         />
       )}
-      {pronto && MODOS_GRADE.includes(modo) && modo !== 'dia' && modo !== '3dias' && (
-        <GradeTempo dias={dias} eventos={evs} tarefas={tks} onAbrirEvento={setEditorEvento} onAbrirTarefa={setEditorTarefa} onCriar={aoCriar} onPanDias={panDias} />
-      )}
       {pronto && modo === 'mes' && (
         <VistaMes mesRef={ancora.slice(0, 7)} eventos={evs} onAbrirEvento={setEditorEvento} onIrParaDia={irParaDia} />
       )}
@@ -207,6 +206,7 @@ export function AgendaPage() {
       {eventoAtual && <EditorEvento evento={eventoAtual} cronogramas={crs} onFechar={() => setEditorEvento(null)} />}
       <TaskEditorSheet task={tarefaAtual} projetos={ps} todas={tks} onFechar={() => setEditorTarefa(null)} />
       {gerCron && <GerenciarCronogramas cronogramas={crs} onFechar={() => setGerCron(false)} />}
+      {gerContextos && <GerenciarContextos onFechar={() => setGerContextos(false)} />}
     </div>
   )
 }

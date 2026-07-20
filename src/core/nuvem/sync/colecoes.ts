@@ -12,6 +12,7 @@ export const COLECOES: ColecaoSync[] = [
   { colecao: 'projetos', chave: 'id' },
   { colecao: 'eventos', chave: 'id' },
   { colecao: 'cronogramas', chave: 'id' },
+  { colecao: 'contextos', chave: 'id' },
   { colecao: 'paginas', chave: 'id' },
   { colecao: 'grupos', chave: 'id' },
   { colecao: 'habitos', chave: 'id' },

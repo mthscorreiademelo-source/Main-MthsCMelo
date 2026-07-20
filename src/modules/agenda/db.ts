@@ -1,7 +1,7 @@
 import { addDays, addMonths, addWeeks, addYears, format, parseISO, startOfWeek } from 'date-fns'
 import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
-import type { Cronograma, Evento, RecorrenciaEvento } from './types'
+import type { Contexto, Cronograma, Evento, RecorrenciaEvento } from './types'
 
 /** Paleta de cores dos eventos (estilo Google Calendar). */
 export const CORES_EVENTO = [
@@ -93,6 +93,44 @@ export async function excluirCronograma(id: string) {
     await db.eventos.where('cronogramaId').equals(id).modify({ cronogramaId: undefined })
     await db.cronogramas.delete(id)
   })
+}
+
+/* ---------- contextos ---------- */
+
+/** Categorias sugeridas de contexto (o nome é livre). */
+export const CATEGORIAS_CONTEXTO = ['Sono', 'Trabalho', 'Home Office', 'Estudos', 'Academia', 'Viagem', 'Férias', 'Lazer']
+
+export async function criarContexto(dados: Partial<Contexto> & { nome: string }): Promise<string> {
+  const id = dados.id ?? nanoid()
+  const max = await db.contextos.orderBy('ordem').last()
+  await db.contextos.add({
+    id,
+    nome: dados.nome.trim() || 'Contexto',
+    cor: dados.cor ?? '#5a6b8c',
+    opacidade: dados.opacidade ?? 0.08,
+    inicioMin: dados.inicioMin ?? 9 * 60,
+    fimMin: dados.fimMin ?? 18 * 60,
+    dias: dados.dias,
+    excecoes: dados.excecoes,
+    categoria: dados.categoria,
+    icone: dados.icone,
+    ordem: dados.ordem ?? (max?.ordem ?? 0) + 1,
+    criadoEm: Date.now(),
+  })
+  return id
+}
+export const atualizarContexto = (id: string, m: Partial<Contexto>) => db.contextos.update(id, m)
+export const excluirContexto = (id: string) => db.contextos.delete(id)
+
+/** Semeia contextos padrão na primeira visita (Sono + Trabalho), editáveis. */
+export async function semearContextosSePreciso() {
+  if ((await db.contextos.count()) > 0) return
+  if (localStorage.getItem('lume:contextos:semeado') === '1') return
+  localStorage.setItem('lume:contextos:semeado', '1')
+  await db.contextos.bulkAdd([
+    { id: nanoid(), nome: 'Sono', cor: '#5a6b8c', opacidade: 0.1, inicioMin: 23 * 60, fimMin: 7 * 60, icone: '🌙', categoria: 'Sono', ordem: 1, criadoEm: Date.now() },
+    { id: nanoid(), nome: 'Trabalho', cor: '#299438', opacidade: 0.07, inicioMin: 9 * 60, fimMin: 18 * 60, dias: [1, 2, 3, 4, 5], icone: '💼', categoria: 'Trabalho', ordem: 2, criadoEm: Date.now() },
+  ])
 }
 
 /* ---------- seleção ---------- */

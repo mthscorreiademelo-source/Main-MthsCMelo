@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../core/db/db'
-import type { Cronograma, Evento } from './types'
+import type { Contexto, Cronograma, Evento } from './types'
 
 export function useEventos(): Evento[] | undefined {
   return useLiveQuery(() => db.eventos.toArray(), [])
@@ -8,4 +8,8 @@ export function useEventos(): Evento[] | undefined {
 
 export function useCronogramas(): Cronograma[] | undefined {
   return useLiveQuery(async () => (await db.cronogramas.toArray()).sort((a, b) => a.ordem - b.ordem), [])
+}
+
+export function useContextos(): Contexto[] | undefined {
+  return useLiveQuery(async () => (await db.contextos.toArray()).sort((a, b) => a.ordem - b.ordem), [])
 }

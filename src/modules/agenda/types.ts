@@ -25,6 +25,30 @@ export interface RecorrenciaEvento {
 /** Presença no evento (estilo Google Calendar). Ausente = pendente (não respondi). */
 export type Presenca = 'confirmado' | 'recusado'
 
+/**
+ * Contexto de rotina — faixa de fundo (Sono, Trabalho, Estudos…), totalmente
+ * editável. Não é um evento: contextualiza o dia sem competir com os eventos.
+ */
+export interface Contexto {
+  id: string
+  nome: string
+  cor: string
+  /** Transparência da faixa (0.03–0.25). Padrão ~0.08. */
+  opacidade?: number
+  /** Minutos desde a meia-noite. Se fim ≤ início, a faixa cruza a meia-noite. */
+  inicioMin: number
+  fimMin: number
+  /** Dias da semana (0=dom … 6=sáb). Vazio/ausente = todos os dias. */
+  dias?: number[]
+  /** Datas ISO (yyyy-MM-dd) em que o contexto não se aplica. */
+  excecoes?: string[]
+  categoria?: string
+  icone?: string
+  ordem: number
+  criadoEm: number
+  atualizadoEm?: number
+}
+
 /** Um evento da agenda. Fase 1: eventos de um único dia. */
 export interface Evento {
   id: string
