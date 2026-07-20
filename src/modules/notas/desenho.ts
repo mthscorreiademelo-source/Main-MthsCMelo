@@ -183,8 +183,10 @@ function caminhoFechado(contorno: { x: number; y: number }[]): Path2D {
   return path
 }
 
-/** Constrói o contorno preenchível de um traço com raio variável. */
-function contornoDoTraco(pts: Ponto[], raios: number[]): Path2D {
+/** Constrói o contorno preenchível de um traço com raio variável. Com
+ *  `pontasRetas`, as extremidades ficam chanfradas (sem tampa arredondada) —
+ *  usado na borracha dura para a tinta parar exatamente no corte. */
+function contornoDoTraco(pts: Ponto[], raios: number[], pontasRetas = false): Path2D {
   const n = pts.length
   const esq: { x: number; y: number }[] = []
   const dir: { x: number; y: number }[] = []
@@ -218,6 +220,10 @@ function contornoDoTraco(pts: Ponto[], raios: number[]): Path2D {
     return pontos
   }
 
+  if (pontasRetas) {
+    // sem tampas: liga esquerda→direita direto, deixando as pontas chanfradas
+    return caminhoFechado([...esq, ...dir.reverse()])
+  }
   const fim = capa(pts[n - 1], pts[Math.max(0, n - 2)], raios[n - 1])
   const inicio = capa(pts[0], pts[Math.min(n - 1, 1)], raios[0])
   return caminhoFechado([...esq, ...fim, ...dir.reverse(), ...inicio])
@@ -247,6 +253,7 @@ function desenharLapis(
   base: number,
   alpha: number,
   cor: string,
+  pontasRetas = false,
 ) {
   const n = pts.length
   ctx.fillStyle = cor
@@ -254,7 +261,7 @@ function desenharLapis(
   // 1) Corpo: mancha translúcida (encolhida). É translúcida de propósito — cada
   //    passada some sobre a outra, então repassar no mesmo lugar vai escurecendo.
   ctx.globalAlpha = alpha * 0.3
-  ctx.fill(contornoDoTraco(pts, raios.map((r) => r * 0.78)))
+  ctx.fill(contornoDoTraco(pts, raios.map((r) => r * 0.78), pontasRetas))
 
   // 2) Grão: dente do papel. Cheio (mas ainda translúcido) no núcleo, esparso
   //    na borda → aresta áspera e granulada, e o papel aparece entre os grãos.
@@ -347,7 +354,9 @@ export function desenharTraco(ctx: CanvasRenderingContext2D, traco: Traco) {
     total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y)
     dist.push(total)
   }
-  const taper = caneta.afilaPontas * base
+  // Pedaço cortado pela borracha dura: pontas retas (sem afilar), pra tinta
+  // ir até a borda do círculo em vez de desvanecer antes.
+  const taper = traco.cortado ? 0 : caneta.afilaPontas * base
 
   const raios = pts.map((pt, i) => {
     let fator = 1 - caneta.afinamento * (1 - pt.p)
@@ -359,12 +368,12 @@ export function desenharTraco(ctx: CanvasRenderingContext2D, traco: Traco) {
   })
 
   if (ehLapis) {
-    desenharLapis(ctx, pts, raios, base, caneta.alpha, traco.cor)
+    desenharLapis(ctx, pts, raios, base, caneta.alpha, traco.cor, !!traco.cortado)
     ctx.restore()
     return
   }
 
-  ctx.fill(contornoDoTraco(pts, raios))
+  ctx.fill(contornoDoTraco(pts, raios, !!traco.cortado))
   ctx.restore()
 }
 
@@ -448,11 +457,37 @@ export function pontoNoPostIt(
   return Math.abs(lx) <= postIt.largura / 2 && Math.abs(ly) <= postIt.altura / 2
 }
 
-/* ---------- borracha de pixels ---------- */
+/* ---------- borracha de pixels (dura) ---------- */
+
+/** Ponto onde o segmento A→B cruza o círculo (centro c, raio r). Um endpoint
+ *  está dentro e o outro fora, então há exatamente um cruzamento em (0,1). */
+function cruzamentoCirculo(
+  ax: number, ay: number, bx: number, by: number,
+  cx: number, cy: number, r: number,
+): [number, number] | null {
+  const dx = bx - ax
+  const dy = by - ay
+  const fx = ax - cx
+  const fy = ay - cy
+  const a = dx * dx + dy * dy
+  if (a < 1e-9) return null
+  const b = 2 * (fx * dx + fy * dy)
+  const c = fx * fx + fy * fy - r * r
+  const disc = b * b - 4 * a * c
+  if (disc < 0) return null
+  const s = Math.sqrt(disc)
+  const t1 = (-b - s) / (2 * a)
+  const t2 = (-b + s) / (2 * a)
+  const t = t1 >= 0 && t1 <= 1 ? t1 : t2 >= 0 && t2 <= 1 ? t2 : null
+  if (t === null) return null
+  return [ax + dx * t, ay + dy * t]
+}
 
 /**
- * Remove do traço os pontos dentro do círculo da borracha, dividindo-o
- * nos pedaços restantes. Retorna null se nada foi atingido.
+ * Borracha "dura": remove os pontos dentro do círculo e corta a linha
+ * EXATAMENTE na borda do círculo (insere o ponto de interseção), preservando
+ * fielmente o que está fora. Os pedaços saem marcados como `cortado` para
+ * renderizar com pontas retas (sem afilar/desvanecer). Null se nada atingido.
  */
 export function apagarPixelsDoTraco(
   traco: Traco,
@@ -462,23 +497,56 @@ export function apagarPixelsDoTraco(
 ): Traco[] | null {
   const p = traco.pontos
   const r2 = raio * raio
-  const pedacos: number[][] = []
-  let atual: number[] = []
-  let mudou = false
-  for (let i = 0; i < p.length; i += 3) {
+  const n = p.length / 3
+  const dentro = (i: number) => {
     const dx = p[i] - x
     const dy = p[i + 1] - y
-    if (dx * dx + dy * dy <= r2) {
-      mudou = true
-      if (atual.length >= 6) pedacos.push(atual)
-      atual = []
-    } else {
-      atual.push(p[i], p[i + 1], p[i + 2])
+    return dx * dx + dy * dy <= r2
+  }
+
+  let algum = false
+  for (let k = 0; k < n; k++) {
+    if (dentro(k * 3)) {
+      algum = true
+      break
     }
   }
-  if (!mudou) return null
-  if (atual.length >= 6) pedacos.push(atual)
-  return pedacos.map((pontos) => ({ ...traco, pontos }))
+  if (!algum) return null
+
+  const pedacos: number[][] = []
+  let atual: number[] = []
+  const fechar = () => {
+    if (atual.length >= 6) pedacos.push(atual)
+    atual = []
+  }
+
+  for (let k = 0; k < n; k++) {
+    const i = k * 3
+    const in0 = dentro(i)
+    if (!in0) atual.push(p[i], p[i + 1], p[i + 2])
+    if (k < n - 1) {
+      const j = (k + 1) * 3
+      const in1 = dentro(j)
+      if (in0 !== in1) {
+        const cruz = cruzamentoCirculo(p[i], p[i + 1], p[j], p[j + 1], x, y, raio)
+        if (cruz) {
+          const pr = in0 ? p[j + 2] : p[i + 2]
+          if (!in0 && in1) {
+            // saindo (fora → dentro): fecha o pedaço na borda
+            atual.push(cruz[0], cruz[1], pr)
+            fechar()
+          } else {
+            // entrando (dentro → fora): começa novo pedaço na borda
+            atual.push(cruz[0], cruz[1], pr)
+          }
+        } else if (!in0 && in1) {
+          fechar()
+        }
+      }
+    }
+  }
+  fechar()
+  return pedacos.map((pontos) => ({ ...traco, pontos, cortado: true }))
 }
 
 /* ---------- seleção ---------- */

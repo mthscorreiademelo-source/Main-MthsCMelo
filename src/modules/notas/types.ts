@@ -25,6 +25,8 @@ export interface Traco {
   itemId?: string
   /** Página do folheador em que o traço foi feito (com itemId) */
   paginaItem?: number
+  /** Pedaço resultante de corte pela borracha dura: pontas retas (sem afilar). */
+  cortado?: boolean
 }
 
 /** Papel adesivo colado no quadro; traços com postItId acompanham seus movimentos. */
