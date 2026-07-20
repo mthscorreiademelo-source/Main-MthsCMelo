@@ -8,7 +8,8 @@ import {
   IconRepetir,
 } from '../../../core/components/Icons'
 import { rotuloData } from '../../../core/dates'
-import { alternarConclusao, contarSubtarefas, corPrioridade, estaAtrasada, subtarefas } from '../db'
+import { alternarConclusao, contarSubtarefas, corPrioridade, estaAtrasada, infoEnergia, subtarefas } from '../db'
+import { tarefaBloqueada } from '../execucao'
 import { MenuReagendar } from './MenuReagendar'
 import type { Projeto, Task } from '../types'
 
@@ -153,6 +154,21 @@ export function TaskItem({
                   <IconCheck width={12} height={12} />
                   {cont.feitas}/{cont.total}
                 </span>
+              )}
+              {task.duracaoMin != null && (
+                <span className="flex items-center gap-1">
+                  <IconRelogio width={12} height={12} />
+                  {task.duracaoMin >= 60 ? `${Math.floor(task.duracaoMin / 60)}h${task.duracaoMin % 60 ? String(task.duracaoMin % 60) : ''}` : `${task.duracaoMin}m`}
+                </span>
+              )}
+              {infoEnergia(task.energia) && (
+                <span title={`Energia ${infoEnergia(task.energia)!.rotulo}`}>{infoEnergia(task.energia)!.icone}</span>
+              )}
+              {task.contexto && (
+                <span className="rounded bg-hover px-1.5 py-px text-[11px] text-muted">@{task.contexto}</span>
+              )}
+              {tarefaBloqueada(task, todas) && (
+                <span className="flex items-center gap-0.5 text-[11px] text-danger/80" title="Bloqueada por dependência">🔒 bloqueada</span>
               )}
               {task.labels?.map((l) => (
                 <span key={l} className="rounded bg-hover px-1.5 py-px text-[11px] text-muted">

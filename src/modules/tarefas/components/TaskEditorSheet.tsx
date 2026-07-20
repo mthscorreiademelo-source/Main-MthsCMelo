@@ -7,11 +7,13 @@ import {
   atualizarTarefa,
   corPrioridade,
   criarTarefa,
+  CONTEXTOS,
+  ENERGIAS,
   excluirTarefa,
   PRIORIDADES,
   subtarefas,
 } from '../db'
-import type { Projeto, Task, TipoRecorrencia } from '../types'
+import type { NivelEnergia, Projeto, Task, TipoRecorrencia } from '../types'
 
 interface Props {
   task: Task | null
@@ -232,6 +234,70 @@ export function TaskEditorSheet({ task, projetos, todas, onFechar }: Props) {
               ))}
             </select>
           </label>
+        </div>
+
+        {/* Energia + contexto */}
+        <div className="flex gap-3">
+          <div className="flex flex-1 flex-col gap-1.5">
+            <span className={ROTULO}>Energia</span>
+            <div className="flex gap-1.5">
+              {ENERGIAS.map((en) => {
+                const ativo = task.energia === en.valor
+                return (
+                  <button
+                    key={en.valor}
+                    onClick={() => atualizarTarefa(task.id, { energia: ativo ? undefined : (en.valor as NivelEnergia) })}
+                    className="flex min-h-10 flex-1 items-center justify-center gap-1 rounded-lg border text-[13px] font-semibold transition-colors"
+                    style={{ borderColor: ativo ? en.cor : 'var(--vida-line)', backgroundColor: ativo ? `${en.cor}1a` : 'transparent', color: ativo ? en.cor : 'var(--vida-muted)' }}
+                  >
+                    {en.icone} {en.rotulo}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          <label className="flex w-40 flex-col gap-1.5">
+            <span className={ROTULO}>Contexto</span>
+            <input
+              list="contextos-tarefa"
+              value={task.contexto ?? ''}
+              onChange={(e) => atualizarTarefa(task.id, { contexto: e.target.value.trim() || undefined })}
+              placeholder="Casa, Computador…"
+              className={CAMPO}
+            />
+            <datalist id="contextos-tarefa">
+              {CONTEXTOS.map((c) => <option key={c} value={c} />)}
+            </datalist>
+          </label>
+        </div>
+
+        {/* Dependências */}
+        <div className="flex flex-col gap-1.5">
+          <span className={ROTULO}>Depende de</span>
+          {(task.dependeDe ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {(task.dependeDe ?? []).map((id) => {
+                const dep = todas.find((t) => t.id === id)
+                if (!dep) return null
+                return (
+                  <span key={id} className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[13px] ${dep.concluidaEm ? 'bg-hover text-muted line-through' : 'bg-hover'}`}>
+                    {dep.titulo}
+                    <button onClick={() => atualizarTarefa(task.id, { dependeDe: (task.dependeDe ?? []).filter((x) => x !== id).length ? (task.dependeDe ?? []).filter((x) => x !== id) : undefined })} className="text-muted hover:text-ink" aria-label="Remover dependência">×</button>
+                  </span>
+                )
+              })}
+            </div>
+          )}
+          <select
+            value=""
+            onChange={(e) => { if (e.target.value) atualizarTarefa(task.id, { dependeDe: [...(task.dependeDe ?? []), e.target.value] }) }}
+            className={CAMPO}
+          >
+            <option value="">Adicionar dependência…</option>
+            {todas.filter((t) => t.id !== task.id && !t.paiId && !(task.dependeDe ?? []).includes(t.id)).map((t) => (
+              <option key={t.id} value={t.id}>{t.titulo}</option>
+            ))}
+          </select>
         </div>
 
         {/* Labels */}
