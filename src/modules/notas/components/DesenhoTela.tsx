@@ -6,6 +6,7 @@ import {
   IconExpandir,
   IconLixeira,
   IconMenuPontos,
+  IconRefazer,
   IconSetaEsquerda,
 } from '../../../core/components/Icons'
 import { Sheet } from '../../../core/components/Sheet'
@@ -62,6 +63,14 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   const inputImagem = useRef<HTMLInputElement>(null)
   const inputPdf = useRef<HTMLInputElement>(null)
 
+  // Histórico de desfazer/refazer: pilhas de instantâneos do conteúdo do quadro
+  // (traços, itens, post-its). Toda alteração passa por `aplicar`, então é ali
+  // que empilhamos — cobre desenhar, apagar, mover, colar, limpar etc.
+  type Instantaneo = { tracos: Traco[]; itens: ItemQuadro[]; postIts: PostIt[] }
+  const desfazerPilha = useRef<Instantaneo[]>([])
+  const refazerPilha = useRef<Instantaneo[]>([])
+  const [hist, setHist] = useState({ desfazer: 0, refazer: 0 })
+
   // Tela cheia imersiva: esconde as barras de navegação do tablet enquanto
   // se desenha (palma da mão encostava nelas). Sai ao fechar o desenho.
   useEffect(() => {
@@ -110,7 +119,15 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
     novosTracos: Traco[],
     novosItens: ItemQuadro[] = itens,
     novosPostIts: PostIt[] = postIts,
+    registrar = true,
   ) {
+    if (registrar) {
+      // guarda o estado ATUAL (antes da mudança) para poder desfazer
+      desfazerPilha.current.push({ tracos, itens, postIts })
+      if (desfazerPilha.current.length > 100) desfazerPilha.current.shift()
+      refazerPilha.current = []
+      setHist({ desfazer: desfazerPilha.current.length, refazer: 0 })
+    }
     onMudar({
       tracos: novosTracos,
       itens: novosItens,
@@ -118,6 +135,51 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
       miniatura: gerarMiniatura(novosTracos),
     })
   }
+
+  function desfazer() {
+    const anterior = desfazerPilha.current.pop()
+    if (!anterior) return
+    refazerPilha.current.push({ tracos, itens, postIts })
+    setHist({ desfazer: desfazerPilha.current.length, refazer: refazerPilha.current.length })
+    quadro.current?.limparSelecao()
+    onMudar({ ...anterior, miniatura: gerarMiniatura(anterior.tracos) })
+  }
+
+  function refazer() {
+    const proximo = refazerPilha.current.pop()
+    if (!proximo) return
+    desfazerPilha.current.push({ tracos, itens, postIts })
+    setHist({ desfazer: desfazerPilha.current.length, refazer: refazerPilha.current.length })
+    quadro.current?.limparSelecao()
+    onMudar({ ...proximo, miniatura: gerarMiniatura(proximo.tracos) })
+  }
+
+  // Atalhos de teclado: Ctrl/Cmd+Z desfaz, Ctrl+Shift+Z ou Ctrl+Y refaz.
+  useEffect(() => {
+    const aoTecla = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return
+      const k = e.key.toLowerCase()
+      const alvo = e.target as HTMLElement | null
+      if (alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA')) return
+      if (k === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        desfazer()
+      } else if ((k === 'z' && e.shiftKey) || k === 'y') {
+        e.preventDefault()
+        refazer()
+      }
+    }
+    window.addEventListener('keydown', aoTecla)
+    return () => window.removeEventListener('keydown', aoTecla)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracos, itens, postIts])
+
+  // Novo desenho aberto: zera o histórico de desfazer/refazer.
+  useEffect(() => {
+    desfazerPilha.current = []
+    refazerPilha.current = []
+    setHist({ desfazer: 0, refazer: 0 })
+  }, [pagina.id])
 
   /** Após inserir algo, ativa o ponteiro e deixa o objeto selecionado. */
   function selecionarInserido(alvo: { postItId?: string; itemId?: string }) {
@@ -394,12 +456,11 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
           className="pointer-events-auto min-h-11 w-56 rounded-full border border-line bg-bg/95 px-4 text-sm font-medium shadow-md backdrop-blur outline-none placeholder:text-muted/60 focus:border-muted/50"
         />
         <div className="pointer-events-auto ml-auto flex items-center gap-0.5 rounded-full border border-line bg-bg/95 px-1 shadow-md backdrop-blur">
-          <IconButton
-            onClick={() => aplicar(tracos.slice(0, -1))}
-            aria-label="Desfazer"
-            disabled={tracos.length === 0}
-          >
+          <IconButton onClick={desfazer} aria-label="Desfazer" disabled={hist.desfazer === 0}>
             <IconDesfazer />
+          </IconButton>
+          <IconButton onClick={refazer} aria-label="Refazer" disabled={hist.refazer === 0}>
+            <IconRefazer />
           </IconButton>
           <IconButton
             onClick={() => alternarTelaCheia(true)}
@@ -590,7 +651,8 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
 
           <p className="text-[13px] leading-relaxed text-muted">
             Stylus desenha (com pressão). Um dedo arrasta o quadro, dois dedos
-            dão zoom. Com a régua ativa: um dedo move a régua, dois dedos giram.
+            dão zoom e giram a folha. Com a régua ativa: um dedo move a régua,
+            dois dedos giram. Ctrl/Cmd+Z desfaz, Ctrl+Shift+Z refaz.
           </p>
 
           <div className="flex-1" />

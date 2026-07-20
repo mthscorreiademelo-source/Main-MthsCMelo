@@ -149,6 +149,14 @@ export function IconDesfazer(props: IconProps) {
   )
 }
 
+export function IconRefazer(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M20 9H10a6 6 0 0 0 0 12h4M20 9l-4-4M20 9l-4 4" />
+    </svg>
+  )
+}
+
 export function IconTinteiro(props: IconProps) {
   return (
     <svg {...base(props)}>

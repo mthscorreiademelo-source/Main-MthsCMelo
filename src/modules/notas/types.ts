@@ -45,6 +45,8 @@ export interface Camera {
   x: number
   y: number
   escala: number
+  /** rotação da "folha" em radianos (2 dedos giram o quadro). */
+  rot?: number
 }
 
 /**

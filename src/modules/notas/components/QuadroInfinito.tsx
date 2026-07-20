@@ -172,12 +172,40 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   function paraMundo(clientX: number, clientY: number): [number, number] {
     const rect = canvasRef.current!.getBoundingClientRect()
     const c = cam.current
-    return [c.x + (clientX - rect.left) / c.escala, c.y + (clientY - rect.top) / c.escala]
+    const sx = clientX - rect.left
+    const sy = clientY - rect.top
+    const cos = Math.cos(c.rot ?? 0)
+    const sin = Math.sin(c.rot ?? 0)
+    // W = cam + R(−θ)·S / escala
+    const rx = sx * cos + sy * sin
+    const ry = -sx * sin + sy * cos
+    return [c.x + rx / c.escala, c.y + ry / c.escala]
   }
 
   function paraTela(x: number, y: number): [number, number] {
     const c = cam.current
-    return [(x - c.x) * c.escala, (y - c.y) * c.escala]
+    const dx = (x - c.x) * c.escala
+    const dy = (y - c.y) * c.escala
+    const cos = Math.cos(c.rot ?? 0)
+    const sin = Math.sin(c.rot ?? 0)
+    // S = escala·R(θ)·(W − cam)
+    return [dx * cos - dy * sin, dx * sin + dy * cos]
+  }
+
+  /** Aplica ao contexto a transformação mundo→tela (com rotação da folha). */
+  function transformMundo(ctx: CanvasRenderingContext2D, dpr: number) {
+    const c = cam.current
+    const s = c.escala
+    const cos = Math.cos(c.rot ?? 0)
+    const sin = Math.sin(c.rot ?? 0)
+    ctx.setTransform(
+      dpr * s * cos,
+      dpr * s * sin,
+      -dpr * s * sin,
+      dpr * s * cos,
+      -dpr * s * (cos * c.x - sin * c.y),
+      -dpr * s * (sin * c.x + cos * c.y),
+    )
   }
 
   /* ---------- render ---------- */
@@ -204,17 +232,34 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     let passo = 64
     while (passo * escala < 24) passo *= 4
     ctx.fillStyle = '#E4E4E1'
-    const x0 = Math.floor(x / passo) * passo
-    const y0 = Math.floor(y / passo) * passo
-    for (let gx = x0; gx < x + w / escala; gx += passo) {
-      for (let gy = y0; gy < y + h / escala; gy += passo) {
+    // A grade acompanha a folha (roda junto). Cobre o retângulo do mundo que
+    // envolve os quatro cantos da tela e projeta cada ponto com a rotação.
+    const cos = Math.cos(cam.current.rot ?? 0)
+    const sin = Math.sin(cam.current.rot ?? 0)
+    const paraMundoRel = (sxp: number, syp: number): [number, number] => [
+      x + (sxp * cos + syp * sin) / escala,
+      y + (-sxp * sin + syp * cos) / escala,
+    ]
+    const paraTelaRel = (wx: number, wy: number): [number, number] => {
+      const ddx = (wx - x) * escala
+      const ddy = (wy - y) * escala
+      return [ddx * cos - ddy * sin, ddx * sin + ddy * cos]
+    }
+    const cantos = [paraMundoRel(0, 0), paraMundoRel(w, 0), paraMundoRel(0, h), paraMundoRel(w, h)]
+    const minX = Math.min(...cantos.map((c) => c[0]))
+    const maxX = Math.max(...cantos.map((c) => c[0]))
+    const minY = Math.min(...cantos.map((c) => c[1]))
+    const maxY = Math.max(...cantos.map((c) => c[1]))
+    for (let gx = Math.floor(minX / passo) * passo; gx < maxX; gx += passo) {
+      for (let gy = Math.floor(minY / passo) * passo; gy < maxY; gy += passo) {
+        const [sxp, syp] = paraTelaRel(gx, gy)
         ctx.beginPath()
-        ctx.arc((gx - x) * escala, (gy - y) * escala, 1.4, 0, Math.PI * 2)
+        ctx.arc(sxp, syp, 1.4, 0, Math.PI * 2)
         ctx.fill()
       }
     }
 
-    ctx.setTransform(escala * dpr, 0, 0, escala * dpr, -x * escala * dpr, -y * escala * dpr)
+    transformMundo(ctx, dpr)
 
     const sel = selecao.current
     const selIdx = new Set(sel?.indices ?? [])
@@ -229,8 +274,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       selIdx.has(i) && temTrans ? transformarTraco(traco, t.dx, t.dy, t.ang, ccx, ccy, t.s) : traco
 
     const lista = tracosLocais.current ?? tracosRef.current
-    const aplicarMundo = () =>
-      ctx.setTransform(escala * dpr, 0, 0, escala * dpr, -x * escala * dpr, -y * escala * dpr)
+    const aplicarMundo = () => transformMundo(ctx, dpr)
 
     // camada 1: imagens/PDF (e a tinta colada em cada página do folheador)
     for (const item of itensRef.current) {
@@ -325,7 +369,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       // tinta colada neste post-it: clip fica registrado no papel;
       // volta ao sistema de mundo para desenhar os traços
       ctx.clip()
-      ctx.setTransform(escala * dpr, 0, 0, escala * dpr, -x * escala * dpr, -y * escala * dpr)
+      transformMundo(ctx, dpr)
       lista.forEach((traco, i) => {
         if (traco.postItId === p.id) desenharTraco(ctx, comTransTraco(traco, i))
       })
@@ -358,7 +402,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       const f = ferramentaRef.current
       if (f.modo !== 'borracha' && f.modo !== 'selecao' && f.modo !== 'ponteiro') {
         ctx.save()
-        ctx.setTransform(escala * dpr, 0, 0, escala * dpr, -x * escala * dpr, -y * escala * dpr)
+        transformMundo(ctx, dpr)
         // recorta o traço em curso ao papel (post-it) ou à página (PDF)
         const alvo: { x: number; y: number; largura: number; altura: number; rotacao?: number } | undefined =
           tracoNoPostIt.current
@@ -409,19 +453,19 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       ctx.setLineDash([])
     }
 
-    // caixa da seleção ativa + alça de rotação
+    // caixa da seleção ativa + alça de rotação (acompanha a rotação da folha)
     const sel = selecao.current
     if (sel) {
       const t = transSel.current
       const cx = (sel.caixa.minX + sel.caixa.maxX) / 2
       const cy = (sel.caixa.minY + sel.caixa.maxY) / 2
-      const [ax, ay] = paraTela(sel.caixa.minX, sel.caixa.minY)
-      const [bx, by] = paraTela(sel.caixa.maxX, sel.caixa.maxY)
+      const camRot = cam.current.rot ?? 0
+      const [csx, csy] = paraTela(cx + t.dx, cy + t.dy)
       ctx.save()
-      ctx.translate((ax + bx) / 2 + t.dx * escala, (ay + by) / 2 + t.dy * escala)
-      ctx.rotate(t.ang)
-      const lw = (bx - ax) * t.s
-      const lh = (by - ay) * t.s
+      ctx.translate(csx, csy)
+      ctx.rotate(t.ang + camRot)
+      const lw = (sel.caixa.maxX - sel.caixa.minX) * escala * t.s
+      const lh = (sel.caixa.maxY - sel.caixa.minY) * escala * t.s
       ctx.strokeStyle = '#2383E2'
       ctx.setLineDash([6, 4])
       ctx.lineWidth = 1.5
@@ -444,8 +488,6 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       ctx.fill()
       ctx.stroke()
       ctx.restore()
-      void cx
-      void cy
     }
 
     // régua
@@ -455,7 +497,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       const diag = Math.hypot(w, h)
       ctx.save()
       ctx.translate(rx, ry)
-      ctx.rotate(r.ang)
+      ctx.rotate(r.ang + (cam.current.rot ?? 0))
       ctx.fillStyle = 'rgba(250, 250, 248, 0.92)'
       ctx.strokeStyle = '#B9B9B4'
       ctx.lineWidth = 1
@@ -486,6 +528,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
 
     canvas.dataset.escala = escala.toFixed(3)
     canvas.dataset.cam = `${Math.round(x)},${Math.round(y)}`
+    canvas.dataset.rot = (cam.current.rot ?? 0).toFixed(3)
     canvas.dataset.regua = reguaAtiva && r ? `${Math.round(r.x)},${Math.round(r.y)},${r.ang.toFixed(2)}` : ''
     canvas.dataset.selecao = String(
       sel ? sel.indices.length + sel.itemIds.length + sel.postItIds.length : 0,
@@ -659,16 +702,24 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     const aoRolar = (e: WheelEvent) => {
       e.preventDefault()
       const c = cam.current
+      const cos = Math.cos(c.rot ?? 0)
+      const sin = Math.sin(c.rot ?? 0)
       if (e.ctrlKey || e.metaKey) {
         const rect = canvas.getBoundingClientRect()
         const sx = e.clientX - rect.left
         const sy = e.clientY - rect.top
-        const alvoX = c.x + sx / c.escala
-        const alvoY = c.y + sy / c.escala
+        const [alvoX, alvoY] = paraMundo(e.clientX, e.clientY)
         const nova = Math.min(ESCALA_MAX, Math.max(ESCALA_MIN, c.escala * Math.exp(-e.deltaY * 0.002)))
-        moverCamera({ escala: nova, x: alvoX - sx / nova, y: alvoY - sy / nova })
+        // mantém o ponto sob o cursor fixo (com a rotação atual)
+        const rmx = sx * cos + sy * sin
+        const rmy = -sx * sin + sy * cos
+        moverCamera({ escala: nova, rot: c.rot, x: alvoX - rmx / nova, y: alvoY - rmy / nova })
       } else {
-        moverCamera({ ...c, x: c.x + e.deltaX / c.escala, y: c.y + e.deltaY / c.escala })
+        moverCamera({
+          ...c,
+          x: c.x + (e.deltaX * cos + e.deltaY * sin) / c.escala,
+          y: c.y + (-e.deltaX * sin + e.deltaY * cos) / c.escala,
+        })
       }
     }
     canvas.addEventListener('wheel', aoRolar, { passive: false })
@@ -684,8 +735,10 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     const [rx, ry] = paraTela(r.x, r.y)
     const px = clientX - rect.left - rx
     const py = clientY - rect.top - ry
-    const cos = Math.cos(-r.ang)
-    const sen = Math.sin(-r.ang)
+    // a régua aparece girada por r.ang + rotação da folha
+    const ang = -(r.ang + (cam.current.rot ?? 0))
+    const cos = Math.cos(ang)
+    const sen = Math.sin(ang)
     return { ao: px * cos - py * sen, perp: px * sen + py * cos }
   }
 
@@ -893,23 +946,47 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     definirSelecao([], [], [])
   }
 
-  function alcaDeRotacao(clientX: number, clientY: number): boolean {
+  /** Posição de tela (client) de um ponto local da caixa da seleção (que gira
+   *  junto com a folha e com a rotação própria da seleção). */
+  function alcaTela(localX: number, localY: number): [number, number] | null {
     const sel = selecao.current
-    if (!sel) return false
+    if (!sel) return null
+    const t = transSel.current
+    const cx = (sel.caixa.minX + sel.caixa.maxX) / 2
+    const cy = (sel.caixa.minY + sel.caixa.maxY) / 2
+    const [csx, csy] = paraTela(cx + t.dx, cy + t.dy)
+    const phi = t.ang + (cam.current.rot ?? 0)
+    const cos = Math.cos(phi)
+    const sin = Math.sin(phi)
     const rect = canvasRef.current!.getBoundingClientRect()
-    const [ax, ay] = paraTela(sel.caixa.minX, sel.caixa.minY)
-    const [bx] = paraTela(sel.caixa.maxX, sel.caixa.maxY)
-    const hx = (ax + bx) / 2
-    const hy = ay - 8 - 44
-    return Math.hypot(clientX - rect.left - hx, clientY - rect.top - hy) <= 16
+    return [
+      rect.left + csx + localX * cos - localY * sin,
+      rect.top + csy + localX * sin + localY * cos,
+    ]
+  }
+
+  function meiaCaixaTela(): { lw: number; lh: number } {
+    const sel = selecao.current!
+    const t = transSel.current
+    const s = cam.current.escala * t.s
+    return {
+      lw: (sel.caixa.maxX - sel.caixa.minX) * s,
+      lh: (sel.caixa.maxY - sel.caixa.minY) * s,
+    }
+  }
+
+  function alcaDeRotacao(clientX: number, clientY: number): boolean {
+    if (!selecao.current) return false
+    const { lh } = meiaCaixaTela()
+    const h = alcaTela(0, -lh / 2 - 44)
+    return !!h && Math.hypot(clientX - h[0], clientY - h[1]) <= 16
   }
 
   function alcaDeEscala(clientX: number, clientY: number): boolean {
-    const sel = selecao.current
-    if (!sel) return false
-    const rect = canvasRef.current!.getBoundingClientRect()
-    const [bx, by] = paraTela(sel.caixa.maxX, sel.caixa.maxY)
-    return Math.hypot(clientX - rect.left - (bx + 15), clientY - rect.top - (by + 15)) <= 18
+    if (!selecao.current) return false
+    const { lw, lh } = meiaCaixaTela()
+    const h = alcaTela(lw / 2 + 15, lh / 2 + 15)
+    return !!h && Math.hypot(clientX - h[0], clientY - h[1]) <= 18
   }
 
   function dentroDaCaixa(x: number, y: number): boolean {
@@ -1126,40 +1203,55 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
         const ang = Math.atan2(b.y - a.y, b.x - a.x)
 
         if (gestoRegua.current === 'girar' && regua.current) {
+          const cosr = Math.cos(c.rot ?? 0)
+          const sinr = Math.sin(c.rot ?? 0)
+          const dmx = midX - pinca.current.midX
+          const dmy = midY - pinca.current.midY
           regua.current.ang += ang - pinca.current.ang
-          regua.current.x += (midX - pinca.current.midX) / c.escala
-          regua.current.y += (midY - pinca.current.midY) / c.escala
+          regua.current.x += (dmx * cosr + dmy * sinr) / c.escala
+          regua.current.y += (-dmx * sinr + dmy * cosr) / c.escala
           pinca.current = { dist, midX, midY, ang }
           pedirRender()
           return
         }
 
         const rect = canvasRef.current!.getBoundingClientRect()
-        const sx = pinca.current.midX - rect.left
-        const sy = pinca.current.midY - rect.top
-        const alvoX = c.x + sx / c.escala
-        const alvoY = c.y + sy / c.escala
+        // Zoom + rotação + pan juntos: os dois dedos "fixam" a folha —
+        // o ponto do mundo sob o ponto médio anterior vai para o novo médio,
+        // com a escala e o giro variando conforme os dedos.
+        const [wpx, wpy] = paraMundo(pinca.current.midX, pinca.current.midY)
         const nova = Math.min(
           ESCALA_MAX,
           Math.max(ESCALA_MIN, c.escala * (dist / Math.max(1, pinca.current.dist))),
         )
+        const novoRot = (c.rot ?? 0) + (ang - pinca.current.ang)
+        const mcx = midX - rect.left
+        const mcy = midY - rect.top
+        const cosr = Math.cos(novoRot)
+        const sinr = Math.sin(novoRot)
+        const rmx = mcx * cosr + mcy * sinr
+        const rmy = -mcx * sinr + mcy * cosr
         pinca.current = { dist, midX, midY, ang }
-        moverCamera({
-          escala: nova,
-          x: alvoX - (midX - rect.left) / nova,
-          y: alvoY - (midY - rect.top) / nova,
-        })
+        moverCamera({ escala: nova, rot: novoRot, x: wpx - rmx / nova, y: wpy - rmy / nova })
       } else if (dedos.current.size === 1) {
         if (gestoRegua.current === 'mover' && regua.current) {
-          regua.current.x += (atual.x - anterior.x) / c.escala
-          regua.current.y += (atual.y - anterior.y) / c.escala
+          const cosr = Math.cos(c.rot ?? 0)
+          const sinr = Math.sin(c.rot ?? 0)
+          const dmx = atual.x - anterior.x
+          const dmy = atual.y - anterior.y
+          regua.current.x += (dmx * cosr + dmy * sinr) / c.escala
+          regua.current.y += (-dmx * sinr + dmy * cosr) / c.escala
           pedirRender()
           return
         }
+        const dsx = atual.x - anterior.x
+        const dsy = atual.y - anterior.y
+        const cos = Math.cos(c.rot ?? 0)
+        const sin = Math.sin(c.rot ?? 0)
         moverCamera({
           ...c,
-          x: c.x - (atual.x - anterior.x) / c.escala,
-          y: c.y - (atual.y - anterior.y) / c.escala,
+          x: c.x - (dsx * cos + dsy * sin) / c.escala,
+          y: c.y - (-dsx * sin + dsy * cos) / c.escala,
         })
       }
       return
