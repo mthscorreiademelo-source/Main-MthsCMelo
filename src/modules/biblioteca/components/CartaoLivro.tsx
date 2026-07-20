@@ -1,10 +1,19 @@
 import { Link } from 'react-router-dom'
 import { IconLivro } from '../../../core/components/Icons'
 import { rotuloStatus, rotuloTipo } from '../db'
-import type { Livro } from '../types'
+import type { Livro, StatusLeitura } from '../types'
 
 /** Capa de um livro (ou compilado) na estante (grade). */
-export function CartaoLivro({ livro, volumes }: { livro: Livro; volumes?: number }) {
+export function CartaoLivro({
+  livro,
+  volumes,
+  status,
+}: {
+  livro: Livro
+  volumes?: number
+  /** status efetivo (séries derivam dos volumes) para o subtítulo. */
+  status?: StatusLeitura
+}) {
   const progresso = livro.progresso ?? 0
   const ehComp = !!livro.ehCompilado
   const destino = ehComp ? `/biblioteca/compilado/${livro.id}` : `/biblioteca/${livro.id}`
@@ -49,7 +58,7 @@ export function CartaoLivro({ livro, volumes }: { livro: Livro; volumes?: number
         <p className="truncate text-[13px] font-medium leading-tight">{livro.titulo}</p>
         <p className="truncate text-[11px] text-muted">
           {ehComp
-            ? `${rotuloTipo(livro.tipo)} · série`
+            ? `${rotuloTipo(livro.tipo)} · ${rotuloStatus(status ?? livro.status)}`
             : livro.autor || livro.colecao || rotuloStatus(livro.status)}
         </p>
       </div>

@@ -23,6 +23,19 @@ export function rotuloTipo(t: TipoObra): string {
   return TIPOS.find((x) => x.valor === t)?.rotulo ?? t
 }
 
+/**
+ * Status de uma SÉRIE derivado dos seus volumes (o nível de baixo manda):
+ * algum lendo → lendo; senão algum abandonado → abandonado; senão todos lido →
+ * lido; senão quero_ler. Sem volumes = quero_ler.
+ */
+export function statusDerivadoSerie(volumes: Livro[]): StatusLeitura {
+  if (volumes.length === 0) return 'quero_ler'
+  if (volumes.some((v) => v.status === 'lendo')) return 'lendo'
+  if (volumes.some((v) => v.status === 'abandonado')) return 'abandonado'
+  if (volumes.every((v) => v.status === 'lido')) return 'lido'
+  return 'quero_ler'
+}
+
 export function novoLivro(dados: Partial<Livro> & { titulo: string }): Livro {
   const agora = Date.now()
   return {
