@@ -222,39 +222,71 @@ function Coluna({
   const horas: number[] = []
   for (let h = Math.ceil(ini / 60); h <= fim / 60; h += 2) horas.push(h)
 
+  // Prévia do bloco de tempo: 1º toque cria a prévia (sem gravar nada);
+  // arrastar ajusta o horário; tocar na prévia confirma e abre "novo evento".
+  const [previa, setPrevia] = useState<{ ini: number; fim: number } | null>(null)
+  const arrasto = useRef<{ tipo: 'mover' | 'fim'; y0: number; ini0: number; fim0: number; moveu: boolean } | null>(null)
+
   function abrirItem(it: ItemPlano) {
     if (it.tipo === 'evento') onAbrirEvento(it.ref as Evento)
     else onAbrirTarefa(it.ref as Task)
   }
 
+  function minutoEm(clientY: number, el: HTMLElement): number {
+    const r = el.getBoundingClientRect()
+    const min = ini + ((clientY - r.top) / HORA_PX) * 60
+    return Math.min(fim, Math.max(ini, Math.round(min / 15) * 15))
+  }
+
   function clicarVazio(e: React.MouseEvent<HTMLDivElement>) {
     if (e.target !== e.currentTarget) return
-    const r = e.currentTarget.getBoundingClientRect()
-    const min = ini + ((e.clientY - r.top) / HORA_PX) * 60
-    const m = Math.max(0, Math.round(min / 15) * 15)
-    onCriar(plano.dia, m, m + 60)
+    const m = Math.min(fim - 30, minutoEm(e.clientY, e.currentTarget))
+    setPrevia({ ini: m, fim: m + 60 })
+  }
+
+  function iniciarArrasto(e: React.PointerEvent, tipo: 'mover' | 'fim') {
+    if (!previa) return
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    arrasto.current = { tipo, y0: e.clientY, ini0: previa.ini, fim0: previa.fim, moveu: false }
+  }
+
+  function moverArrasto(e: React.PointerEvent) {
+    const a = arrasto.current
+    if (!a || !previa) return
+    const delta = Math.round(((e.clientY - a.y0) / HORA_PX) * 60 / 15) * 15
+    if (Math.abs(e.clientY - a.y0) > 3) a.moveu = true
+    if (a.tipo === 'mover') {
+      const dur = a.fim0 - a.ini0
+      const novoIni = Math.max(ini, Math.min(fim - dur, a.ini0 + delta))
+      setPrevia({ ini: novoIni, fim: novoIni + dur })
+    } else {
+      const novoFim = Math.max(a.ini0 + 15, Math.min(fim, a.fim0 + delta))
+      setPrevia({ ini: a.ini0, fim: novoFim })
+    }
+  }
+
+  function soltarArrasto(e: React.PointerEvent) {
+    const a = arrasto.current
+    arrasto.current = null
+    if (!a || !previa) return
+    // Tocar na prévia (sem arrastar) confirma e abre o editor de evento.
+    if (!a.moveu && a.tipo === 'mover') {
+      const p = previa
+      setPrevia(null)
+      onCriar(plano.dia, p.ini, p.fim)
+    }
+    e.stopPropagation()
   }
 
   return (
     <section className="lume-entrada flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-line bg-surface/40">
       {/* Cabeçalho do dia */}
-      <header className={`sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-line px-3 py-2.5 backdrop-blur ${ehHoje ? 'bg-accent/10' : 'bg-surface/80'}`}>
-        <div className="flex items-baseline gap-2">
-          <span className={`text-[22px] font-bold leading-none ${ehHoje ? 'text-accent' : ''}`}>{format(dt, 'd')}</span>
-          <div className="flex flex-col leading-none">
-            <span className="text-[12px] font-semibold capitalize">{nomeDiaCurto(plano.dia)}</span>
-            <span className="text-[10px] uppercase tracking-wide text-muted">{format(dt, 'MMM', { locale: ptBR })}</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-1 text-[10px]">
-          {plano.nEventos > 0 && (
-            <span className="rounded-full bg-hover px-1.5 py-0.5 font-medium text-muted">{plano.nEventos} ev</span>
-          )}
-          {plano.ocupadoMin === 0 ? (
-            <span className="rounded-full bg-green-500/15 px-1.5 py-0.5 font-medium text-green-600">livre</span>
-          ) : (
-            <span className="rounded-full bg-hover px-1.5 py-0.5 font-medium text-muted">{durLegivel(plano.ocupadoMin)}</span>
-          )}
+      <header className={`sticky top-0 z-30 flex items-center gap-2 border-b border-line px-3 py-2.5 backdrop-blur ${ehHoje ? 'bg-accent/10' : 'bg-surface/80'}`}>
+        <span className={`text-[22px] font-bold leading-none ${ehHoje ? 'text-accent' : ''}`}>{format(dt, 'd')}</span>
+        <div className="flex min-w-0 flex-col leading-none">
+          <span className="truncate text-[12px] font-semibold capitalize">{nomeDiaCurto(plano.dia)}</span>
+          <span className="text-[10px] uppercase tracking-wide text-muted">{format(dt, 'MMM', { locale: ptBR })}</span>
         </div>
       </header>
 
@@ -341,6 +373,49 @@ function Coluna({
             onAbrirItem={abrirItem}
           />
         ))}
+
+        {/* Prévia do novo evento — confirma ao tocar, arrasta para ajustar */}
+        {previa && (
+          <div
+            className="lume-pop absolute z-[25] rounded-xl border-2 border-dashed border-accent bg-accent/10 px-2 py-1 text-left"
+            style={{
+              top: ((previa.ini - ini) / 60) * HORA_PX,
+              height: Math.max(30, ((previa.fim - previa.ini) / 60) * HORA_PX - 3),
+              left: 4,
+              right: 4,
+              touchAction: 'none',
+              cursor: 'grab',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => iniciarArrasto(e, 'mover')}
+            onPointerMove={moverArrasto}
+            onPointerUp={soltarArrasto}
+          >
+            <div className="flex items-center justify-between gap-1">
+              <span className="truncate text-[11px] font-semibold text-accent">
+                {paraHHMM(previa.ini)}–{paraHHMM(previa.fim)}
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); setPrevia(null) }}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="shrink-0 rounded px-1 text-[13px] leading-none text-muted hover:text-ink"
+                aria-label="Cancelar prévia"
+              >
+                ×
+              </button>
+            </div>
+            <div className="truncate text-[9.5px] text-muted">toque para criar</div>
+            {/* Alça inferior para ajustar duração */}
+            <div
+              onPointerDown={(e) => iniciarArrasto(e, 'fim')}
+              onPointerMove={moverArrasto}
+              onPointerUp={soltarArrasto}
+              className="absolute inset-x-0 bottom-0 flex h-3 cursor-ns-resize items-center justify-center"
+            >
+              <span className="h-0.5 w-6 rounded-full bg-accent/60" />
+            </div>
+          </div>
+        )}
       </div>
     </section>
   )
@@ -530,6 +605,7 @@ export function PlannerTresDias({
   onIrSemana,
   onIrHoje,
   onAbrirContextos,
+  mostrarPainel = true,
 }: {
   dias: string[]
   eventos: Evento[]
@@ -541,11 +617,13 @@ export function PlannerTresDias({
   onIrSemana: () => void
   onIrHoje: () => void
   onAbrirContextos: () => void
+  mostrarPainel?: boolean
 }) {
   const agora = useAgora()
   const agoraMin = minutosDoDia(agora)
   const contextos = useContextos()
   const [expandidoId, setExpandidoId] = useState<string | null>(null)
+  const [painelMin, setPainelMin] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Dia inteiro é alto: ao abrir, rola até perto do horário atual (com folga).
@@ -571,10 +649,10 @@ export function PlannerTresDias({
     <div className="flex flex-col gap-3">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <div ref={scrollRef} className="overflow-auto pb-1" style={{ maxHeight: 'calc(100vh - 210px)' }}>
-            <div className="flex gap-2.5">
+          <div ref={scrollRef} className="overflow-y-auto overflow-x-hidden pb-1" style={{ maxHeight: 'calc(100vh - 210px)' }}>
+            <div className={`flex ${planos.length > 4 ? 'gap-1' : 'gap-2.5'}`}>
               {planos.map((p) => (
-                <div key={p.dia} className={`flex-1 ${planos.length === 1 ? 'sm:max-w-2xl' : ''}`} style={{ minWidth: planos.length > 4 ? 132 : planos.length > 1 ? 168 : undefined }}>
+                <div key={p.dia} className={`min-w-0 flex-1 ${planos.length === 1 ? 'sm:max-w-2xl' : ''}`}>
                   <Coluna
                     plano={p}
                     ini={ini}
@@ -593,7 +671,43 @@ export function PlannerTresDias({
             </div>
           </div>
         </div>
-        <aside className="hidden w-72 shrink-0 lg:block">
+        {mostrarPainel && !painelMin && (
+          <aside className="hidden w-72 shrink-0 lg:block">
+            <div className="mb-2 flex justify-end">
+              <button
+                onClick={() => setPainelMin(true)}
+                className="rounded-full border border-line px-2.5 py-1 text-[12px] font-medium text-muted hover:text-ink"
+                title="Minimizar painel"
+              >
+                Ocultar painel →
+              </button>
+            </div>
+            <PainelInteligente
+              planos={planos}
+              eventos={eventos}
+              dias={dias}
+              hoje={hoje}
+              agoraMin={agoraMin}
+              onAbrirEvento={onAbrirEvento}
+              onIrSemana={onIrSemana}
+              onCriar={() => onCriar(dias[0], 9 * 60, 10 * 60)}
+              onIrHoje={onIrHoje}
+            />
+          </aside>
+        )}
+        {mostrarPainel && painelMin && (
+          <button
+            onClick={() => setPainelMin(false)}
+            className="hidden shrink-0 self-start rounded-full border border-line bg-surface/60 px-2 py-2 text-[12px] font-medium text-muted hover:text-ink lg:block"
+            title="Mostrar painel"
+          >
+            ←
+          </button>
+        )}
+      </div>
+
+      {mostrarPainel && (
+        <div className="lg:hidden">
           <PainelInteligente
             planos={planos}
             eventos={eventos}
@@ -605,24 +719,10 @@ export function PlannerTresDias({
             onCriar={() => onCriar(dias[0], 9 * 60, 10 * 60)}
             onIrHoje={onIrHoje}
           />
-        </aside>
-      </div>
+        </div>
+      )}
 
-      <div className="lg:hidden">
-        <PainelInteligente
-          planos={planos}
-          eventos={eventos}
-          dias={dias}
-          hoje={hoje}
-          agoraMin={agoraMin}
-          onAbrirEvento={onAbrirEvento}
-          onIrSemana={onIrSemana}
-          onCriar={() => onCriar(dias[0], 9 * 60, 10 * 60)}
-          onIrHoje={onIrHoje}
-        />
-      </div>
-
-      <LinhaCarga planos={planos} iniH={iniH} fimH={fimH} />
+      {mostrarPainel && <LinhaCarga planos={planos} iniH={iniH} fimH={fimH} />}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { addDays, addMonths, addYears, endOfMonth, format, parseISO, startOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { IconMais, IconRegua, IconSetaEsquerda } from '../../core/components/Icons'
@@ -13,7 +13,7 @@ import { GerenciarCronogramas } from './components/GerenciarCronogramas'
 import { PlannerTresDias } from './components/PlannerTresDias'
 import { VistaMes } from './components/VistaMes'
 import { VistaMultiMes } from './components/VistaMultiMes'
-import { criarEvento, expandirEventos, paraHHMM, rotuloRecorrencia, semearContextosSePreciso } from './db'
+import { criarEvento, excluirEvento, expandirEventos, paraHHMM, rotuloRecorrencia, semearContextosSePreciso } from './db'
 import { useCronogramas, useEventos } from './hooks'
 import type { Evento } from './types'
 
@@ -49,10 +49,26 @@ export function AgendaPage() {
   const [gerCron, setGerCron] = useState(false)
   const [gerContextos, setGerContextos] = useState(false)
   const [abrirId, setAbrirId] = useState<string | null>(null)
+  const recemCriado = useRef<string | null>(null)
 
   useEffect(() => {
     semearContextosSePreciso()
   }, [])
+
+  /** Fecha o editor de evento; descarta o evento recém-criado se ficou sem
+   *  nenhuma informação (nome padrão e nada preenchido). */
+  function fecharEditorEvento() {
+    const e = editorEvento && evs.find((x) => x.id === editorEvento.id)
+    if (e && recemCriado.current === e.id) {
+      const vazio =
+        (!e.titulo || e.titulo === 'Novo evento') &&
+        !e.local && !e.descricao && !(e.participantes?.length) &&
+        !e.custoCentavos && !e.diaInteiro && !e.recorrencia && !e.cronogramaId
+      if (vazio) excluirEvento(e.id)
+    }
+    recemCriado.current = null
+    setEditorEvento(null)
+  }
 
   const evs = useMemo(() => eventos ?? [], [eventos])
   const tks = useMemo(() => tarefas ?? [], [tarefas])
@@ -105,6 +121,7 @@ export function AgendaPage() {
 
   async function aoCriar(data: string, ini: number, fim: number) {
     const id = await criarEvento({ titulo: '', data, inicio: paraHHMM(ini), fim: paraHHMM(fim) })
+    recemCriado.current = id
     setAbrirId(id)
   }
 
@@ -194,6 +211,7 @@ export function AgendaPage() {
           onIrSemana={() => setModo('semana')}
           onIrHoje={() => setAncora(hojeISO())}
           onAbrirContextos={() => setGerContextos(true)}
+          mostrarPainel={modo === '3dias'}
         />
       )}
       {pronto && modo === 'mes' && (
@@ -204,7 +222,7 @@ export function AgendaPage() {
         <GanttCronogramas dias={diasMes} eventos={evs} cronogramas={crs} onAbrirEvento={setEditorEvento} onGerenciar={() => setGerCron(true)} />
       )}
 
-      {eventoAtual && <EditorEvento evento={eventoAtual} cronogramas={crs} onFechar={() => setEditorEvento(null)} />}
+      {eventoAtual && <EditorEvento evento={eventoAtual} cronogramas={crs} onFechar={fecharEditorEvento} />}
       <TaskEditorSheet task={tarefaAtual} projetos={ps} todas={tks} onFechar={() => setEditorTarefa(null)} />
       {gerCron && <GerenciarCronogramas cronogramas={crs} onFechar={() => setGerCron(false)} />}
       {gerContextos && <GerenciarContextos onFechar={() => setGerContextos(false)} />}
