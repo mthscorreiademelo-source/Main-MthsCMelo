@@ -1,6 +1,6 @@
 export type StatusLeitura = 'quero_ler' | 'lendo' | 'lido' | 'abandonado'
 export type TipoObra = 'livro' | 'quadrinho' | 'manga'
-export type FormatoArquivo = 'epub' | 'pdf' | 'cbz'
+export type FormatoArquivo = 'epub' | 'pdf' | 'cbz' | 'mobi'
 
 /**
  * Um item da biblioteca. Os metadados (inclusive a capa-miniatura) sincronizam

@@ -4,6 +4,7 @@ import { IconLivro, IconMais, IconUpload } from '../../../core/components/Icons'
 import { guardarArquivo, novoLivro, salvarLivro, STATUS, TIPOS } from '../db'
 import { detectarFormato, extrairMetadados, gerarMiniatura } from '../importar'
 import type { FormatoArquivo, StatusLeitura, TipoObra } from '../types'
+import { EditorTags } from './EditorTags'
 
 const CAMPO =
   'min-h-11 w-full rounded-lg border border-line bg-surface px-3 text-[15px] outline-none focus:border-muted/60'
@@ -18,6 +19,7 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
   const [status, setStatus] = useState<StatusLeitura>('quero_ler')
   const [colecao, setColecao] = useState('')
   const [numero, setNumero] = useState('')
+  const [generos, setGeneros] = useState<string[]>([])
   const [capa, setCapa] = useState<string | undefined>()
   const [paginas, setPaginas] = useState<number | undefined>()
   const [arquivo, setArquivo] = useState<File | null>(null)
@@ -70,6 +72,7 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
       status,
       colecao: colecao.trim() || undefined,
       numero: numero.trim() ? Number(numero) : undefined,
+      generos: generos.length ? generos : undefined,
       capa,
       paginasTotais: paginas,
       temArquivo: !!arquivo,
@@ -140,7 +143,7 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
       <input
         ref={inputArquivo}
         type="file"
-        accept=".epub,.pdf,.cbz,.zip,application/epub+zip,application/pdf"
+        accept=".epub,.pdf,.cbz,.zip,.mobi,.azw,.azw3,application/epub+zip,application/pdf"
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0]
@@ -223,6 +226,11 @@ export function AdicionarLivro({ onFechar }: { onFechar: () => void }) {
             ))}
           </select>
         </label>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[13px] font-medium text-muted">Gêneros / tags</span>
+        <EditorTags tags={generos} onChange={setGeneros} rotulo="Gêneros" placeholder="ex.: ficção, fantasia" />
       </div>
 
       {erro && <p className="text-[13px] text-red-500">{erro}</p>}

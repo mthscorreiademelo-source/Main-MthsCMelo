@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { IconAbrir, IconLivro, IconLixeira, IconSetaEsquerda, IconUpload } from '../../core/components/Icons'
 import { rotuloData } from '../../core/dates'
+import { EditorTags } from './components/EditorTags'
 import { EstrelasNota } from './components/EstrelasNota'
 import { apagarArquivo, guardarArquivo, removerLivro, rotuloTipo, salvarLivro, STATUS } from './db'
 import { useLivro } from './hooks'
@@ -25,7 +26,6 @@ export function LivroPage() {
   const [titulo, setTitulo] = useState('')
   const [autor, setAutor] = useState('')
   const [resenha, setResenha] = useState('')
-  const [generos, setGeneros] = useState('')
   const [colecao, setColecao] = useState('')
   const inputCapa = useRef<HTMLInputElement>(null)
   const inputArquivo = useRef<HTMLInputElement>(null)
@@ -37,7 +37,6 @@ export function LivroPage() {
     setTitulo(livro.titulo)
     setAutor(livro.autor ?? '')
     setResenha(livro.resenha ?? '')
-    setGeneros((livro.generos ?? []).join(', '))
     setColecao(livro.colecao ?? '')
   }, [livro?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -241,37 +240,35 @@ export function LivroPage() {
         </label>
       </div>
 
-      {/* Gêneros */}
-      <label className="flex flex-col gap-1.5">
+      {/* Gêneros (tags) */}
+      <div className="flex flex-col gap-1.5">
         <span className="text-[13px] font-medium text-muted">Gêneros / tags</span>
-        <input
-          value={generos}
-          onChange={(e) => setGeneros(e.target.value)}
-          onBlur={() =>
-            salvar({
-              generos: generos
-                .split(',')
-                .map((g) => g.trim())
-                .filter(Boolean),
-            })
-          }
-          placeholder="ex.: ficção, fantasia"
-          className={CAMPO}
+        <EditorTags
+          tags={livro.generos ?? []}
+          onChange={(t) => salvar({ generos: t.length ? t : undefined })}
+          rotulo="Gêneros"
+          placeholder="ex.: ficção, fantasia — Enter para adicionar"
         />
-      </label>
+      </div>
 
       {/* Arquivo para leitura (anexar / ler / trocar / remover) */}
       <div className="flex flex-col gap-2">
         <span className="text-[13px] font-medium text-muted">Arquivo para leitura</span>
         {livro.temArquivo ? (
           <>
-            <Link
-              to={`/biblioteca/${livro.id}/ler`}
-              className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-ink text-[15px] font-medium text-surface transition-opacity hover:opacity-90"
-            >
-              <IconAbrir width={18} height={18} />
-              {(livro.progresso ?? 0) > 0 ? 'Continuar lendo' : 'Ler'}
-            </Link>
+            {livro.formato === 'mobi' ? (
+              <p className="rounded-xl border border-line bg-surface/60 px-3 py-3 text-center text-[13px] text-muted">
+                MOBI — leitura ainda não suportada aqui. Converta para EPUB ou PDF para ler.
+              </p>
+            ) : (
+              <Link
+                to={`/biblioteca/${livro.id}/ler`}
+                className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-ink text-[15px] font-medium text-surface transition-opacity hover:opacity-90"
+              >
+                <IconAbrir width={18} height={18} />
+                {(livro.progresso ?? 0) > 0 ? 'Continuar lendo' : 'Ler'}
+              </Link>
+            )}
             <div className="flex items-center justify-between gap-2">
               <p className="min-w-0 flex-1 truncate text-[12px] text-muted/80">
                 {livro.arquivoNome} ({livro.formato?.toUpperCase()} · {tamanhoLegivel(livro.arquivoTamanho)})
@@ -314,7 +311,7 @@ export function LivroPage() {
         <input
           ref={inputArquivo}
           type="file"
-          accept=".epub,.pdf,.cbz,.zip,application/epub+zip,application/pdf"
+          accept=".epub,.pdf,.cbz,.zip,.mobi,.azw,.azw3,application/epub+zip,application/pdf"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0]

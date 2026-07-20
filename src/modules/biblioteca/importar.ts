@@ -16,6 +16,7 @@ export function detectarFormato(arquivo: File): FormatoArquivo | null {
   if (nome.endsWith('.epub')) return 'epub'
   if (nome.endsWith('.pdf')) return 'pdf'
   if (nome.endsWith('.cbz') || nome.endsWith('.zip')) return 'cbz'
+  if (nome.endsWith('.mobi') || nome.endsWith('.azw') || nome.endsWith('.azw3')) return 'mobi'
   if (arquivo.type === 'application/pdf') return 'pdf'
   if (arquivo.type === 'application/epub+zip') return 'epub'
   return null
@@ -149,6 +150,8 @@ export async function extrairMetadados(arquivo: File): Promise<MetadadosLivro | 
   const formato = detectarFormato(arquivo)
   if (!formato) return null
   if (formato === 'pdf') return metadadosPdf(arquivo)
+  // MOBI/AZW: sem parser no navegador — cataloga pelo nome do arquivo.
+  if (formato === 'mobi') return { titulo: semExtensao(arquivo.name), formato: 'mobi', tipo: 'livro' }
   const { default: JSZip } = await import('jszip')
   if (formato === 'epub') return metadadosEpub(arquivo, JSZip)
   return metadadosCbz(arquivo, JSZip)
