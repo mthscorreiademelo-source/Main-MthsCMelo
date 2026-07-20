@@ -232,11 +232,13 @@ function ruido(x: number, y: number): number {
 }
 
 /**
- * Renderiza o lápis como muitas FIBRAS finas de grafite que correm ao longo do
- * traço (na direção do movimento), espalhadas pela largura e quebradas em
- * tracejado — como grafite pegando só no "dente" do papel. Tudo é geometria
- * determinística (semeada pela posição), então o resultado é idêntico enquanto
- * se desenha e depois de concluir: não há realinhamento nem "pulo".
+ * Renderiza o lápis em duas camadas: um CORPO translúcido suave (dá a mancha
+ * contínua e o "acúmulo" ao repassar no mesmo lugar) + um GRÃO fino pontilhado
+ * por cima (o "dente" do papel), mais denso no centro e esparso nas bordas.
+ *
+ * O grão é semeado pela posição de cada grão no mundo — geometria determinística
+ * — então fica idêntico enquanto se desenha e depois de concluir (sem "pulo"),
+ * e por ser fino lê como tooth de grafite em qualquer zoom, sem virar minhocas.
  */
 function desenharLapis(
   ctx: CanvasRenderingContext2D,
@@ -247,51 +249,51 @@ function desenharLapis(
   cor: string,
 ) {
   const n = pts.length
-  // normal unitária por ponto (perpendicular à direção do traço)
-  const nx: number[] = new Array(n)
-  const ny: number[] = new Array(n)
-  for (let i = 0; i < n; i++) {
-    const a = pts[Math.max(0, i - 1)]
-    const b = pts[Math.min(n - 1, i + 1)]
+  ctx.fillStyle = cor
+
+  // 1) Corpo: mancha translúcida (encolhida) — some ao repassar acumula.
+  ctx.globalAlpha = alpha * 0.2
+  ctx.fill(contornoDoTraco(pts, raios.map((r) => r * 0.82)))
+
+  // 2) Grão: poeira de grafite ao longo do traço, densa no centro, rala na borda.
+  const passo = Math.max(0.8, base * 0.18)
+  const trans = Math.max(2, Math.min(18, Math.round(base * 0.95)))
+  for (let i = 0; i < n - 1; i++) {
+    const a = pts[i]
+    const b = pts[i + 1]
     const dx = b.x - a.x
     const dy = b.y - a.y
-    const len = Math.hypot(dx, dy) || 1
-    nx[i] = -dy / len
-    ny[i] = dx / len
-  }
-
-  ctx.strokeStyle = cor
-  ctx.lineCap = 'round'
-  ctx.lineJoin = 'round'
-
-  const F = Math.max(8, Math.min(34, Math.round(base * 2.1)))
-  for (let f = 0; f < F; f++) {
-    const semente = f * 13.31 + 0.7
-    // posição transversal da fibra dentro da largura (-1..1)
-    const frac = F === 1 ? 0 : (f / (F - 1)) * 2 - 1
-    ctx.beginPath()
-    for (let i = 0; i < n; i++) {
-      const r = raios[i]
-      // leve ondulação da fibra ao longo do caminho (quebra o paralelismo)
-      const ond = (ruido(i * 0.6 + semente, pts[i].x * 0.5) - 0.5) * r * 0.4
-      const off = frac * r * 0.98 + ond
-      const x = pts[i].x + nx[i] * off
-      const y = pts[i].y + ny[i] * off
-      if (i === 0) ctx.moveTo(x, y)
-      else ctx.lineTo(x, y)
+    const seg = Math.hypot(dx, dy)
+    if (seg < 1e-3) continue
+    const tx = dx / seg
+    const ty = dy / seg
+    const npx = -ty
+    const npy = tx
+    const passos = Math.max(1, Math.round(seg / passo))
+    for (let s = 0; s < passos; s++) {
+      const t = s / passos
+      const px = a.x + dx * t
+      const py = a.y + dy * t
+      const r = raios[i] + (raios[i + 1] - raios[i]) * t
+      for (let k = 0; k < trans; k++) {
+        const h1 = ruido(i * 3.1 + s * 0.37 + k * 5.9, px * 0.7 + 0.3)
+        const h2 = ruido(py * 0.7 + 0.1, i * 1.3 + s * 0.71 + k * 2.3)
+        const h3 = ruido(k * 7.7 + s * 1.9 + 0.5, px * 0.31 + py * 0.11)
+        const frac = h1 * 2 - 1 // posição transversal −1..1
+        // vãos de papel: mais buracos na borda (|frac|→1), poucos no centro
+        if (h3 > 0.92 - 0.44 * Math.abs(frac)) continue
+        const off = frac * r
+        const jt = (h2 - 0.5) * passo
+        const gx = px + npx * off + tx * jt
+        const gy = py + npy * off + ty * jt
+        const raio = 0.32 + h2 * 0.5
+        ctx.globalAlpha = Math.min(1, alpha * (0.26 + 0.55 * h1))
+        ctx.beginPath()
+        ctx.arc(gx, gy, raio, 0, Math.PI * 2)
+        ctx.fill()
+      }
     }
-    // grão: cada fibra é um tracejado irregular → pontilhado do papel
-    const d1 = base * (0.55 + ruido(semente, 1.1) * 1.7)
-    const d2 = base * (0.08 + ruido(semente, 2.2) * 0.4)
-    ctx.setLineDash([d1, d2])
-    ctx.lineDashOffset = ruido(semente, 3.3) * 40
-    // núcleo mais escuro (pressão), bordas mais claras e granuladas
-    const nucleo = 0.5 + 0.5 * (1 - Math.abs(frac))
-    ctx.globalAlpha = Math.min(1, alpha * (0.2 + 0.34 * ruido(semente, 4.4)) * nucleo)
-    ctx.lineWidth = Math.max(0.5, base * (0.07 + 0.12 * ruido(semente, 5.5)))
-    ctx.stroke()
   }
-  ctx.setLineDash([])
 }
 
 export function desenharTraco(ctx: CanvasRenderingContext2D, traco: Traco) {
