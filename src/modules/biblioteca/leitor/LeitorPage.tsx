@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { IconChevron, IconFechar } from '../../../core/components/Icons'
-import { obterArquivo, salvarLivro } from '../db'
-import { useLivro } from '../hooks'
+import { IconChevron, IconEtiqueta, IconFechar } from '../../../core/components/Icons'
+import { CORES_DESTAQUE, criarDestaque, criarNota, obterArquivo, salvarLivro } from '../db'
+import { useDestaquesLivro, useLivro, useNotasLivro } from '../hooks'
 import { LeitorEpub } from './LeitorEpub'
 import { LeitorPaginado } from './LeitorPaginado'
 import { ORDEM_TEMAS, TEMAS, type Controles, type TemaLeitor } from './temas'
@@ -26,6 +26,29 @@ export function LeitorPage() {
   const [preparo, setPreparo] = useState<Preparo>({ modo: 'carregando' })
   const [chrome, setChrome] = useState(true)
   const [pct, setPct] = useState(0)
+  const destaques = useDestaquesLivro(id) ?? []
+  const notas = useNotasLivro(id) ?? []
+  const [selecao, setSelecao] = useState<{ cfi: string; texto: string; capitulo?: string } | null>(null)
+  const [notaTexto, setNotaTexto] = useState<string | null>(null)
+  const [irParaCfi, setIrParaCfi] = useState<string | undefined>(undefined)
+  const [painel, setPainel] = useState(false)
+
+  const onSelecao = useCallback((cfi: string, texto: string, capitulo?: string) => {
+    setSelecao({ cfi, texto, capitulo })
+    setChrome(false)
+  }, [])
+
+  async function destacar(cor: string) {
+    if (!selecao || !id) return
+    await criarDestaque({ livroId: id, trecho: selecao.texto, cfi: selecao.cfi, capitulo: selecao.capitulo, cor })
+    setSelecao(null)
+  }
+  async function salvarNota() {
+    if (!selecao || !id || !notaTexto?.trim()) return
+    await criarNota({ livroId: id, resumo: notaTexto.trim(), trecho: selecao.texto, cfi: selecao.cfi, capitulo: selecao.capitulo })
+    setNotaTexto(null)
+    setSelecao(null)
+  }
 
   const [tema, setTema] = useState<TemaLeitor>(
     () => (localStorage.getItem(CHAVE_TEMA) as TemaLeitor) || 'claro',
@@ -190,6 +213,10 @@ export function LeitorPage() {
               inicial={livro?.localizacao}
               onProgresso={onProgresso}
               registrarControles={registrarControles}
+              destaques={destaques}
+              onSelecao={onSelecao}
+              irParaCfi={irParaCfi ?? livro?.localizacao}
+              onAbrirDestaque={() => setPainel(true)}
             />
           </div>
         )}
@@ -243,6 +270,18 @@ export function LeitorPage() {
               </button>
             </div>
           )}
+          {livro?.formato === 'epub' && (
+            <button
+              onClick={() => setPainel(true)}
+              className="relative flex size-9 items-center justify-center rounded-full hover:bg-black/10"
+              aria-label="Marcadores"
+            >
+              <IconEtiqueta width={17} height={17} />
+              {destaques.length + notas.length > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold text-white">{destaques.length + notas.length}</span>
+              )}
+            </button>
+          )}
           <button
             onClick={() =>
               setTema((t) => ORDEM_TEMAS[(ORDEM_TEMAS.indexOf(t) + 1) % ORDEM_TEMAS.length])
@@ -282,6 +321,62 @@ export function LeitorPage() {
           >
             <IconChevron width={18} height={18} style={{ transform: 'rotate(-90deg)' }} />
           </button>
+        </div>
+      )}
+
+      {/* Barra de seleção → destacar / criar nota */}
+      {selecao && notaTexto === null && (
+        <div className="absolute inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 p-4">
+          <div className="flex items-center gap-2 rounded-2xl border border-line bg-surface px-3 py-2 shadow-lg">
+            {CORES_DESTAQUE.map((c) => (
+              <button key={c} onClick={() => destacar(c)} className="size-7 rounded-full ring-1 ring-black/10 transition-transform hover:scale-110" style={{ backgroundColor: c }} aria-label={`Destacar ${c}`} />
+            ))}
+            <span className="mx-0.5 h-6 w-px bg-line" />
+            <button onClick={() => setNotaTexto('')} className="rounded-full bg-ink px-3 py-1.5 text-[13px] font-medium text-surface">✎ Nota</button>
+            <button onClick={() => setSelecao(null)} className="rounded-full px-2 py-1.5 text-[13px] text-muted hover:text-ink" aria-label="Cancelar">✕</button>
+          </div>
+        </div>
+      )}
+
+      {/* Compositor de nota */}
+      {selecao && notaTexto !== null && (
+        <div className="absolute inset-x-0 bottom-0 z-40 flex flex-col gap-2 border-t border-line bg-surface p-4 text-ink">
+          <p className="line-clamp-2 border-l-2 border-accent pl-2 text-[13px] italic text-muted">"{selecao.texto}"</p>
+          <textarea autoFocus value={notaTexto} onChange={(e) => setNotaTexto(e.target.value)} rows={3} placeholder="Sua anotação…" className="w-full resize-none rounded-lg border border-line bg-bg px-3 py-2 text-[14px] outline-none focus:border-muted/60" />
+          <div className="flex justify-end gap-2">
+            <button onClick={() => { setNotaTexto(null); setSelecao(null) }} className="rounded-full px-3 py-1.5 text-[13px] text-muted">Cancelar</button>
+            <button onClick={salvarNota} className="rounded-full bg-ink px-4 py-1.5 text-[13px] font-medium text-surface">Salvar nota</button>
+          </div>
+        </div>
+      )}
+
+      {/* Painel de marcadores (destaques + notas) */}
+      {painel && (
+        <div className="absolute inset-0 z-50 flex">
+          <button className="flex-1 bg-black/30" aria-label="Fechar" onClick={() => setPainel(false)} />
+          <div className="flex w-80 max-w-[85%] flex-col bg-surface text-ink shadow-xl">
+            <div className="flex items-center justify-between border-b border-line px-4 py-3">
+              <span className="text-[14px] font-semibold">Marcadores</span>
+              <button onClick={() => setPainel(false)} aria-label="Fechar"><IconFechar width={17} height={17} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3">
+              {destaques.length === 0 && notas.length === 0 && <p className="p-4 text-center text-[13px] text-muted">Selecione um trecho na leitura para destacar ou anotar.</p>}
+              {destaques.length > 0 && <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Destaques</div>}
+              {destaques.sort((a, b) => b.criadoEm - a.criadoEm).map((d) => (
+                <button key={d.id} onClick={() => { if (d.cfi) setIrParaCfi(d.cfi); setPainel(false) }} className="mb-2 block w-full rounded-lg border-l-4 bg-hover/50 p-2.5 text-left" style={{ borderColor: d.cor }}>
+                  <span className="line-clamp-3 text-[13px]">{d.trecho}</span>
+                  {d.capitulo && <span className="mt-1 block text-[11px] text-muted">{d.capitulo}</span>}
+                </button>
+              ))}
+              {notas.length > 0 && <div className="mb-1 mt-3 text-[11px] font-semibold uppercase tracking-wide text-muted">Notas</div>}
+              {notas.sort((a, b) => b.criadoEm - a.criadoEm).map((n) => (
+                <button key={n.id} onClick={() => { if (n.cfi) setIrParaCfi(n.cfi); setPainel(false) }} className="mb-2 block w-full rounded-lg border border-line p-2.5 text-left">
+                  {n.trecho && <span className="mb-1 line-clamp-2 border-l-2 border-accent pl-1.5 text-[12px] italic text-muted">"{n.trecho}"</span>}
+                  <span className="line-clamp-3 text-[13px]">{n.resumo}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

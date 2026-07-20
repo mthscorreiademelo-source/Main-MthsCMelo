@@ -4,6 +4,7 @@ import { IconAbrir, IconLivro, IconLixeira, IconSetaEsquerda, IconUpload } from 
 import { rotuloData } from '../../core/dates'
 import { EditorTags } from './components/EditorTags'
 import { EstrelasNota } from './components/EstrelasNota'
+import { LivroNotas } from './components/LivroNotas'
 import { apagarArquivo, guardarArquivo, removerLivro, rotuloTipo, salvarLivro, STATUS } from './db'
 import { useLivro } from './hooks'
 import { detectarFormato, extrairMetadados, gerarMiniatura } from './importar'
@@ -31,6 +32,7 @@ export function LivroPage() {
   const inputArquivo = useRef<HTMLInputElement>(null)
   const [anexando, setAnexando] = useState(false)
   const [erroArq, setErroArq] = useState<string | null>(null)
+  const [aba, setAba] = useState<'livro' | 'notas' | 'destaques'>('livro')
 
   useEffect(() => {
     if (!livro) return
@@ -113,6 +115,16 @@ export function LivroPage() {
         <IconSetaEsquerda width={16} height={16} />
         {livro.compiladoId ? 'Compilado' : 'Biblioteca'}
       </Link>
+
+      <div className="flex gap-1 border-b border-line">
+        {([['livro', 'Visão'], ['notas', 'Notas'], ['destaques', 'Destaques']] as const).map(([id2, r]) => (
+          <button key={id2} onClick={() => setAba(id2)} className={`border-b-2 px-3 py-1.5 text-[13.5px] font-medium transition-colors ${aba === id2 ? 'border-accent text-ink' : 'border-transparent text-muted hover:text-ink'}`}>{r}</button>
+        ))}
+      </div>
+
+      {aba === 'notas' && <LivroNotas livroId={livro.id} modo="notas" />}
+      {aba === 'destaques' && <LivroNotas livroId={livro.id} modo="destaques" />}
+      {aba === 'livro' && (<>
 
       <div className="flex gap-4">
         <div className="flex w-28 shrink-0 flex-col gap-1.5">
@@ -341,6 +353,7 @@ export function LivroPage() {
         <IconLixeira width={16} height={16} />
         Remover
       </button>
+      </>)}
     </div>
   )
 }

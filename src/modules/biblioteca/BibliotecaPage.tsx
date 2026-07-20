@@ -1,273 +1,262 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 import { EmptyState } from '../../core/components/EmptyState'
 import { IconLivro, IconMais } from '../../core/components/Icons'
-import { CartaoLivro } from './components/CartaoLivro'
 import { AdicionarLivro } from './components/AdicionarLivro'
+import { CartaoLivro } from './components/CartaoLivro'
+import { Estante } from './components/Estante'
 import { statusDerivadoSerie } from './db'
-import { useLivros } from './hooks'
-import type { Livro, StatusLeitura } from './types'
+import { useDestaques, useLivros, useNotas } from './hooks'
+import type { Livro } from './types'
 
-type Filtro = 'todos' | StatusLeitura
-
-type Criterio = 'atualizado' | 'adicionado' | 'titulo' | 'autor' | 'ano' | 'nota'
-
-const CRITERIOS: { valor: Criterio; rotulo: string }[] = [
-  { valor: 'atualizado', rotulo: 'Recentes' },
-  { valor: 'adicionado', rotulo: 'Adição' },
-  { valor: 'titulo', rotulo: 'Título' },
-  { valor: 'autor', rotulo: 'Autor' },
-  { valor: 'ano', rotulo: 'Ano' },
-  { valor: 'nota', rotulo: 'Nota' },
+type Aba = 'geral' | 'estante' | 'leituras' | 'notas' | 'autores' | 'colecoes'
+const ABAS: { id: Aba; rotulo: string }[] = [
+  { id: 'geral', rotulo: 'Visão geral' },
+  { id: 'estante', rotulo: 'Estante' },
+  { id: 'leituras', rotulo: 'Leituras' },
+  { id: 'notas', rotulo: 'Notas' },
+  { id: 'autores', rotulo: 'Autores' },
+  { id: 'colecoes', rotulo: 'Coleções' },
 ]
 
-/** Comparador base (crescente) por critério; a direção é aplicada fora. */
-function compararPor(criterio: Criterio, a: Livro, b: Livro): number {
-  let d: number
-  switch (criterio) {
-    case 'adicionado':
-      d = a.adicionadoEm - b.adicionadoEm
-      break
-    case 'titulo':
-      d = a.titulo.localeCompare(b.titulo, 'pt', { sensitivity: 'base' })
-      break
-    case 'autor':
-      d = (a.autor ?? '~').localeCompare(b.autor ?? '~', 'pt', { sensitivity: 'base' })
-      break
-    case 'ano':
-      d = (a.ano ?? 0) - (b.ano ?? 0)
-      break
-    case 'nota':
-      d = (a.nota ?? 0) - (b.nota ?? 0)
-      break
-    default:
-      d = (a.atualizadoEm ?? a.adicionadoEm) - (b.atualizadoEm ?? b.adicionadoEm)
-  }
-  return d || a.titulo.localeCompare(b.titulo, 'pt', { sensitivity: 'base' })
+const CARTAO = 'rounded-2xl border border-line bg-surface/50 p-4'
+const ROTULO = 'text-[13px] font-semibold'
+
+function tempoRestante(l: Livro): string | null {
+  if (!l.paginasTotais) return null
+  const restantes = Math.max(0, l.paginasTotais * (1 - (l.progresso ?? 0) / 100))
+  const min = Math.round(restantes * 1.9)
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return h ? `~${h}h ${m}min de leitura restantes` : `~${m}min de leitura restantes`
 }
-
-const FILTROS: { valor: Filtro; rotulo: string }[] = [
-  { valor: 'todos', rotulo: 'Todos' },
-  { valor: 'lendo', rotulo: 'Lendo' },
-  { valor: 'quero_ler', rotulo: 'Quero ler' },
-  { valor: 'lido', rotulo: 'Lido' },
-  { valor: 'abandonado', rotulo: 'Abandonei' },
-]
-
-const SENTINELA_AVULSO = ' avulsos'
 
 export function BibliotecaPage() {
   const livros = useLivros()
-  const [filtro, setFiltro] = useState<Filtro>('todos')
-  const [genero, setGenero] = useState<string | null>(null)
-  const [busca, setBusca] = useState('')
-  const [agrupar, setAgrupar] = useState(false)
+  const notas = useNotas() ?? []
+  const destaques = useDestaques() ?? []
+  const [aba, setAba] = useState<Aba>('geral')
+  const [generoEstante, setGeneroEstante] = useState<string | null>(null)
   const [adicionando, setAdicionando] = useState(false)
-  const [ordenarPor, setOrdenarPor] = useState<Criterio>(
-    () => (localStorage.getItem('lume:bib:sort') as Criterio) || 'atualizado',
+
+  const ls = useMemo(() => (livros ?? []).filter((l) => !l.compiladoId), [livros])
+  const tituloDe = (id: string) => (livros ?? []).find((l) => l.id === id)?.titulo ?? '—'
+
+  const lendo = useMemo(
+    () => ls.filter((l) => (l.ehCompilado ? false : l.status === 'lendo')).sort((a, b) => (b.atualizadoEm ?? b.adicionadoEm) - (a.atualizadoEm ?? a.adicionadoEm)),
+    [ls],
   )
-  const [asc, setAsc] = useState(() => localStorage.getItem('lume:bib:sortDir') === 'asc')
-  useEffect(() => localStorage.setItem('lume:bib:sort', ordenarPor), [ordenarPor])
-  useEffect(() => localStorage.setItem('lume:bib:sortDir', asc ? 'asc' : 'desc'), [asc])
+  const leituraAtual = lendo[0]
+  const jornada = useMemo(() => {
+    const querLer = ls.filter((l) => (l.ehCompilado ? statusDerivadoSerie([]) : l.status) === 'quero_ler')
+    return [...lendo, ...querLer].slice(0, 5)
+  }, [ls, lendo])
 
-  // Ao trocar o critério, escolhe uma direção sensata (texto A–Z; resto ↓).
-  function mudarCriterio(c: Criterio) {
-    setOrdenarPor(c)
-    setAsc(c === 'titulo' || c === 'autor')
-  }
-
-  // volumes por compilado → nº e status derivado (o nível de baixo manda)
-  const volumesPorSerie = useMemo(() => {
-    const m = new Map<string, Livro[]>()
-    for (const l of livros ?? []) {
-      if (!l.compiladoId) continue
-      const arr = m.get(l.compiladoId) ?? []
-      arr.push(l)
-      m.set(l.compiladoId, arr)
-    }
-    return m
-  }, [livros])
-  const contagemVol = (id: string) => volumesPorSerie.get(id)?.length ?? 0
-  // status efetivo: séries derivam dos volumes; livros usam o próprio
-  const statusEfetivo = (l: Livro) =>
-    l.ehCompilado ? statusDerivadoSerie(volumesPorSerie.get(l.id) ?? []) : l.status
-
-  // gêneros da estante (ignora volumes, que ficam dentro dos compilados)
   const generos = useMemo(() => {
     const conta = new Map<string, number>()
-    for (const l of livros ?? []) {
-      if (l.compiladoId) continue
-      for (const g of l.generos ?? []) conta.set(g, (conta.get(g) ?? 0) + 1)
-    }
+    for (const l of ls) for (const g of l.generos ?? []) conta.set(g, (conta.get(g) ?? 0) + 1)
     return [...conta.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-  }, [livros])
+  }, [ls])
 
-  const visiveis = useMemo(() => {
-    const b = busca.trim().toLowerCase()
-    return [...(livros ?? [])]
-      // volumes de um compilado não aparecem na estante — só dentro dele
-      .filter((l) => !l.compiladoId)
-      .filter((l) => (filtro === 'todos' ? true : statusEfetivo(l) === filtro))
-      .filter((l) => !genero || (l.generos ?? []).includes(genero))
-      .filter(
-        (l) =>
-          !b ||
-          l.titulo.toLowerCase().includes(b) ||
-          (l.autor ?? '').toLowerCase().includes(b) ||
-          (l.colecao ?? '').toLowerCase().includes(b) ||
-          (l.generos ?? []).some((g) => g.toLowerCase().includes(b)),
-      )
-      .sort((a, b2) => (asc ? 1 : -1) * compararPor(ordenarPor, a, b2))
-  }, [livros, filtro, genero, busca, ordenarPor, asc])
+  const notasRecentes = [...notas].sort((a, b) => b.criadoEm - a.criadoEm).slice(0, 4)
+  const destaquesRecentes = [...destaques].sort((a, b) => b.criadoEm - a.criadoEm).slice(0, 3)
 
-  const grupos = useMemo(() => {
-    if (!agrupar) return null
-    const mapa = new Map<string, typeof visiveis>()
-    for (const l of visiveis) {
-      const k = l.colecao?.trim() || SENTINELA_AVULSO
-      const arr = mapa.get(k) ?? []
-      arr.push(l)
-      mapa.set(k, arr)
-    }
-    const entradas = [...mapa.entries()].map(([k, arr]) => ({
-      nome: k === SENTINELA_AVULSO ? 'Avulsos' : k,
-      avulso: k === SENTINELA_AVULSO,
-      livros: [...arr].sort(
-        (a, b) => (a.numero ?? 9999) - (b.numero ?? 9999) || a.titulo.localeCompare(b.titulo),
-      ),
-    }))
-    entradas.sort((a, b) =>
-      a.avulso === b.avulso ? a.nome.localeCompare(b.nome) : a.avulso ? 1 : -1,
-    )
-    return entradas
-  }, [visiveis, agrupar])
+  const porAutor = useMemo(() => {
+    const m = new Map<string, Livro[]>()
+    for (const l of ls) { const a = l.autor?.trim() || 'Sem autor'; const arr = m.get(a) ?? []; arr.push(l); m.set(a, arr) }
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+  }, [ls])
 
-  const vazio = livros && (livros.length === 0 || visiveis.length === 0)
+  const linkLivro = (l: Livro) => (l.temArquivo ? `/biblioteca/${l.id}/ler` : `/biblioteca/${l.id}`)
+
+  function irColecao(g: string) { setGeneroEstante(g); setAba('estante') }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Biblioteca</h1>
-        <button
-          onClick={() => setAdicionando(true)}
-          className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full bg-ink px-4 text-[14px] font-medium text-surface transition-opacity hover:opacity-90"
-        >
-          <IconMais width={16} height={16} />
-          Adicionar
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-[22px] font-bold">Biblioteca</h1>
+        <button onClick={() => setAdicionando(true)} className="flex min-h-9 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[14px] font-medium text-white">
+          <IconMais width={16} height={16} /> Novo
         </button>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <input
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar por título, autor ou gênero…"
-          className="min-h-10 w-full rounded-lg border border-line bg-surface px-3 text-[14px] outline-none focus:border-muted/60"
-        />
-        <div className="flex flex-wrap items-center gap-1.5">
-          {FILTROS.map((f) => (
-            <button
-              key={f.valor}
-              onClick={() => setFiltro(f.valor)}
-              className={`min-h-8 cursor-pointer rounded-full px-3 text-[13px] font-medium transition-colors ${
-                filtro === f.valor ? 'bg-ink text-surface' : 'bg-hover text-muted hover:text-ink'
-              }`}
-            >
-              {f.rotulo}
-            </button>
-          ))}
-          <span className="flex-1" />
-          {/* Ordenar por + direção */}
-          <select
-            value={ordenarPor}
-            onChange={(e) => mudarCriterio(e.target.value as Criterio)}
-            aria-label="Ordenar por"
-            className="min-h-8 cursor-pointer rounded-full bg-hover px-3 text-[13px] font-medium text-muted outline-none transition-colors hover:text-ink"
-          >
-            {CRITERIOS.map((c) => (
-              <option key={c.valor} value={c.valor}>
-                {c.rotulo}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={() => setAsc((v) => !v)}
-            aria-label={asc ? 'Ordem crescente' : 'Ordem decrescente'}
-            title={asc ? 'Crescente' : 'Decrescente'}
-            className="flex min-h-8 w-8 items-center justify-center rounded-full bg-hover text-[14px] font-semibold text-muted transition-colors hover:text-ink"
-          >
-            {asc ? '↑' : '↓'}
-          </button>
-          <button
-            onClick={() => setAgrupar((v) => !v)}
-            className={`min-h-8 cursor-pointer rounded-full px-3 text-[13px] font-medium transition-colors ${
-              agrupar ? 'bg-ink text-surface' : 'bg-hover text-muted hover:text-ink'
-            }`}
-          >
-            Por coleção
-          </button>
-        </div>
-
-        {/* Filtro por gênero (tags) */}
-        {generos.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[12px] font-medium text-muted/70">Gêneros:</span>
-            {generos.map(([g, n]) => (
-              <button
-                key={g}
-                onClick={() => setGenero((atual) => (atual === g ? null : g))}
-                className={`min-h-7 cursor-pointer rounded-full px-2.5 text-[12px] font-medium transition-colors ${
-                  genero === g ? 'bg-ink text-surface' : 'bg-hover text-muted hover:text-ink'
-                }`}
-              >
-                {g} <span className="opacity-60">{n}</span>
-              </button>
-            ))}
-            {genero && (
-              <button
-                onClick={() => setGenero(null)}
-                className="min-h-7 cursor-pointer px-1.5 text-[12px] text-muted underline-offset-2 hover:underline"
-              >
-                limpar
-              </button>
-            )}
-          </div>
-        )}
+      <div className="-mx-1 flex gap-1 overflow-x-auto border-b border-line px-1">
+        {ABAS.map((a) => (
+          <button key={a.id} onClick={() => setAba(a.id)} className={`shrink-0 border-b-2 px-3 py-2 text-[14px] font-medium transition-colors ${aba === a.id ? 'border-accent text-ink' : 'border-transparent text-muted hover:text-ink'}`}>{a.rotulo}</button>
+        ))}
       </div>
 
-      {vazio ? (
-        <EmptyState
-          icone={<IconLivro />}
-          titulo={busca || filtro !== 'todos' || genero ? 'Nada aqui' : 'Sua estante está vazia'}
-          descricao={
-            busca || filtro !== 'todos' || genero
-              ? 'Tente outro filtro ou busca.'
-              : 'Adicione um livro, quadrinho ou mangá — com ou sem o arquivo.'
-          }
-        />
-      ) : grupos ? (
-        <div className="flex flex-col gap-6">
-          {grupos.map((g) => (
-            <section key={g.nome} className="flex flex-col gap-2.5">
-              <h2 className="px-0.5 text-[13px] font-semibold text-muted">
-                {g.nome} <span className="font-normal opacity-60">· {g.livros.length}</span>
-              </h2>
-              <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-                {g.livros.map((l) => (
-                  <CartaoLivro key={l.id} livro={l} volumes={contagemVol(l.id)} status={statusEfetivo(l)} />
+      {aba === 'estante' && <Estante generoInicial={generoEstante} />}
+
+      {aba === 'geral' && (
+        <div className="flex flex-col gap-4">
+          {/* Leitura atual */}
+          {leituraAtual ? (
+            <div className={CARTAO}>
+              <span className={ROTULO}>Leitura atual</span>
+              <div className="mt-3 grid grid-cols-1 gap-5 sm:grid-cols-[auto_1fr_1fr]">
+                <Link to={linkLivro(leituraAtual)} className="mx-auto block w-32 shrink-0 sm:mx-0">
+                  <Capa livro={leituraAtual} />
+                </Link>
+                <div className="flex flex-col">
+                  <h2 className="text-[19px] font-bold leading-tight">{leituraAtual.titulo}</h2>
+                  <p className="text-[13px] text-muted">{leituraAtual.autor}</p>
+                  <div className="mt-3 text-[12px] font-semibold text-accent">{Math.round(leituraAtual.progresso ?? 0)}% concluído</div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-hover"><div className="h-full rounded-full bg-accent" style={{ width: `${leituraAtual.progresso ?? 0}%` }} /></div>
+                  <div className="mt-3 flex flex-col gap-1 text-[12.5px] text-muted">
+                    {tempoRestante(leituraAtual) && <span>🕐 {tempoRestante(leituraAtual)}</span>}
+                    {leituraAtual.iniciadoEm && <span>📅 Começado em {format(leituraAtual.iniciadoEm, "d 'de' MMM 'de' yyyy", { locale: ptBR })}</span>}
+                    {leituraAtual.paginasTotais && <span>🔖 Página {Math.round((leituraAtual.progresso ?? 0) / 100 * leituraAtual.paginasTotais)} de {leituraAtual.paginasTotais}</span>}
+                  </div>
+                </div>
+                <div className="flex flex-col justify-between gap-3">
+                  {(() => {
+                    const nota = notas.filter((n) => n.livroId === leituraAtual.id).sort((a, b) => b.criadoEm - a.criadoEm)[0]
+                    const dest = destaques.filter((d) => d.livroId === leituraAtual.id).sort((a, b) => b.criadoEm - a.criadoEm)[0]
+                    const cit = nota?.trecho || dest?.trecho || nota?.resumo
+                    return cit ? (
+                      <div>
+                        <span className="text-[26px] leading-none text-muted/40">"</span>
+                        <p className="text-[14px] italic leading-snug">{cit}</p>
+                        {(nota?.capitulo || dest?.capitulo) && <span className="mt-1 inline-block rounded bg-hover px-2 py-0.5 text-[11px] text-muted">{nota?.capitulo || dest?.capitulo}</span>}
+                      </div>
+                    ) : <div className="text-[13px] text-muted">Selecione um trecho na leitura para destacar ou anotar.</div>
+                  })()}
+                  <Link to={linkLivro(leituraAtual)} className="flex min-h-11 items-center justify-center rounded-xl bg-accent/12 text-[14px] font-semibold text-accent hover:bg-accent/20">Continuar lendo</Link>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <EmptyState icone={<IconLivro />} titulo="Nada em leitura" descricao="Comece um livro da sua estante para vê-lo aqui." />
+          )}
+
+          {/* Continue sua jornada */}
+          {jornada.length > 0 && (
+            <div className={CARTAO}>
+              <div className="mb-3 flex items-center justify-between"><span className={ROTULO}>Continue sua jornada</span><button onClick={() => setAba('leituras')} className="text-[12px] text-muted hover:text-ink">Ver todos</button></div>
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+                {jornada.map((l) => (
+                  <Link key={l.id} to={linkLivro(l)} className="flex flex-col gap-1.5">
+                    <Capa livro={l} />
+                    <div className="h-1 overflow-hidden rounded-full bg-hover"><div className="h-full rounded-full bg-accent" style={{ width: `${l.progresso ?? 0}%` }} /></div>
+                    <span className="text-[11px] text-muted">{Math.round(l.progresso ?? 0)}%</span>
+                  </Link>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Notas recentes */}
+          {notasRecentes.length > 0 && (
+            <div className={CARTAO}>
+              <div className="mb-3 flex items-center justify-between"><span className={ROTULO}>Notas recentes</span><button onClick={() => setAba('notas')} className="text-[12px] text-muted hover:text-ink">Ver todas</button></div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {notasRecentes.map((n) => (
+                  <Link key={n.id} to={`/biblioteca/${n.livroId}`} className="flex flex-col rounded-xl border border-line p-3 hover:border-muted/40">
+                    <div className="flex items-center justify-between"><span className="truncate text-[12px] font-semibold text-accent">{tituloDe(n.livroId)}</span>{n.capitulo && <span className="shrink-0 text-[11px] text-muted">{n.capitulo}</span>}</div>
+                    <p className="mt-1.5 line-clamp-3 text-[13px] leading-snug">{n.resumo || (n.trecho ? `"${n.trecho}"` : '')}</p>
+                    <span className="mt-2 text-[11px] text-muted">{format(n.criadoEm, "d MMM 'às' HH:mm", { locale: ptBR })}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Destaques recentes */}
+          {destaquesRecentes.length > 0 && (
+            <div className={CARTAO}>
+              <div className="mb-3 flex items-center justify-between"><span className={ROTULO}>Destaques recentes</span><button onClick={() => setAba('notas')} className="text-[12px] text-muted hover:text-ink">Ver todos</button></div>
+              <div className="flex flex-col divide-y divide-line/60">
+                {destaquesRecentes.map((d) => (
+                  <Link key={d.id} to={`/biblioteca/${d.livroId}`} className="flex items-center gap-3 py-2.5">
+                    <span className="h-10 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: d.cor }} />
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-2 text-[13.5px] italic">"{d.trecho}"</p>
+                      <span className="text-[11px] text-muted">{tituloDe(d.livroId)}{d.capitulo ? ` · ${d.capitulo}` : ''}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Coleções (gêneros) */}
+          {generos.length > 0 && (
+            <div className={CARTAO}>
+              <div className="mb-3 flex items-center justify-between"><span className={ROTULO}>Coleções</span><button onClick={() => setAba('colecoes')} className="text-[12px] text-muted hover:text-ink">Ver todas</button></div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-5">
+                {generos.slice(0, 5).map(([g, n]) => (
+                  <button key={g} onClick={() => irColecao(g)} className="flex flex-col items-center gap-2 rounded-xl border border-line p-4 text-center hover:border-muted/40">
+                    <span className="flex size-11 items-center justify-center rounded-full bg-accent/10 text-[19px]">📚</span>
+                    <span className="text-[13px] font-semibold leading-tight">{g}</span>
+                    <span className="text-[11px] text-muted">{n} {n === 1 ? 'livro' : 'livros'}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {aba === 'leituras' && (
+        <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+          {lendo.length === 0 && <p className="col-span-full text-[13px] text-muted">Nenhuma leitura em andamento.</p>}
+          {lendo.map((l) => <CartaoLivro key={l.id} livro={l} volumes={0} status="lendo" />)}
+        </div>
+      )}
+
+      {aba === 'notas' && (
+        <div className="flex flex-col gap-3">
+          {notas.length === 0 && destaques.length === 0 && <p className="text-[13px] text-muted">Suas notas e destaques de leitura aparecerão aqui.</p>}
+          {[...notas].sort((a, b) => b.criadoEm - a.criadoEm).map((n) => (
+            <Link key={n.id} to={`/biblioteca/${n.livroId}`} className="rounded-xl border border-line p-3 hover:border-muted/40">
+              <div className="flex items-center justify-between"><span className="text-[12px] font-semibold text-accent">{tituloDe(n.livroId)}</span><span className="text-[11px] text-muted">{format(n.criadoEm, 'dd/MM/yyyy')}</span></div>
+              {n.trecho && <p className="mt-1 border-l-2 border-accent pl-2 text-[12.5px] italic text-muted">"{n.trecho}"</p>}
+              <p className="mt-1 text-[14px]">{n.resumo}</p>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {aba === 'autores' && (
+        <div className="flex flex-col gap-4">
+          {porAutor.map(([autor, ls2]) => (
+            <section key={autor} className="flex flex-col gap-2">
+              <h2 className="text-[13px] font-semibold text-muted">{autor} <span className="font-normal opacity-60">· {ls2.length}</span></h2>
+              <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+                {ls2.map((l) => <CartaoLivro key={l.id} livro={l} volumes={0} status={l.status} />)}
               </div>
             </section>
           ))}
         </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-          {visiveis.map((l) => (
-            <CartaoLivro key={l.id} livro={l} volumes={contagemVol(l.id)} status={statusEfetivo(l)} />
+      )}
+
+      {aba === 'colecoes' && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+          {generos.length === 0 && <p className="col-span-full text-[13px] text-muted">Adicione gêneros aos seus livros para formar coleções.</p>}
+          {generos.map(([g, n]) => (
+            <button key={g} onClick={() => irColecao(g)} className="flex flex-col items-center gap-2 rounded-2xl border border-line p-5 text-center hover:border-muted/40">
+              <span className="flex size-12 items-center justify-center rounded-full bg-accent/10 text-[21px]">📚</span>
+              <span className="text-[14px] font-semibold">{g}</span>
+              <span className="text-[12px] text-muted">{n} {n === 1 ? 'livro' : 'livros'}</span>
+            </button>
           ))}
         </div>
       )}
 
       {adicionando && <AdicionarLivro onFechar={() => setAdicionando(false)} />}
+    </div>
+  )
+}
+
+/** Capa do livro (imagem ou fallback com título). */
+function Capa({ livro }: { livro: Livro }) {
+  if (livro.capa) return <img src={livro.capa} alt="" className="aspect-[2/3] w-full rounded-lg object-cover shadow-sm" />
+  return (
+    <div className="flex aspect-[2/3] w-full flex-col items-center justify-center rounded-lg bg-hover p-2 text-center shadow-sm">
+      <span className="line-clamp-4 text-[11px] font-semibold">{livro.titulo}</span>
     </div>
   )
 }

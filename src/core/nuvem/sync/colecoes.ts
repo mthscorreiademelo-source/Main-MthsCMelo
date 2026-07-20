@@ -41,6 +41,8 @@ export const COLECOES: ColecaoSync[] = [
   { colecao: 'doacoesSangue', chave: 'id' },
   { colecao: 'saudeConfig', chave: 'id' },
   { colecao: 'livros', chave: 'id' },
+  { colecao: 'notasLivro', chave: 'id' },
+  { colecao: 'destaques', chave: 'id' },
   { colecao: 'categoriasHabito', chave: 'id' },
 ]
 

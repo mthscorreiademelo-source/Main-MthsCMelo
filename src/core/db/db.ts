@@ -34,7 +34,7 @@ import type {
   SaudeDia,
   Vacina,
 } from '../../modules/saude/types'
-import type { ArquivoLivro, Livro } from '../../modules/biblioteca/types'
+import type { ArquivoLivro, Destaque, Livro, NotaLivro } from '../../modules/biblioteca/types'
 import type { Contexto, Cronograma, Evento } from '../../modules/agenda/types'
 
 /** Conteúdo binário de um arquivo anexado a uma nota do tipo 'arquivos'. */
@@ -89,6 +89,8 @@ class VidaDB extends Dexie {
   doacoesSangue!: Table<DoacaoSangue, string>
   saudeConfig!: Table<SaudeConfig, string>
   livros!: Table<Livro, string>
+  notasLivro!: Table<NotaLivro, string>
+  destaques!: Table<Destaque, string>
   /** Arquivos dos livros (blobs) — locais, não sincronizam. */
   arquivosLivros!: Table<ArquivoLivro, string>
   /** Espelho do último estado sincronizado (chave → atualizadoEm). */
@@ -226,6 +228,11 @@ class VidaDB extends Dexie {
     this.version(19).stores({
       contextos: 'id, ordem',
     })
+    // v20: Biblioteca — notas de leitura e destaques por livro.
+    this.version(20).stores({
+      notasLivro: 'id, livroId, criadoEm',
+      destaques: 'id, livroId, criadoEm',
+    })
   }
 }
 
@@ -312,6 +319,8 @@ export async function exportarBackup() {
     doacoesSangue: await db.doacoesSangue.toArray(),
     saudeConfig: await db.saudeConfig.toArray(),
     livros: await db.livros.toArray(),
+    notasLivro: await db.notasLivro.toArray(),
+    destaques: await db.destaques.toArray(),
     categoriasHabito: await db.categoriasHabito.toArray(),
   }
 }
@@ -364,6 +373,8 @@ export async function importarBackup(json: unknown) {
     doacoesSangue?: DoacaoSangue[]
     saudeConfig?: SaudeConfig[]
     livros?: Livro[]
+    notasLivro?: NotaLivro[]
+    destaques?: Destaque[]
     categoriasHabito?: CategoriaHabito[]
   }
   const temTasks = Array.isArray(dados?.tasks)
@@ -421,6 +432,8 @@ export async function importarBackup(json: unknown) {
   if (Array.isArray(dados.doacoesSangue)) await db.doacoesSangue.bulkPut(dados.doacoesSangue)
   if (Array.isArray(dados.saudeConfig)) await db.saudeConfig.bulkPut(dados.saudeConfig)
   if (Array.isArray(dados.livros)) await db.livros.bulkPut(dados.livros)
+  if (Array.isArray(dados.notasLivro)) await db.notasLivro.bulkPut(dados.notasLivro)
+  if (Array.isArray(dados.destaques)) await db.destaques.bulkPut(dados.destaques)
   if (Array.isArray(dados.categoriasHabito)) await db.categoriasHabito.bulkPut(dados.categoriasHabito)
   return {
     tasks: dados.tasks?.length ?? 0,

@@ -1,6 +1,48 @@
 import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
-import type { FormatoArquivo, Livro, StatusLeitura, TipoObra } from './types'
+import type { Destaque, FormatoArquivo, Livro, NotaLivro, StatusLeitura, TipoObra } from './types'
+
+/* ---------- notas & destaques ---------- */
+
+/** Paleta de cores para destaques (grifos). */
+export const CORES_DESTAQUE = ['#f6c945', '#7ecc49', '#6accbc', '#eb96eb', '#f28b82']
+
+export async function criarNota(d: Partial<NotaLivro> & { livroId: string; resumo: string }): Promise<string> {
+  const id = d.id ?? nanoid()
+  await db.notasLivro.add({
+    id,
+    livroId: d.livroId,
+    resumo: d.resumo.trim(),
+    trecho: d.trecho,
+    capitulo: d.capitulo,
+    tags: d.tags,
+    cfi: d.cfi,
+    pagina: d.pagina,
+    favorito: d.favorito,
+    criadoEm: Date.now(),
+  })
+  return id
+}
+export const atualizarNota = (id: string, m: Partial<NotaLivro>) => db.notasLivro.update(id, m)
+export const removerNota = (id: string) => db.notasLivro.delete(id)
+
+export async function criarDestaque(d: Partial<Destaque> & { livroId: string; trecho: string }): Promise<string> {
+  const id = d.id ?? nanoid()
+  await db.destaques.add({
+    id,
+    livroId: d.livroId,
+    trecho: d.trecho.trim(),
+    capitulo: d.capitulo,
+    cfi: d.cfi,
+    pagina: d.pagina,
+    cor: d.cor ?? CORES_DESTAQUE[0],
+    favorito: d.favorito,
+    criadoEm: Date.now(),
+  })
+  return id
+}
+export const atualizarDestaque = (id: string, m: Partial<Destaque>) => db.destaques.update(id, m)
+export const removerDestaque = (id: string) => db.destaques.delete(id)
 
 export const STATUS: { valor: StatusLeitura; rotulo: string }[] = [
   { valor: 'quero_ler', rotulo: 'Quero ler' },

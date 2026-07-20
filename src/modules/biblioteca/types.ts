@@ -48,6 +48,38 @@ export interface Livro {
   atualizadoEm?: number
 }
 
+/** Nota de leitura vinculada a um livro (e opcionalmente a um trecho). */
+export interface NotaLivro {
+  id: string
+  livroId: string
+  /** Texto da nota/resumo. */
+  resumo: string
+  /** Trecho citado ao qual a nota se refere. */
+  trecho?: string
+  capitulo?: string
+  tags?: string[]
+  /** Localização no EPUB (epubcfi) para reabrir exatamente ali. */
+  cfi?: string
+  pagina?: number
+  favorito?: boolean
+  criadoEm: number
+  atualizadoEm?: number
+}
+
+/** Destaque (trecho grifado) de um livro. */
+export interface Destaque {
+  id: string
+  livroId: string
+  trecho: string
+  capitulo?: string
+  cfi?: string
+  pagina?: number
+  cor?: string
+  favorito?: boolean
+  criadoEm: number
+  atualizadoEm?: number
+}
+
 /** Conteúdo binário local de um livro (não sincroniza). */
 export interface ArquivoLivro {
   id: string
