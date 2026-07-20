@@ -23,6 +23,8 @@ export interface Livro {
   nota?: number
   resenha?: string
   generos?: string[]
+  /** Ano de publicação (para ordenar por ano). */
+  ano?: number
   paginasTotais?: number
   /** Progresso de leitura em % (0–100). */
   progresso?: number

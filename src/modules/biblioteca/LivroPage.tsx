@@ -230,7 +230,7 @@ export function LivroPage() {
             className={CAMPO}
           />
         </label>
-        <label className="flex w-24 flex-col gap-1.5">
+        <label className="flex w-20 flex-col gap-1.5">
           <span className="text-[13px] font-medium text-muted">Nº</span>
           <input
             type="number"
@@ -238,6 +238,16 @@ export function LivroPage() {
             value={livro.numero ?? ''}
             onChange={(e) => salvar({ numero: e.target.value ? Number(e.target.value) : undefined })}
             placeholder="1"
+            className={CAMPO}
+          />
+        </label>
+        <label className="flex w-24 flex-col gap-1.5">
+          <span className="text-[13px] font-medium text-muted">Ano</span>
+          <input
+            type="number"
+            value={livro.ano ?? ''}
+            onChange={(e) => salvar({ ano: e.target.value ? Number(e.target.value) : undefined })}
+            placeholder="2020"
             className={CAMPO}
           />
         </label>
