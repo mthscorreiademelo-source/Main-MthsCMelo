@@ -14,6 +14,7 @@ type Preparo =
   | { modo: 'carregando' }
   | { modo: 'epub' }
   | { modo: 'paginado'; total: number; provider: (n: number) => Promise<string | undefined> }
+  | { modo: 'incompativel' }
   | { modo: 'erro'; msg: string }
 
 const IMG_EXT = /\.(jpe?g|png|webp|gif|avif)$/i
@@ -64,6 +65,10 @@ export function LeitorPage() {
 
     ;(async () => {
       try {
+        if (livro.formato === 'mobi') {
+          if (vivo) setPreparo({ modo: 'incompativel' })
+          return
+        }
         if (livro.formato === 'epub') {
           if (vivo) setPreparo({ modo: 'epub' })
           return
@@ -164,15 +169,29 @@ export function LeitorPage() {
             Não consegui abrir este arquivo. ({preparo.msg})
           </div>
         )}
+        {preparo.modo === 'incompativel' && (
+          <div className="mx-auto flex h-full max-w-sm flex-col items-center justify-center gap-3 px-8 text-center">
+            <p className="text-sm opacity-80">
+              A leitura de arquivos MOBI ainda não é suportada aqui. Converta o livro para
+              EPUB ou PDF para ler — o livro continua na sua estante para organizar e avaliar.
+            </p>
+            <Link to={`/biblioteca/${id}`} className="text-sm underline opacity-90">
+              Voltar ao livro
+            </Link>
+          </div>
+        )}
         {preparo.modo === 'epub' && blob && (
-          <LeitorEpub
-            blob={blob}
-            tema={tema}
-            fontePct={fontePct}
-            inicial={livro?.localizacao}
-            onProgresso={onProgresso}
-            registrarControles={registrarControles}
-          />
+          // margem vertical para o texto não ficar sob a barra de título/progresso
+          <div className="h-full w-full px-2" style={{ paddingTop: 60, paddingBottom: 60 }}>
+            <LeitorEpub
+              blob={blob}
+              tema={tema}
+              fontePct={fontePct}
+              inicial={livro?.localizacao}
+              onProgresso={onProgresso}
+              registrarControles={registrarControles}
+            />
+          </div>
         )}
         {preparo.modo === 'paginado' && (
           <LeitorPaginado

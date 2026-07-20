@@ -39,6 +39,12 @@ export function LeitorEpub({
         flow: 'paginated',
       })
       rendicaoRef.current = rendition
+      // Capítulos começam no topo: força quebra de página antes dos títulos.
+      // (No começo de um arquivo a quebra é ignorada, então não cria página em
+      // branco — só separa capítulos que dividem o mesmo arquivo.)
+      rendition.themes.default({
+        'h1, h2': { 'break-before': 'column', 'page-break-before': 'always' },
+      })
       aplicarTema(rendition, tema, fontePct)
       await rendition.display(inicial || undefined)
       registrarControles({ prev: () => rendition.prev(), next: () => rendition.next() })
