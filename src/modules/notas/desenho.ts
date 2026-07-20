@@ -225,53 +225,73 @@ function contornoDoTraco(pts: Ponto[], raios: number[]): Path2D {
 
 /* ---------- textura de grafite (lápis) ---------- */
 
-// Um padrão de "dente do papel" por (contexto, cor): a cor aplicada em grãos de
-// opacidade variável, deixando vãos = vales do papel onde o grafite não pega.
-// Duas camadas dão o contraste do grafite real: um véu fino de tooth + grãos
-// escuros esparsos onde o pigmento acumula.
-const cacheGrafite = new WeakMap<CanvasRenderingContext2D, Map<string, CanvasPattern | null>>()
-
 /** Ruído determinístico 0..1 (hash de valor) — estável entre re-renders. */
 function ruido(x: number, y: number): number {
   const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453
   return n - Math.floor(n)
 }
 
-function padraoGrafite(ctx: CanvasRenderingContext2D, cor: string): CanvasPattern | null {
-  let mapa = cacheGrafite.get(ctx)
-  if (!mapa) {
-    mapa = new Map()
-    cacheGrafite.set(ctx, mapa)
+/**
+ * Renderiza o lápis como muitas FIBRAS finas de grafite que correm ao longo do
+ * traço (na direção do movimento), espalhadas pela largura e quebradas em
+ * tracejado — como grafite pegando só no "dente" do papel. Tudo é geometria
+ * determinística (semeada pela posição), então o resultado é idêntico enquanto
+ * se desenha e depois de concluir: não há realinhamento nem "pulo".
+ */
+function desenharLapis(
+  ctx: CanvasRenderingContext2D,
+  pts: Ponto[],
+  raios: number[],
+  base: number,
+  alpha: number,
+  cor: string,
+) {
+  const n = pts.length
+  // normal unitária por ponto (perpendicular à direção do traço)
+  const nx: number[] = new Array(n)
+  const ny: number[] = new Array(n)
+  for (let i = 0; i < n; i++) {
+    const a = pts[Math.max(0, i - 1)]
+    const b = pts[Math.min(n - 1, i + 1)]
+    const dx = b.x - a.x
+    const dy = b.y - a.y
+    const len = Math.hypot(dx, dy) || 1
+    nx[i] = -dy / len
+    ny[i] = dx / len
   }
-  const cache = mapa.get(cor)
-  if (cache !== undefined) return cache
 
-  const T = 128
-  const tile = document.createElement('canvas')
-  tile.width = T
-  tile.height = T
-  const tctx = tile.getContext('2d')
-  if (!tctx) {
-    mapa.set(cor, null)
-    return null
+  ctx.strokeStyle = cor
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+
+  const F = Math.max(8, Math.min(34, Math.round(base * 2.1)))
+  for (let f = 0; f < F; f++) {
+    const semente = f * 13.31 + 0.7
+    // posição transversal da fibra dentro da largura (-1..1)
+    const frac = F === 1 ? 0 : (f / (F - 1)) * 2 - 1
+    ctx.beginPath()
+    for (let i = 0; i < n; i++) {
+      const r = raios[i]
+      // leve ondulação da fibra ao longo do caminho (quebra o paralelismo)
+      const ond = (ruido(i * 0.6 + semente, pts[i].x * 0.5) - 0.5) * r * 0.4
+      const off = frac * r * 0.98 + ond
+      const x = pts[i].x + nx[i] * off
+      const y = pts[i].y + ny[i] * off
+      if (i === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    }
+    // grão: cada fibra é um tracejado irregular → pontilhado do papel
+    const d1 = base * (0.55 + ruido(semente, 1.1) * 1.7)
+    const d2 = base * (0.08 + ruido(semente, 2.2) * 0.4)
+    ctx.setLineDash([d1, d2])
+    ctx.lineDashOffset = ruido(semente, 3.3) * 40
+    // núcleo mais escuro (pressão), bordas mais claras e granuladas
+    const nucleo = 0.5 + 0.5 * (1 - Math.abs(frac))
+    ctx.globalAlpha = Math.min(1, alpha * (0.2 + 0.34 * ruido(semente, 4.4)) * nucleo)
+    ctx.lineWidth = Math.max(0.5, base * (0.07 + 0.12 * ruido(semente, 5.5)))
+    ctx.stroke()
   }
-  tctx.fillStyle = cor
-  // Camada 1 — tooth: véu esparso e fraco, muitos vãos de papel visíveis.
-  const toothN = Math.round(T * T * 0.5)
-  for (let i = 0; i < toothN; i++) {
-    tctx.globalAlpha = 0.08 + Math.random() * 0.22
-    tctx.fillRect(Math.random() * T, Math.random() * T, 1, 1)
-  }
-  // Camada 2 — grãos: pigmento acumulado, poucos e escuros, dão o contraste.
-  const graosN = Math.round(T * T * 0.14)
-  for (let i = 0; i < graosN; i++) {
-    tctx.globalAlpha = 0.4 + Math.random() * 0.5
-    const s = Math.random() < 0.3 ? 2 : 1
-    tctx.fillRect(Math.random() * T, Math.random() * T, s, s)
-  }
-  const pat = ctx.createPattern(tile, 'repeat')
-  mapa.set(cor, pat)
-  return pat
+  ctx.setLineDash([])
 }
 
 export function desenharTraco(ctx: CanvasRenderingContext2D, traco: Traco) {
@@ -280,22 +300,20 @@ export function desenharTraco(ctx: CanvasRenderingContext2D, traco: Traco) {
   const caneta = canetaDoTraco(traco)
   const base = traco.espessura * caneta.fatorLargura
 
+  const ehLapis = caneta.id === 'lapis'
+
   ctx.save()
   ctx.globalAlpha = caneta.alpha
   ctx.fillStyle = traco.cor
   ctx.strokeStyle = traco.cor
 
-  // Lápis: preenche com o grão de grafite em vez da cor lisa.
-  if (caneta.id === 'lapis') {
-    const grao = padraoGrafite(ctx, traco.cor)
-    if (grao) ctx.fillStyle = grao
-  }
-
   const pts = suavizar(extrairPontos(flat), traco.suavizacao ?? caneta.suavizacao)
 
   if (pts.length === 1 || flat.length === 3) {
     ctx.beginPath()
-    ctx.arc(pts[0].x, pts[0].y, Math.max(0.6, (base * (1 - caneta.afinamento * 0.5)) / 2), 0, Math.PI * 2)
+    const rp = Math.max(0.6, (base * (1 - caneta.afinamento * 0.5)) / 2)
+    if (ehLapis) ctx.globalAlpha = caneta.alpha * 0.6
+    ctx.arc(pts[0].x, pts[0].y, rp, 0, Math.PI * 2)
     ctx.fill()
     ctx.restore()
     return
@@ -326,22 +344,20 @@ export function desenharTraco(ctx: CanvasRenderingContext2D, traco: Traco) {
   }
   const taper = caneta.afilaPontas * base
 
-  const ehLapis = caneta.id === 'lapis'
   const raios = pts.map((pt, i) => {
     let fator = 1 - caneta.afinamento * (1 - pt.p)
     if (taper > 0 && total > taper) {
       const daPonta = Math.min(dist[i], total - dist[i])
       if (daPonta < taper) fator *= 0.2 + 0.8 * Math.sqrt(daPonta / taper)
     }
-    // Lápis: borda irregular — encolhe/dilata a largura ponto a ponto com ruído
-    // estável (não cintila entre re-renders), quebrando o contorno liso.
-    if (ehLapis) {
-      const r = ruido(Math.round(pt.x * 0.9), Math.round(pt.y * 0.9))
-      const r2 = ruido(i * 2.3, Math.round(pt.x))
-      fator *= 0.68 + 0.5 * r * r2
-    }
     return Math.max(base * 0.06, (base * fator) / 2)
   })
+
+  if (ehLapis) {
+    desenharLapis(ctx, pts, raios, base, caneta.alpha, traco.cor)
+    ctx.restore()
+    return
+  }
 
   ctx.fill(contornoDoTraco(pts, raios))
   ctx.restore()
