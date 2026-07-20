@@ -46,6 +46,8 @@ export interface Evento {
   local?: string
   /** Nomes dos participantes (avatares por iniciais nos blocos). */
   participantes?: string[]
+  /** Custo estimado do evento em centavos — reservado no orçamento de Finanças. */
+  custoCentavos?: number
   descricao?: string
   /** Repetição do evento (gera ocorrências nas datas seguintes). */
   recorrencia?: RecorrenciaEvento

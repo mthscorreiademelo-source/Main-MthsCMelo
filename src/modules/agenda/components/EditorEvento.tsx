@@ -35,6 +35,7 @@ export function EditorEvento({
   const [categoria, setCategoria] = useState<string | undefined>(evento.categoria)
   const [local, setLocal] = useState(evento.local ?? '')
   const [participantes, setParticipantes] = useState((evento.participantes ?? []).join(', '))
+  const [custo, setCusto] = useState(evento.custoCentavos ? (evento.custoCentavos / 100).toFixed(2).replace('.', ',') : '')
   const [descricao, setDescricao] = useState(evento.descricao ?? '')
   const [presenca, setPresenca] = useState<Presenca | undefined>(evento.presenca)
 
@@ -49,6 +50,7 @@ export function EditorEvento({
     setCategoria(evento.categoria)
     setLocal(evento.local ?? '')
     setParticipantes((evento.participantes ?? []).join(', '))
+    setCusto(evento.custoCentavos ? (evento.custoCentavos / 100).toFixed(2).replace('.', ',') : '')
     setDescricao(evento.descricao ?? '')
     setPresenca(evento.presenca)
   }, [evento.id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -298,6 +300,23 @@ export function EditorEvento({
               ))}
           </div>
         )}
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className={ROTULO}>Custo estimado (opcional)</span>
+        <input
+          value={custo}
+          inputMode="decimal"
+          onChange={(e) => {
+            setCusto(e.target.value)
+            const limpo = e.target.value.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.')
+            const n = Number(limpo)
+            salvar({ custoCentavos: e.target.value.trim() && Number.isFinite(n) && n > 0 ? Math.round(n * 100) : undefined })
+          }}
+          placeholder="0,00"
+          className={CAMPO}
+        />
+        <span className="text-[12px] text-muted">Reservado no orçamento de Finanças para eventos futuros do mês.</span>
       </label>
 
       <label className="flex flex-col gap-1">

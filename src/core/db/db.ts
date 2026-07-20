@@ -2,7 +2,15 @@ import Dexie, { type Table } from 'dexie'
 import type { Projeto, Task } from '../../modules/tarefas/types'
 import type { Grupo, Pagina } from '../../modules/notas/types'
 import type { CategoriaHabito, Habito, HabitoRegistro } from '../../modules/habitos/types'
-import type { Movimento } from '../../modules/financas/types'
+import type {
+  Conta,
+  FinancasConfig,
+  Movimento,
+  Objetivo,
+  OrcamentoLinha,
+  PatrimonioSnapshot,
+  Recorrente,
+} from '../../modules/financas/types'
 import { deveIgnorarHooks } from '../nuvem/sync/bandeira'
 import { NOMES_SYNC } from '../nuvem/sync/colecoes'
 import type {
@@ -42,6 +50,12 @@ class VidaDB extends Dexie {
   habitoRegistros!: Table<HabitoRegistro, string>
   categoriasHabito!: Table<CategoriaHabito, string>
   movimentos!: Table<Movimento, string>
+  contas!: Table<Conta, string>
+  objetivos!: Table<Objetivo, string>
+  recorrentes!: Table<Recorrente, string>
+  orcamentoLinhas!: Table<OrcamentoLinha, string>
+  financasConfig!: Table<FinancasConfig, string>
+  patrimonioSnapshots!: Table<PatrimonioSnapshot, string>
   arquivos!: Table<ArquivoDados, string>
   humores!: Table<HumorRegistro, string>
   registros!: Table<Registro, string>
@@ -158,6 +172,16 @@ class VidaDB extends Dexie {
       cronogramas: 'id, ordem',
       eventos: 'id, data, cronogramaId, atualizadoEm',
     })
+    // v17: Finanças — patrimônio (contas), objetivos, recorrentes, distribuição
+    // do orçamento, config do módulo e snapshots mensais do patrimônio.
+    this.version(17).stores({
+      contas: 'id, ordem',
+      objetivos: 'id, ordem',
+      recorrentes: 'id, ordem',
+      orcamentoLinhas: 'id, ordem',
+      financasConfig: 'id',
+      patrimonioSnapshots: 'mes',
+    })
   }
 }
 
@@ -218,6 +242,12 @@ export async function exportarBackup() {
     habitos: await db.habitos.toArray(),
     habitoRegistros: await db.habitoRegistros.toArray(),
     movimentos: await db.movimentos.toArray(),
+    contas: await db.contas.toArray(),
+    objetivos: await db.objetivos.toArray(),
+    recorrentes: await db.recorrentes.toArray(),
+    orcamentoLinhas: await db.orcamentoLinhas.toArray(),
+    financasConfig: await db.financasConfig.toArray(),
+    patrimonioSnapshots: await db.patrimonioSnapshots.toArray(),
     arquivos: arquivosSerial,
     humores: await db.humores.toArray(),
     registros: await db.registros.toArray(),
@@ -252,6 +282,12 @@ export async function importarBackup(json: unknown) {
     habitos?: Habito[]
     habitoRegistros?: HabitoRegistro[]
     movimentos?: Movimento[]
+    contas?: Conta[]
+    objetivos?: Objetivo[]
+    recorrentes?: Recorrente[]
+    orcamentoLinhas?: OrcamentoLinha[]
+    financasConfig?: FinancasConfig[]
+    patrimonioSnapshots?: PatrimonioSnapshot[]
     arquivos?: ArquivoSerial[]
     humores?: HumorRegistro[]
     registros?: Registro[]
@@ -280,6 +316,12 @@ export async function importarBackup(json: unknown) {
     await db.habitoRegistros.bulkPut(dados.habitoRegistros)
   }
   if (temMovimentos) await db.movimentos.bulkPut(dados.movimentos!)
+  if (Array.isArray(dados.contas)) await db.contas.bulkPut(dados.contas)
+  if (Array.isArray(dados.objetivos)) await db.objetivos.bulkPut(dados.objetivos)
+  if (Array.isArray(dados.recorrentes)) await db.recorrentes.bulkPut(dados.recorrentes)
+  if (Array.isArray(dados.orcamentoLinhas)) await db.orcamentoLinhas.bulkPut(dados.orcamentoLinhas)
+  if (Array.isArray(dados.financasConfig)) await db.financasConfig.bulkPut(dados.financasConfig)
+  if (Array.isArray(dados.patrimonioSnapshots)) await db.patrimonioSnapshots.bulkPut(dados.patrimonioSnapshots)
   if (Array.isArray(dados.arquivos)) {
     await db.arquivos.bulkPut(
       dados.arquivos.map((a) => ({
