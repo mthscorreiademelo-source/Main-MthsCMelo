@@ -223,6 +223,57 @@ function contornoDoTraco(pts: Ponto[], raios: number[]): Path2D {
   return caminhoFechado([...esq, ...fim, ...dir.reverse(), ...inicio])
 }
 
+/* ---------- textura de grafite (lápis) ---------- */
+
+// Um padrão de "dente do papel" por (contexto, cor): a cor aplicada em grãos de
+// opacidade variável, deixando vãos = vales do papel onde o grafite não pega.
+// Duas camadas dão o contraste do grafite real: um véu fino de tooth + grãos
+// escuros esparsos onde o pigmento acumula.
+const cacheGrafite = new WeakMap<CanvasRenderingContext2D, Map<string, CanvasPattern | null>>()
+
+/** Ruído determinístico 0..1 (hash de valor) — estável entre re-renders. */
+function ruido(x: number, y: number): number {
+  const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453
+  return n - Math.floor(n)
+}
+
+function padraoGrafite(ctx: CanvasRenderingContext2D, cor: string): CanvasPattern | null {
+  let mapa = cacheGrafite.get(ctx)
+  if (!mapa) {
+    mapa = new Map()
+    cacheGrafite.set(ctx, mapa)
+  }
+  const cache = mapa.get(cor)
+  if (cache !== undefined) return cache
+
+  const T = 128
+  const tile = document.createElement('canvas')
+  tile.width = T
+  tile.height = T
+  const tctx = tile.getContext('2d')
+  if (!tctx) {
+    mapa.set(cor, null)
+    return null
+  }
+  tctx.fillStyle = cor
+  // Camada 1 — tooth: véu esparso e fraco, muitos vãos de papel visíveis.
+  const toothN = Math.round(T * T * 0.5)
+  for (let i = 0; i < toothN; i++) {
+    tctx.globalAlpha = 0.08 + Math.random() * 0.22
+    tctx.fillRect(Math.random() * T, Math.random() * T, 1, 1)
+  }
+  // Camada 2 — grãos: pigmento acumulado, poucos e escuros, dão o contraste.
+  const graosN = Math.round(T * T * 0.14)
+  for (let i = 0; i < graosN; i++) {
+    tctx.globalAlpha = 0.4 + Math.random() * 0.5
+    const s = Math.random() < 0.3 ? 2 : 1
+    tctx.fillRect(Math.random() * T, Math.random() * T, s, s)
+  }
+  const pat = ctx.createPattern(tile, 'repeat')
+  mapa.set(cor, pat)
+  return pat
+}
+
 export function desenharTraco(ctx: CanvasRenderingContext2D, traco: Traco) {
   const flat = traco.pontos
   if (flat.length < 3) return
@@ -233,6 +284,12 @@ export function desenharTraco(ctx: CanvasRenderingContext2D, traco: Traco) {
   ctx.globalAlpha = caneta.alpha
   ctx.fillStyle = traco.cor
   ctx.strokeStyle = traco.cor
+
+  // Lápis: preenche com o grão de grafite em vez da cor lisa.
+  if (caneta.id === 'lapis') {
+    const grao = padraoGrafite(ctx, traco.cor)
+    if (grao) ctx.fillStyle = grao
+  }
 
   const pts = suavizar(extrairPontos(flat), traco.suavizacao ?? caneta.suavizacao)
 
@@ -269,11 +326,19 @@ export function desenharTraco(ctx: CanvasRenderingContext2D, traco: Traco) {
   }
   const taper = caneta.afilaPontas * base
 
+  const ehLapis = caneta.id === 'lapis'
   const raios = pts.map((pt, i) => {
     let fator = 1 - caneta.afinamento * (1 - pt.p)
     if (taper > 0 && total > taper) {
       const daPonta = Math.min(dist[i], total - dist[i])
       if (daPonta < taper) fator *= 0.2 + 0.8 * Math.sqrt(daPonta / taper)
+    }
+    // Lápis: borda irregular — encolhe/dilata a largura ponto a ponto com ruído
+    // estável (não cintila entre re-renders), quebrando o contorno liso.
+    if (ehLapis) {
+      const r = ruido(Math.round(pt.x * 0.9), Math.round(pt.y * 0.9))
+      const r2 = ruido(i * 2.3, Math.round(pt.x))
+      fator *= 0.68 + 0.5 * r * r2
     }
     return Math.max(base * 0.06, (base * fator) / 2)
   })
