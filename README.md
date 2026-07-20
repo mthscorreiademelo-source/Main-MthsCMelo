@@ -26,6 +26,7 @@ Mais do que um conjunto de módulos, o Lume é pensado como um **sistema operaci
 
 **Roadmap** (um módulo por versão)
 - v0.7 — Sincronização opcional em nuvem
+- Futuro — **Open Finance**: sincronização automática de contas/saldos e importação de transações direto do banco (opt-in, via agregador + backend fino). Arquitetura e plano em [`OPEN-FINANCE.md`](./OPEN-FINANCE.md)
 
 ## Como rodar
 
