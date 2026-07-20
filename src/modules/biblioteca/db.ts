@@ -68,6 +68,11 @@ export async function guardarArquivo(
   })
 }
 
+/** Remove só o arquivo local (mantém o livro na estante). */
+export async function apagarArquivo(id: string): Promise<void> {
+  await db.arquivosLivros.delete(id)
+}
+
 export async function obterArquivo(id: string): Promise<Blob | undefined> {
   return (await db.arquivosLivros.get(id))?.blob
 }

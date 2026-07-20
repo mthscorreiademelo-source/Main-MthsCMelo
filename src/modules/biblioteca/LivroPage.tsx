@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { IconAbrir, IconLivro, IconLixeira, IconSetaEsquerda } from '../../core/components/Icons'
+import { IconAbrir, IconLivro, IconLixeira, IconSetaEsquerda, IconUpload } from '../../core/components/Icons'
 import { rotuloData } from '../../core/dates'
 import { EstrelasNota } from './components/EstrelasNota'
-import { removerLivro, rotuloTipo, salvarLivro, STATUS } from './db'
+import { apagarArquivo, guardarArquivo, removerLivro, rotuloTipo, salvarLivro, STATUS } from './db'
 import { useLivro } from './hooks'
-import { gerarMiniatura } from './importar'
+import { detectarFormato, extrairMetadados, gerarMiniatura } from './importar'
 import type { Livro, StatusLeitura } from './types'
 
 const CAMPO =
@@ -28,6 +28,9 @@ export function LivroPage() {
   const [generos, setGeneros] = useState('')
   const [colecao, setColecao] = useState('')
   const inputCapa = useRef<HTMLInputElement>(null)
+  const inputArquivo = useRef<HTMLInputElement>(null)
+  const [anexando, setAnexando] = useState(false)
+  const [erroArq, setErroArq] = useState<string | null>(null)
 
   useEffect(() => {
     if (!livro) return
@@ -53,6 +56,48 @@ export function LivroPage() {
   }
 
   const salvar = (mudancas: Partial<Livro>) => salvarLivro({ ...livro, ...mudancas })
+
+  async function anexarArquivo(file: File) {
+    setErroArq(null)
+    const fmt = detectarFormato(file)
+    if (!fmt) {
+      setErroArq('Formato não suportado. Use EPUB, PDF ou CBZ.')
+      return
+    }
+    setAnexando(true)
+    try {
+      await guardarArquivo(livro!.id, file, fmt, file.name)
+      const extra: Partial<Livro> = {
+        temArquivo: true,
+        formato: fmt,
+        arquivoNome: file.name,
+        arquivoTamanho: file.size,
+      }
+      // aproveita capa/nº de páginas do arquivo se ainda faltarem
+      if (!livro!.capa || !livro!.paginasTotais) {
+        const meta = await extrairMetadados(file)
+        if (meta) {
+          if (!livro!.capa && meta.capa) extra.capa = meta.capa
+          if (!livro!.paginasTotais && meta.paginasTotais) extra.paginasTotais = meta.paginasTotais
+        }
+      }
+      await salvar(extra)
+    } catch (e) {
+      setErroArq('Não consegui anexar: ' + (e as Error).message)
+    } finally {
+      setAnexando(false)
+    }
+  }
+
+  async function removerArquivo() {
+    await apagarArquivo(livro!.id)
+    await salvar({
+      temArquivo: undefined,
+      formato: undefined,
+      arquivoNome: undefined,
+      arquivoTamanho: undefined,
+    })
+  }
 
   async function excluir() {
     if (!confirm('Remover este livro da biblioteca? O arquivo local também será apagado.')) return
@@ -215,20 +260,69 @@ export function LivroPage() {
         />
       </label>
 
-      {livro.temArquivo && (
-        <div className="flex flex-col gap-2">
-          <Link
-            to={`/biblioteca/${livro.id}/ler`}
-            className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-ink text-[15px] font-medium text-surface transition-opacity hover:opacity-90"
+      {/* Arquivo para leitura (anexar / ler / trocar / remover) */}
+      <div className="flex flex-col gap-2">
+        <span className="text-[13px] font-medium text-muted">Arquivo para leitura</span>
+        {livro.temArquivo ? (
+          <>
+            <Link
+              to={`/biblioteca/${livro.id}/ler`}
+              className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-ink text-[15px] font-medium text-surface transition-opacity hover:opacity-90"
+            >
+              <IconAbrir width={18} height={18} />
+              {(livro.progresso ?? 0) > 0 ? 'Continuar lendo' : 'Ler'}
+            </Link>
+            <div className="flex items-center justify-between gap-2">
+              <p className="min-w-0 flex-1 truncate text-[12px] text-muted/80">
+                {livro.arquivoNome} ({livro.formato?.toUpperCase()} · {tamanhoLegivel(livro.arquivoTamanho)})
+              </p>
+              <div className="flex shrink-0 gap-3">
+                <button
+                  onClick={() => inputArquivo.current?.click()}
+                  disabled={anexando}
+                  className="text-[12px] text-muted transition-colors hover:text-ink disabled:opacity-50"
+                >
+                  {anexando ? 'trocando…' : 'trocar'}
+                </button>
+                <button
+                  onClick={removerArquivo}
+                  className="text-[12px] text-muted transition-colors hover:text-ink"
+                >
+                  remover
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <button
+            onClick={() => inputArquivo.current?.click()}
+            disabled={anexando}
+            className="flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line bg-surface/60 px-3 text-center text-muted transition-colors hover:border-muted/50 hover:text-ink disabled:opacity-60"
           >
-            <IconAbrir width={18} height={18} />
-            {(livro.progresso ?? 0) > 0 ? 'Continuar lendo' : 'Ler'}
-          </Link>
-          <p className="text-[12px] text-muted/80">
-            Arquivo: {livro.arquivoNome} ({livro.formato?.toUpperCase()} · {tamanhoLegivel(livro.arquivoTamanho)})
-          </p>
-        </div>
-      )}
+            {anexando ? (
+              <span className="text-[13px]">Anexando o arquivo…</span>
+            ) : (
+              <>
+                <IconUpload width={18} height={18} />
+                <span className="text-[13px] font-medium">Adicionar arquivo para leitura</span>
+                <span className="text-[11px] text-muted/70">EPUB · PDF · CBZ</span>
+              </>
+            )}
+          </button>
+        )}
+        {erroArq && <p className="text-[13px] text-red-500">{erroArq}</p>}
+        <input
+          ref={inputArquivo}
+          type="file"
+          accept=".epub,.pdf,.cbz,.zip,application/epub+zip,application/pdf"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            e.target.value = ''
+            if (f) anexarArquivo(f)
+          }}
+        />
+      </div>
 
       <button
         onClick={excluir}
