@@ -40,7 +40,7 @@ export const CANETAS: Record<TipoCaneta, Caneta> = {
   lapis: {
     id: 'lapis',
     rotulo: 'Lápis grafite',
-    alpha: 0.85,
+    alpha: 0.6,
     afinamento: 0.3,
     suavizacao: 0.35,
     afilaPontas: 0.8,
@@ -251,15 +251,15 @@ function desenharLapis(
   const n = pts.length
   ctx.fillStyle = cor
 
-  // 1) Corpo: núcleo escuro e encorpado (grafite macio), levemente encolhido —
-  //    a borda fica pro grão deixar áspera. Some ao repassar acumula.
-  ctx.globalAlpha = alpha * 0.7
-  ctx.fill(contornoDoTraco(pts, raios.map((r) => r * 0.76)))
+  // 1) Corpo: mancha translúcida (encolhida). É translúcida de propósito — cada
+  //    passada some sobre a outra, então repassar no mesmo lugar vai escurecendo.
+  ctx.globalAlpha = alpha * 0.3
+  ctx.fill(contornoDoTraco(pts, raios.map((r) => r * 0.78)))
 
-  // 2) Grão: dente do papel. Denso e escuro no núcleo (cobre quase tudo, só
-  //    fina textura), esparso na borda → aresta áspera e granulada.
-  const passo = Math.max(0.6, base * 0.13)
-  const trans = Math.max(4, Math.min(30, Math.round(base * 1.5)))
+  // 2) Grão: dente do papel. Cheio (mas ainda translúcido) no núcleo, esparso
+  //    na borda → aresta áspera e granulada, e o papel aparece entre os grãos.
+  const passo = Math.max(0.7, base * 0.15)
+  const trans = Math.max(3, Math.min(24, Math.round(base * 1.15)))
   for (let i = 0; i < n - 1; i++) {
     const a = pts[i]
     const b = pts[i + 1]
@@ -289,8 +289,8 @@ function desenharLapis(
         const jt = (h2 - 0.5) * passo
         const gx = px + npx * off + tx * jt
         const gy = py + npy * off + ty * jt
-        const raio = 0.4 + h2 * 0.6
-        ctx.globalAlpha = Math.min(1, alpha * (0.45 + 0.5 * h1))
+        const raio = 0.36 + h2 * 0.55
+        ctx.globalAlpha = Math.min(1, alpha * (0.28 + 0.42 * h1))
         ctx.beginPath()
         ctx.arc(gx, gy, raio, 0, Math.PI * 2)
         ctx.fill()
