@@ -9,6 +9,7 @@ import {
   apagarPixelsDoTraco,
   chaveDoItem,
   desenharTraco,
+  ehRasura,
   limitesDosTracos,
   pontoDentroPoligono,
   pontoNoPostIt,
@@ -126,6 +127,8 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   const tracosLocais = useRef<Traco[] | null>(null)
   // cursor da borracha (posição de tela, relativa ao canvas) para o círculo-guia
   const cursorBorracha = useRef<{ x: number; y: number } | null>(null)
+  // rasura-para-apagar: caneta/lápis vira borracha ao rabiscar por cima
+  const rasurando = useRef(false)
 
   // seleção
   const marca = useRef<number[] | null>(null) // polígono/retângulo em curso (mundo)
@@ -842,6 +845,43 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     }
   }
 
+  /* ---------- rasura-para-apagar (gesto) ---------- */
+
+  /** Índices dos traços livres tocados por algum ponto do rabisco. */
+  function alvosDaRasura(pontos: number[], raio: number): number[] {
+    const lista = tracosRef.current
+    const alvo = new Set<number>()
+    for (let k = 0; k < pontos.length; k += 3) {
+      for (let i = 0; i < lista.length; i++) {
+        if (alvo.has(i)) continue
+        const t = lista[i]
+        if (t.postItId || t.itemId) continue // tinta colada não some por rasura solta
+        if (tracoAtingido(t, pontos[k], pontos[k + 1], raio)) alvo.add(i)
+      }
+    }
+    return [...alvo]
+  }
+
+  /** Remove da cópia local os traços tocados no ponto (durante a rasura). */
+  function apagarRasuraEm(x: number, y: number) {
+    const lista = tracosLocais.current
+    if (!lista) return
+    const raio = 7 / cam.current.escala
+    let mudou = false
+    for (let i = lista.length - 1; i >= 0; i--) {
+      const t = lista[i]
+      if (t.postItId || t.itemId) continue
+      if (tracoAtingido(t, x, y, raio)) {
+        lista.splice(i, 1)
+        mudou = true
+      }
+    }
+    if (mudou) {
+      cenaSuja.current = true
+      pedirRender()
+    }
+  }
+
   /* ---------- seleção ---------- */
 
   function concluirMarca(tipoForcado?: 'retangulo' | 'laco') {
@@ -1183,6 +1223,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
 
     // canetas
     ultimaTela.current = null
+    rasurando.current = false
     pressaoSuave.current = e.pointerType === 'pen' && e.pressure > 0 ? e.pressure : 0.5
     // traço que começa sobre um post-it fica colado nele (o mais de cima)
     tracoNoPostIt.current = null
@@ -1340,6 +1381,16 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       return
     }
 
+    // rasura em andamento: a caneta/lápis virou borracha — apaga o que rabiscar
+    if (rasurando.current) {
+      const nativos = e.nativeEvent.getCoalescedEvents?.() ?? [e.nativeEvent]
+      for (const ev of nativos) {
+        const [wx, wy] = paraMundo(ev.clientX, ev.clientY)
+        apagarRasuraEm(wx, wy)
+      }
+      return
+    }
+
     if (!tracoEmCurso.current) return
     if (f.modo === 'borracha') {
       apagarEm(x, y)
@@ -1359,6 +1410,25 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       const [px, py] = tracoNaRegua.current ? projetarNaRegua(wx, wy) : [wx, wy]
       tracoEmCurso.current.push(px, py, p)
     }
+
+    // rasura-para-apagar: só lápis/tinteiro, quando o rabisco cobre traços já
+    // existentes. Vira borracha, descarta o rabisco e apaga o que estiver sob ele.
+    if (
+      (f.modo === 'lapis' || f.modo === 'tinteiro') &&
+      !tracoReto.current &&
+      ehRasura(tracoEmCurso.current)
+    ) {
+      const alvos = alvosDaRasura(tracoEmCurso.current, 7 / cam.current.escala)
+      if (alvos.length > 0) {
+        const set = new Set(alvos)
+        tracosLocais.current = tracosRef.current.filter((_, i) => !set.has(i))
+        rasurando.current = true
+        tracoEmCurso.current = null // descarta o rabisco (não vira tinta)
+        cenaSuja.current = true
+        pedirRender()
+        return
+      }
+    }
     pedirRender()
   }
 
@@ -1375,6 +1445,16 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     }
 
     const f = ferramentaRef.current
+
+    // fim de uma rasura-para-apagar: confirma a remoção (um passo de desfazer)
+    if (rasurando.current) {
+      rasurando.current = false
+      const finais = tracosLocais.current
+      tracosLocais.current = null
+      tracoEmCurso.current = null
+      if (finais) onSubstituir(finais, itensRef.current, postItsRef.current)
+      return
+    }
 
     if (f.modo === 'selecao' || f.modo === 'ponteiro') {
       if (gestoSel.current) {

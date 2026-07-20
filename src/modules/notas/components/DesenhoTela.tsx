@@ -652,7 +652,8 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
           <p className="text-[13px] leading-relaxed text-muted">
             Stylus desenha (com pressão). Um dedo arrasta o quadro, dois dedos
             dão zoom e giram a folha. Com a régua ativa: um dedo move a régua,
-            dois dedos giram. Ctrl/Cmd+Z desfaz, Ctrl+Shift+Z refaz.
+            dois dedos giram. Ctrl/Cmd+Z desfaz, Ctrl+Shift+Z refaz. Com a
+            caneta ou o lápis, rabiscar por cima de um traço o apaga (rasura).
           </p>
 
           <div className="flex-1" />
