@@ -124,6 +124,8 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
 
   // borracha de pixels: edita uma cópia local e confirma ao soltar
   const tracosLocais = useRef<Traco[] | null>(null)
+  // cursor da borracha (posição de tela, relativa ao canvas) para o círculo-guia
+  const cursorBorracha = useRef<{ x: number; y: number } | null>(null)
 
   // seleção
   const marca = useRef<number[] | null>(null) // polígono/retângulo em curso (mundo)
@@ -526,6 +528,33 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       ctx.restore()
     }
 
+    // círculo-guia da borracha: mostra exatamente a área que será apagada
+    // (raio na tela = raio real de apagamento). Aparece no hover e ao apagar.
+    if (ferramentaRef.current.modo === 'borracha' && cursorBorracha.current) {
+      const cfg = borrachaRef.current
+      // mesmo raio usado em apagarEm (mundo → tela)
+      const raioMundo =
+        cfg.modo === 'pixel'
+          ? cfg.tamanho / escala / 2
+          : cfg.tamanho / escala / 2 + 4
+      const raioTela = raioMundo * escala
+      const { x: cxr, y: cyr } = cursorBorracha.current
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      ctx.beginPath()
+      ctx.arc(cxr, cyr, raioTela, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(120, 120, 120, 0.12)'
+      ctx.fill()
+      ctx.setLineDash([])
+      ctx.lineWidth = 1.5
+      ctx.strokeStyle = 'rgba(40, 40, 40, 0.85)'
+      ctx.stroke()
+      // ponto central para mira precisa
+      ctx.beginPath()
+      ctx.arc(cxr, cyr, 1.2, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(40, 40, 40, 0.85)'
+      ctx.fill()
+    }
+
     canvas.dataset.escala = escala.toFixed(3)
     canvas.dataset.cam = `${Math.round(x)},${Math.round(y)}`
     canvas.dataset.rot = (cam.current.rot ?? 0).toFixed(3)
@@ -695,6 +724,14 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       pedirRender()
     }
   }, [ferramenta.modo, onSelecaoMudou, pedirRender])
+
+  // sair da borracha esconde o círculo-guia
+  useEffect(() => {
+    if (ferramenta.modo !== 'borracha' && cursorBorracha.current) {
+      cursorBorracha.current = null
+      pedirRender()
+    }
+  }, [ferramenta.modo, pedirRender])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -1137,6 +1174,8 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     }
 
     if (f.modo === 'borracha') {
+      const rect = canvasRef.current!.getBoundingClientRect()
+      cursorBorracha.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
       apagarEm(x, y)
       tracoEmCurso.current = []
       return
@@ -1259,6 +1298,13 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
 
     const f = ferramentaRef.current
     const [x, y] = paraMundo(e.clientX, e.clientY)
+
+    // borracha: acompanha o cursor (hover da caneta e durante o apagamento)
+    if (f.modo === 'borracha') {
+      const rect = canvasRef.current!.getBoundingClientRect()
+      cursorBorracha.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+      pedirRender()
+    }
 
     if (f.modo === 'selecao' || f.modo === 'ponteiro') {
       if (gestoSel.current === 'mover' && inicioGesto.current) {
@@ -1398,6 +1444,13 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       onPointerMove={aoMover}
       onPointerUp={aoSoltar}
       onPointerCancel={aoSoltar}
+      onPointerLeave={(e) => {
+        // caneta/mouse saiu do quadro: esconde o círculo-guia da borracha
+        if (e.pointerType !== 'touch' && cursorBorracha.current) {
+          cursorBorracha.current = null
+          pedirRender()
+        }
+      }}
       onContextMenu={(e) => {
         e.preventDefault()
         // ignora o contextmenu sintético que o navegador emite após o toque longo
