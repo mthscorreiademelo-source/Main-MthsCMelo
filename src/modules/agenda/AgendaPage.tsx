@@ -193,6 +193,7 @@ export function AgendaPage() {
           onCriar={aoCriar}
           onIrSemana={() => setModo('semana')}
           onIrHoje={() => setAncora(hojeISO())}
+          onAbrirContextos={() => setGerContextos(true)}
         />
       )}
       {pronto && modo === 'mes' && (

@@ -225,23 +225,9 @@ export function uniaoMinutos(intervalos: [number, number][]): number {
 
 /* ----------------------------- Janela dinâmica ---------------------------- */
 
-/** Faixa de horas a exibir: cobre eventos/contextos, com folga, dentro da janela. */
-export function faixaHoras(planos: PlanoDia[]): { ini: number; fim: number } {
-  let min = JANELA_INI
-  let max = 20 * 60
-  for (const p of planos) {
-    for (const g of p.grupos) {
-      min = Math.min(min, g.inicioMin)
-      max = Math.max(max, g.fimMin)
-    }
-    for (const d of p.deadlines) {
-      min = Math.min(min, d.horarioMin)
-      max = Math.max(max, d.horarioMin)
-    }
-  }
-  const ini = Math.max(0, Math.min(JANELA_INI, Math.floor(min / 60) * 60))
-  const fim = Math.min(JANELA_FIM, Math.max(20 * 60, Math.ceil(max / 60) * 60))
-  return { ini, fim }
+/** Faixa de horas exibida: o dia inteiro (00h–24h) em todas as visualizações. */
+export function faixaHoras(_planos: PlanoDia[]): { ini: number; fim: number } {
+  return { ini: 0, fim: JANELA_FIM }
 }
 
 /* ------------------------------- Estatísticas ----------------------------- */

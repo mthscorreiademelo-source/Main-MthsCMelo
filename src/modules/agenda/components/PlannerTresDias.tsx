@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { format, isToday, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { IconMais } from '../../../core/components/Icons'
@@ -203,6 +203,7 @@ function Coluna({
   onAbrirEvento,
   onAbrirTarefa,
   onCriar,
+  onAbrirContextos,
 }: {
   plano: PlanoDia
   ini: number
@@ -214,6 +215,7 @@ function Coluna({
   onAbrirEvento: (e: Evento) => void
   onAbrirTarefa: (t: Task) => void
   onCriar: (data: string, iniMin: number, fimMin: number) => void
+  onAbrirContextos: () => void
 }) {
   const dt = parseISO(plano.dia)
   const altura = ((fim - ini) / 60) * HORA_PX
@@ -285,9 +287,13 @@ function Coluna({
               className="pointer-events-none absolute inset-x-0"
               style={{ top: ((a - ini) / 60) * HORA_PX, height: ((b - a) / 60) * HORA_PX, backgroundColor: `color-mix(in srgb, ${c.cor} ${Math.round(c.opacidade * 100)}%, transparent)` }}
             >
-              <span className="absolute left-1.5 top-1 text-[9px] font-medium uppercase tracking-wide text-muted/50">
+              <button
+                onClick={(e) => { e.stopPropagation(); onAbrirContextos() }}
+                className="pointer-events-auto absolute left-1.5 top-1 rounded px-1 text-[9px] font-medium uppercase tracking-wide text-muted/60 hover:bg-hover hover:text-ink"
+                title={`Editar contexto “${c.rotulo}”`}
+              >
                 {c.icone} {c.rotulo}
-              </span>
+              </button>
             </div>
           )
         })}
@@ -523,6 +529,7 @@ export function PlannerTresDias({
   onCriar,
   onIrSemana,
   onIrHoje,
+  onAbrirContextos,
 }: {
   dias: string[]
   eventos: Evento[]
@@ -533,11 +540,22 @@ export function PlannerTresDias({
   onCriar: (data: string, iniMin: number, fimMin: number) => void
   onIrSemana: () => void
   onIrHoje: () => void
+  onAbrirContextos: () => void
 }) {
   const agora = useAgora()
   const agoraMin = minutosDoDia(agora)
   const contextos = useContextos()
   const [expandidoId, setExpandidoId] = useState<string | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Dia inteiro é alto: ao abrir, rola até perto do horário atual (com folga).
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const alvo = (Math.max(0, agoraMin - 90) / 60) * HORA_PX
+    el.scrollTop = Math.min(alvo, el.scrollHeight)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dias[0]])
 
   const ctx = useMemo(() => contextos ?? [], [contextos])
   const ocorrencias = useMemo(() => expandirEventos(eventos, dias), [eventos, dias])
@@ -553,7 +571,7 @@ export function PlannerTresDias({
     <div className="flex flex-col gap-3">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <div className="overflow-auto pb-1" style={{ maxHeight: 'calc(100vh - 210px)' }}>
+          <div ref={scrollRef} className="overflow-auto pb-1" style={{ maxHeight: 'calc(100vh - 210px)' }}>
             <div className="flex gap-2.5">
               {planos.map((p) => (
                 <div key={p.dia} className={`flex-1 ${planos.length === 1 ? 'sm:max-w-2xl' : ''}`} style={{ minWidth: planos.length > 4 ? 132 : planos.length > 1 ? 168 : undefined }}>
@@ -568,6 +586,7 @@ export function PlannerTresDias({
                     onAbrirEvento={onAbrirEvento}
                     onAbrirTarefa={onAbrirTarefa}
                     onCriar={onCriar}
+                    onAbrirContextos={onAbrirContextos}
                   />
                 </div>
               ))}
