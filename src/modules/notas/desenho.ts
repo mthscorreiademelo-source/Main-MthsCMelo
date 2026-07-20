@@ -40,14 +40,14 @@ export const CANETAS: Record<TipoCaneta, Caneta> = {
   lapis: {
     id: 'lapis',
     rotulo: 'Lápis grafite',
-    alpha: 0.7,
+    alpha: 0.85,
     afinamento: 0.3,
     suavizacao: 0.35,
     afilaPontas: 0.8,
     fatorLargura: 0.9,
     caminhoUnico: false,
     espessuraPadrao: 3,
-    corPadrao: '#5A5A56',
+    corPadrao: '#3B3A37',
   },
   tinteiro: {
     id: 'tinteiro',
@@ -251,13 +251,15 @@ function desenharLapis(
   const n = pts.length
   ctx.fillStyle = cor
 
-  // 1) Corpo: mancha translúcida (encolhida) — some ao repassar acumula.
-  ctx.globalAlpha = alpha * 0.2
-  ctx.fill(contornoDoTraco(pts, raios.map((r) => r * 0.82)))
+  // 1) Corpo: núcleo escuro e encorpado (grafite macio), levemente encolhido —
+  //    a borda fica pro grão deixar áspera. Some ao repassar acumula.
+  ctx.globalAlpha = alpha * 0.7
+  ctx.fill(contornoDoTraco(pts, raios.map((r) => r * 0.76)))
 
-  // 2) Grão: poeira de grafite ao longo do traço, densa no centro, rala na borda.
-  const passo = Math.max(0.8, base * 0.18)
-  const trans = Math.max(2, Math.min(18, Math.round(base * 0.95)))
+  // 2) Grão: dente do papel. Denso e escuro no núcleo (cobre quase tudo, só
+  //    fina textura), esparso na borda → aresta áspera e granulada.
+  const passo = Math.max(0.6, base * 0.13)
+  const trans = Math.max(4, Math.min(30, Math.round(base * 1.5)))
   for (let i = 0; i < n - 1; i++) {
     const a = pts[i]
     const b = pts[i + 1]
@@ -279,15 +281,16 @@ function desenharLapis(
         const h1 = ruido(i * 3.1 + s * 0.37 + k * 5.9, px * 0.7 + 0.3)
         const h2 = ruido(py * 0.7 + 0.1, i * 1.3 + s * 0.71 + k * 2.3)
         const h3 = ruido(k * 7.7 + s * 1.9 + 0.5, px * 0.31 + py * 0.11)
-        const frac = h1 * 2 - 1 // posição transversal −1..1
-        // vãos de papel: mais buracos na borda (|frac|→1), poucos no centro
-        if (h3 > 0.92 - 0.44 * Math.abs(frac)) continue
+        // espalha um pouco além da largura pra aresta "vazar" em grãos soltos
+        const frac = (h1 * 2 - 1) * 1.12
+        // vãos de papel: quase nenhum no núcleo, muitos na borda (|frac|→1)
+        if (h3 > 1.02 - 0.66 * Math.abs(frac)) continue
         const off = frac * r
         const jt = (h2 - 0.5) * passo
         const gx = px + npx * off + tx * jt
         const gy = py + npy * off + ty * jt
-        const raio = 0.32 + h2 * 0.5
-        ctx.globalAlpha = Math.min(1, alpha * (0.26 + 0.55 * h1))
+        const raio = 0.4 + h2 * 0.6
+        ctx.globalAlpha = Math.min(1, alpha * (0.45 + 0.5 * h1))
         ctx.beginPath()
         ctx.arc(gx, gy, raio, 0, Math.PI * 2)
         ctx.fill()
