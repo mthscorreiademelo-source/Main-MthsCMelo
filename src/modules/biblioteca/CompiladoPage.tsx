@@ -5,10 +5,10 @@ import { IconLivro, IconMais, IconLixeira, IconSetaEsquerda } from '../../core/c
 import { AdicionarLivro } from './components/AdicionarLivro'
 import { CartaoLivro } from './components/CartaoLivro'
 import { EditorTags } from './components/EditorTags'
-import { removerCompilado, rotuloTipo, salvarLivro } from './db'
+import { removerCompilado, rotuloTipo, salvarLivro, STATUS } from './db'
 import { useLivro, useVolumes } from './hooks'
 import { gerarMiniatura } from './importar'
-import type { Livro } from './types'
+import type { Livro, StatusLeitura } from './types'
 
 /** Página de um compilado (série de quadrinho/mangá): capa + volumes. */
 export function CompiladoPage() {
@@ -105,6 +105,21 @@ export function CompiladoPage() {
             placeholder="ex.: ação, aventura"
           />
         </div>
+      </div>
+
+      {/* Estante (status) da série */}
+      <div className="flex flex-wrap gap-1.5">
+        {STATUS.map((s) => (
+          <button
+            key={s.valor}
+            onClick={() => salvar({ status: s.valor as StatusLeitura })}
+            className={`min-h-9 cursor-pointer rounded-full px-3.5 text-[13px] font-medium transition-colors ${
+              compilado.status === s.valor ? 'bg-ink text-surface' : 'bg-hover text-muted hover:text-ink'
+            }`}
+          >
+            {s.rotulo}
+          </button>
+        ))}
       </div>
 
       <div className="flex items-center justify-between">
