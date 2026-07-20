@@ -20,7 +20,20 @@ import type {
   HumorTipo,
   Registro,
 } from '../../modules/humor/types'
-import type { SaudeDia } from '../../modules/saude/types'
+import type {
+  Atividade,
+  Consulta,
+  DoacaoSangue,
+  Exame,
+  Medicamento,
+  MedicamentoTomada,
+  Medida,
+  Profissional,
+  Refeicao,
+  SaudeConfig,
+  SaudeDia,
+  Vacina,
+} from '../../modules/saude/types'
 import type { ArquivoLivro, Livro } from '../../modules/biblioteca/types'
 import type { Cronograma, Evento } from '../../modules/agenda/types'
 
@@ -63,6 +76,17 @@ class VidaDB extends Dexie {
   categorias!: Table<Categoria, string>
   fatores!: Table<Fator, string>
   saude!: Table<SaudeDia, string>
+  saudeMedidas!: Table<Medida, string>
+  atividades!: Table<Atividade, string>
+  refeicoes!: Table<Refeicao, string>
+  profissionais!: Table<Profissional, string>
+  consultas!: Table<Consulta, string>
+  medicamentos!: Table<Medicamento, string>
+  medicamentoTomadas!: Table<MedicamentoTomada, string>
+  exames!: Table<Exame, string>
+  vacinas!: Table<Vacina, string>
+  doacoesSangue!: Table<DoacaoSangue, string>
+  saudeConfig!: Table<SaudeConfig, string>
   livros!: Table<Livro, string>
   /** Arquivos dos livros (blobs) — locais, não sincronizam. */
   arquivosLivros!: Table<ArquivoLivro, string>
@@ -182,6 +206,21 @@ class VidaDB extends Dexie {
       financasConfig: 'id',
       patrimonioSnapshots: 'mes',
     })
+    // v18: Saúde expandida — prontuário pessoal (medidas, atividades, refeições,
+    // profissionais, consultas, medicamentos + tomadas, exames, vacinas, doações).
+    this.version(18).stores({
+      saudeMedidas: 'id, data, tipo',
+      atividades: 'id, data',
+      refeicoes: 'id, data',
+      profissionais: 'id',
+      consultas: 'id, data, profissionalId',
+      medicamentos: 'id',
+      medicamentoTomadas: 'id, medicamentoId, data',
+      exames: 'id, data, marcador',
+      vacinas: 'id, data',
+      doacoesSangue: 'id, data',
+      saudeConfig: 'id',
+    })
   }
 }
 
@@ -255,6 +294,17 @@ export async function exportarBackup() {
     categorias: await db.categorias.toArray(),
     fatores: await db.fatores.toArray(),
     saude: await db.saude.toArray(),
+    saudeMedidas: await db.saudeMedidas.toArray(),
+    atividades: await db.atividades.toArray(),
+    refeicoes: await db.refeicoes.toArray(),
+    profissionais: await db.profissionais.toArray(),
+    consultas: await db.consultas.toArray(),
+    medicamentos: await db.medicamentos.toArray(),
+    medicamentoTomadas: await db.medicamentoTomadas.toArray(),
+    exames: await db.exames.toArray(),
+    vacinas: await db.vacinas.toArray(),
+    doacoesSangue: await db.doacoesSangue.toArray(),
+    saudeConfig: await db.saudeConfig.toArray(),
     livros: await db.livros.toArray(),
     categoriasHabito: await db.categoriasHabito.toArray(),
   }
@@ -295,6 +345,17 @@ export async function importarBackup(json: unknown) {
     categorias?: Categoria[]
     fatores?: Fator[]
     saude?: SaudeDia[]
+    saudeMedidas?: Medida[]
+    atividades?: Atividade[]
+    refeicoes?: Refeicao[]
+    profissionais?: Profissional[]
+    consultas?: Consulta[]
+    medicamentos?: Medicamento[]
+    medicamentoTomadas?: MedicamentoTomada[]
+    exames?: Exame[]
+    vacinas?: Vacina[]
+    doacoesSangue?: DoacaoSangue[]
+    saudeConfig?: SaudeConfig[]
     livros?: Livro[]
     categoriasHabito?: CategoriaHabito[]
   }
@@ -340,6 +401,17 @@ export async function importarBackup(json: unknown) {
   if (Array.isArray(dados.categorias)) await db.categorias.bulkPut(dados.categorias)
   if (Array.isArray(dados.fatores)) await db.fatores.bulkPut(dados.fatores)
   if (Array.isArray(dados.saude)) await db.saude.bulkPut(dados.saude)
+  if (Array.isArray(dados.saudeMedidas)) await db.saudeMedidas.bulkPut(dados.saudeMedidas)
+  if (Array.isArray(dados.atividades)) await db.atividades.bulkPut(dados.atividades)
+  if (Array.isArray(dados.refeicoes)) await db.refeicoes.bulkPut(dados.refeicoes)
+  if (Array.isArray(dados.profissionais)) await db.profissionais.bulkPut(dados.profissionais)
+  if (Array.isArray(dados.consultas)) await db.consultas.bulkPut(dados.consultas)
+  if (Array.isArray(dados.medicamentos)) await db.medicamentos.bulkPut(dados.medicamentos)
+  if (Array.isArray(dados.medicamentoTomadas)) await db.medicamentoTomadas.bulkPut(dados.medicamentoTomadas)
+  if (Array.isArray(dados.exames)) await db.exames.bulkPut(dados.exames)
+  if (Array.isArray(dados.vacinas)) await db.vacinas.bulkPut(dados.vacinas)
+  if (Array.isArray(dados.doacoesSangue)) await db.doacoesSangue.bulkPut(dados.doacoesSangue)
+  if (Array.isArray(dados.saudeConfig)) await db.saudeConfig.bulkPut(dados.saudeConfig)
   if (Array.isArray(dados.livros)) await db.livros.bulkPut(dados.livros)
   if (Array.isArray(dados.categoriasHabito)) await db.categoriasHabito.bulkPut(dados.categoriasHabito)
   return {

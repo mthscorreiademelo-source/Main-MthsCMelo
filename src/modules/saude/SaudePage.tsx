@@ -1,151 +1,132 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { EmptyState } from '../../core/components/EmptyState'
-import { IconMais, IconSaude, IconUpload } from '../../core/components/Icons'
-import { hojeISO, rotuloData } from '../../core/dates'
-import {
-  conectarSaudeAndroid,
-  noAppAndroid,
-  ouvirSaude,
-  sincronizarSaudeAndroid,
-} from '../../core/ponteAndroid'
-import { CartaoMetrica } from './components/CartaoMetrica'
+import { useEffect, useRef, useState } from 'react'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { IconEngrenagem, IconMais, IconUpload } from '../../core/components/Icons'
+import { hojeISO } from '../../core/dates'
+import { noAppAndroid, ouvirSaude } from '../../core/ponteAndroid'
 import { EditorDia } from './components/EditorDia'
 import { ImportarSaude } from './components/ImportarSaude'
-import { exibir, METRICAS } from './db'
-import { useSaude } from './hooks'
+import { VisaoGeralSaude } from './components/VisaoGeralSaude'
+import {
+  AbaAlimentacao,
+  AbaConsultas,
+  AbaDoacao,
+  AbaExames,
+  AbaLinhaTempo,
+  AbaMedicamentos,
+  AbaMedidas,
+  AbaMetricas,
+  AbaTreinos,
+  AbaVacinas,
+  AjustesSaude,
+} from './components/AbasSaude'
+import { semearSaudeSePreciso } from './db'
+import { useSaudeDia } from './hooks'
 import { getUrlPlanilha, sincronizarPlanilha } from './planilha'
-import type { SaudeDia } from './types'
+
+export type AbaSaude =
+  | 'geral'
+  | 'metricas'
+  | 'alimentacao'
+  | 'treinos'
+  | 'exames'
+  | 'consultas'
+  | 'medicamentos'
+  | 'vacinas'
+  | 'doacao'
+  | 'medidas'
+  | 'linha'
+
+const ABAS: { id: AbaSaude; rotulo: string }[] = [
+  { id: 'geral', rotulo: 'Visão geral' },
+  { id: 'metricas', rotulo: 'Métricas' },
+  { id: 'alimentacao', rotulo: 'Alimentação' },
+  { id: 'treinos', rotulo: 'Treinos' },
+  { id: 'exames', rotulo: 'Exames' },
+  { id: 'consultas', rotulo: 'Consultas' },
+  { id: 'medicamentos', rotulo: 'Medicamentos' },
+  { id: 'vacinas', rotulo: 'Vacinas' },
+  { id: 'doacao', rotulo: 'Doação' },
+  { id: 'medidas', rotulo: 'Medidas' },
+  { id: 'linha', rotulo: 'Linha do tempo' },
+]
 
 export function SaudePage() {
-  const dias = useSaude()
+  const [aba, setAba] = useState<AbaSaude>('geral')
   const [editando, setEditando] = useState<string | null>(null)
   const [importando, setImportando] = useState(false)
-  const [statusPlan, setStatusPlan] = useState<string | null>(null)
+  const [ajustes, setAjustes] = useState(false)
+  const [statusApp, setStatusApp] = useState<string | null>(null)
   const jaSincronizou = useRef(false)
   const emApp = noAppAndroid()
-  const [statusApp, setStatusApp] = useState<string | null>(null)
+  const diaEditado = useSaudeDia(editando ?? '')
 
-  // Dentro do app Android: ouve os avisos da ponte de saúde (Health Connect).
+  useEffect(() => {
+    semearSaudeSePreciso()
+  }, [])
+
   useEffect(() => {
     if (!emApp) return
     return ouvirSaude((e) => setStatusApp(e.mensagem))
   }, [emApp])
 
-  // Ao abrir a Saúde, relê a planilha conectada (se houver) e importa.
   useEffect(() => {
     if (jaSincronizou.current || !getUrlPlanilha()) return
     jaSincronizou.current = true
-    setStatusPlan('Sincronizando planilha…')
-    sincronizarPlanilha()
-      .then((r) => setStatusPlan(r.dias > 0 ? `Planilha: ${r.dias} dia(s) atualizado(s).` : null))
-      .catch(() => setStatusPlan('Não consegui ler a planilha agora.'))
+    sincronizarPlanilha().catch(() => {})
   }, [])
 
-  const ordenados = useMemo(
-    () => [...(dias ?? [])].sort((a, b) => (a.data < b.data ? 1 : -1)),
-    [dias],
-  )
-  const diaEditado = editando ? (dias ?? []).find((d) => d.data === editando) : undefined
-
-  function resumo(d: SaudeDia): string {
-    return METRICAS.map((m) => (d[m.chave] != null ? exibir(m.chave, d[m.chave]) : null))
-      .filter(Boolean)
-      .join(' · ')
-  }
-
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Saúde</h1>
-        <button
-          onClick={() => setImportando(true)}
-          className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border border-line px-3 text-[14px] font-medium text-muted transition-colors hover:text-ink"
-        >
-          <IconUpload width={16} height={16} />
-          Importar
-        </button>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+      {/* Cabeçalho */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h1 className="text-[22px] font-bold">Saúde</h1>
+          <p className="text-[12px] capitalize text-muted">{format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}</p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setEditando(hojeISO())} className="flex min-h-9 items-center gap-1.5 rounded-full bg-ink px-3.5 text-[14px] font-medium text-surface">
+            <IconMais width={16} height={16} /> Registrar dia
+          </button>
+          <button onClick={() => setImportando(true)} aria-label="Importar" className="flex size-9 items-center justify-center rounded-full text-muted hover:bg-hover hover:text-ink">
+            <IconUpload width={17} height={17} />
+          </button>
+          <button onClick={() => setAjustes(true)} aria-label="Ajustes de Saúde" className="flex size-9 items-center justify-center rounded-full text-muted hover:bg-hover hover:text-ink">
+            <IconEngrenagem width={18} height={18} />
+          </button>
+        </div>
       </div>
 
-      <button
-        onClick={() => setEditando(hojeISO())}
-        className="flex min-h-12 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-dashed border-line bg-surface/60 text-[15px] font-medium text-muted transition-colors hover:border-muted/50 hover:text-ink"
-      >
-        <IconMais width={18} height={18} />
-        Registrar hoje
-      </button>
+      {statusApp && <p className="text-[12px] text-muted">{statusApp}</p>}
 
-      {emApp && (
-        <section className="flex flex-col gap-2.5 rounded-xl border border-line bg-surface/60 p-3">
-          <div className="flex items-center gap-1.5 text-[13px] font-medium text-muted">
-            <IconSaude width={16} height={16} />
-            Conexão Saúde (Health Connect)
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={conectarSaudeAndroid}
-              className="min-h-10 flex-1 cursor-pointer rounded-lg bg-ink px-3 text-[14px] font-medium text-surface transition-opacity hover:opacity-90"
-            >
-              Conectar Saúde
-            </button>
-            <button
-              onClick={sincronizarSaudeAndroid}
-              className="min-h-10 flex-1 cursor-pointer rounded-lg border border-line px-3 text-[14px] font-medium text-ink transition-colors hover:bg-hover"
-            >
-              Sincronizar agora
-            </button>
-          </div>
-          {statusApp && <p className="text-[12px] text-muted">{statusApp}</p>}
-        </section>
-      )}
-
-      {statusPlan && <p className="px-1 text-[12px] text-muted">{statusPlan}</p>}
-
-      {/* Cartões por métrica */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {METRICAS.map((m) => (
-          <CartaoMetrica
-            key={m.chave}
-            def={m}
-            dias={dias ?? []}
-            onAbrir={() => setEditando(hojeISO())}
-          />
+      {/* Abas */}
+      <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
+        {ABAS.map((a) => (
+          <button
+            key={a.id}
+            onClick={() => setAba(a.id)}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${aba === a.id ? 'bg-ink text-surface' : 'text-muted hover:bg-hover hover:text-ink'}`}
+          >
+            {a.rotulo}
+          </button>
         ))}
       </div>
 
-      {/* Histórico */}
-      {dias && ordenados.length === 0 ? (
-        <EmptyState
-          icone={<IconSaude />}
-          titulo="Sem dados de saúde ainda"
-          descricao="Registre um dia ou importe do seu relógio para ver tendências e correlações com o humor."
-        />
-      ) : (
-        <section className="flex flex-col gap-2">
-          <h2 className="px-1 text-[13px] font-medium text-muted">Histórico</h2>
-          <ul className="flex flex-col">
-            {ordenados.map((d) => (
-              <li key={d.id}>
-                <button
-                  onClick={() => setEditando(d.data)}
-                  className="flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-lg px-2 text-left transition-colors hover:bg-hover"
-                >
-                  <span className="min-w-0 flex-1 py-2">
-                    <span className="block text-[14px] font-medium">
-                      {d.data === hojeISO() ? 'Hoje' : rotuloData(d.data)}
-                    </span>
-                    <span className="block truncate text-[13px] text-muted">{resumo(d) || '—'}</span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      {aba === 'geral' && <VisaoGeralSaude onIrAba={setAba} onEditarDia={() => setEditando(hojeISO())} />}
+      {aba === 'metricas' && <AbaMetricas emApp={emApp} onEditarDia={setEditando} />}
+      {aba === 'alimentacao' && <AbaAlimentacao />}
+      {aba === 'treinos' && <AbaTreinos />}
+      {aba === 'exames' && <AbaExames />}
+      {aba === 'consultas' && <AbaConsultas />}
+      {aba === 'medicamentos' && <AbaMedicamentos />}
+      {aba === 'vacinas' && <AbaVacinas />}
+      {aba === 'doacao' && <AbaDoacao />}
+      {aba === 'medidas' && <AbaMedidas />}
+      {aba === 'linha' && <AbaLinhaTempo />}
 
-      {editando && (
-        <EditorDia data={editando} dia={diaEditado} onFechar={() => setEditando(null)} />
-      )}
+      {editando && <EditorDia data={editando} dia={diaEditado} onFechar={() => setEditando(null)} />}
       {importando && <ImportarSaude onFechar={() => setImportando(false)} />}
+      {ajustes && <AjustesSaude onFechar={() => setAjustes(false)} />}
     </div>
   )
 }
