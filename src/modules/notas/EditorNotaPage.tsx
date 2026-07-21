@@ -6,6 +6,7 @@ import { db } from '../../core/db/db'
 import { ArquivosPainel } from './components/ArquivosPainel'
 import { BlocoEditor } from './components/BlocoEditor'
 import { ChipsRelacao } from './components/RelacoesNota'
+import { ExtrairAcoes } from './components/ExtrairAcoes'
 import { DesenhoTela } from './components/DesenhoTela'
 import { excluirPagina, novoBloco, ordenarGrupos, salvarPagina } from './db'
 import { useGrupos } from './hooks'
@@ -18,6 +19,7 @@ export function EditorNotaPage() {
   const [pagina, setPagina] = useState<Pagina | null>(null)
   const [focoEm, setFocoEm] = useState<string | null>(null)
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
+  const [extrair, setExtrair] = useState(false)
   const carregouEm = useRef(0)
   const tituloRef = useRef<HTMLTextAreaElement>(null)
 
@@ -114,6 +116,11 @@ export function EditorNotaPage() {
           <IconSetaEsquerda />
         </IconButton>
         <div className="flex items-center gap-1">
+          {(pagina.tipo ?? 'texto') === 'texto' && (
+            <button onClick={() => setExtrair(true)} className="flex min-h-9 items-center gap-1 rounded-full border border-line px-3 text-[12.5px] font-medium text-muted hover:text-ink" title="Extrair tarefas/eventos/compras">
+              ⚡ Extrair
+            </button>
+          )}
           <button
             onClick={() => setPagina((p) => (p ? { ...p, favorito: !p.favorito } : p))}
             aria-label={pagina.favorito ? 'Remover favorito' : 'Favoritar'}
@@ -189,6 +196,8 @@ export function EditorNotaPage() {
       <div className="mt-2 border-t border-line pt-3">
         <ChipsRelacao pagina={pagina} onAtualizar={(m) => setPagina((p) => (p ? { ...p, ...m } : p))} />
       </div>
+
+      {extrair && <ExtrairAcoes pagina={pagina} onFechar={() => setExtrair(false)} />}
 
       {(grupos?.length ?? 0) > 0 && (
         <div className="flex items-center gap-1.5 overflow-x-auto border-t border-line py-3">

@@ -7,6 +7,8 @@ import { GrupoEditorSheet } from './components/GrupoEditorSheet'
 import { ListaNotas } from './components/ListaNotas'
 import { buscarNotas, ordenarNotas } from './acoes'
 import { criarPagina, ordenarGrupos, textoResumo } from './db'
+import { criarPaginaDeTemplate, TEMPLATES_NOTA } from './templates'
+import { FolhaInferior } from '../../core/components/FolhaInferior'
 import { useGrupos, usePaginas } from './hooks'
 import { capaDoGrupo, type Pagina } from './types'
 
@@ -31,6 +33,7 @@ export function NotasPage() {
   const [buscaAberta, setBuscaAberta] = useState(false)
   const [filtroTipo, setFiltroTipo] = useState<'texto' | 'desenho' | 'arquivos' | undefined>(undefined)
   const [criandoGrupo, setCriandoGrupo] = useState(false)
+  const [modelos, setModelos] = useState(false)
 
   const todas = useMemo(() => paginas ?? [], [paginas])
   const ativas = useMemo(() => ordenarNotas(buscarNotas(todas, {})), [todas])
@@ -73,6 +76,7 @@ export function NotasPage() {
         <BotaoCriar icone={<IconDocumento width={17} height={17} />} rotulo="Texto" onClick={() => novaPagina('texto')} />
         <BotaoCriar icone={<IconCaneta width={17} height={17} />} rotulo="Desenho" onClick={() => novaPagina('desenho')} />
         <BotaoCriar icone={<IconPasta width={17} height={17} />} rotulo="Arquivos" onClick={() => novaPagina('arquivos')} />
+        <BotaoCriar icone={<span className="text-[15px] leading-none">📋</span>} rotulo="Modelo" onClick={() => setModelos(true)} />
         <BotaoCriar icone={<IconMais width={17} height={17} />} rotulo="Caderno" onClick={() => setCriandoGrupo(true)} />
       </div>
 
@@ -113,6 +117,19 @@ export function NotasPage() {
       )}
 
       <GrupoEditorSheet aberto={criandoGrupo} grupo={null} onFechar={() => setCriandoGrupo(false)} />
+
+      {modelos && (
+        <FolhaInferior titulo="Começar com um modelo" onFechar={() => setModelos(false)}>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {TEMPLATES_NOTA.map((t) => (
+              <button key={t.id} onClick={async () => { const id = await criarPaginaDeTemplate(t); setModelos(false); navigate(`/notas/${id}`) }} className="flex flex-col items-center gap-1.5 rounded-2xl border border-line p-3 text-center hover:bg-hover/50">
+                <span className="text-2xl">{t.emoji}</span>
+                <span className="text-[13px] font-medium">{t.nome}</span>
+              </button>
+            ))}
+          </div>
+        </FolhaInferior>
+      )}
     </div>
   )
 }
