@@ -29,7 +29,8 @@ import {
   reservaDeEmergencia,
   serieEvolucao,
 } from './orcamento'
-import type { Movimento } from './types'
+import { MovimentarObjetivo } from './components/MovimentarObjetivo'
+import type { Movimento, Objetivo } from './types'
 
 /* -------------------------------- helpers --------------------------------- */
 
@@ -66,6 +67,7 @@ export function FinancasPage() {
   const [selecionado, setSelecionado] = useState<Movimento | null>(null)
   const [sheet, setSheet] = useState<'ajustes' | 'transacoes' | null>(null)
   const [addAberto, setAddAberto] = useState(false)
+  const [movimentar, setMovimentar] = useState<Objetivo | null>(null)
 
   const hoje = hojeISO()
   const mesHoje = mesDe(hoje)
@@ -361,10 +363,11 @@ export function FinancasPage() {
           {objetivosVis.map((o) => {
             const frac = o.alvoCentavos > 0 ? o.atualCentavos / o.alvoCentavos : 0
             return (
-              <div key={o.id} className="rounded-xl border border-line p-3">
+              <button key={o.id} onClick={() => setMovimentar(o)} className="cursor-pointer rounded-xl border border-line p-3 text-left transition-colors hover:border-muted/40">
                 <div className="flex items-center gap-2">
                   <span className="flex size-8 items-center justify-center rounded-full text-[15px]" style={{ backgroundColor: `color-mix(in srgb, ${o.cor ?? '#7c9885'} 16%, transparent)` }}>{o.icone ?? '🎯'}</span>
                   <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{o.nome}</span>
+                  <span className="text-[11px] text-muted">＋</span>
                 </div>
                 <div className="mt-2 flex items-baseline gap-1">
                   <span className="text-[22px] font-bold leading-none">{Math.round(frac * 100)}</span>
@@ -374,7 +377,7 @@ export function FinancasPage() {
                   <div className="h-full rounded-full" style={{ width: `${Math.min(100, frac * 100)}%`, backgroundColor: o.cor ?? '#7c9885' }} />
                 </div>
                 <div className="mt-1.5 text-[11px] text-muted">{formatarBRL(o.atualCentavos)} de {formatarBRL(o.alvoCentavos)}</div>
-              </div>
+              </button>
             )
           })}
         </div>
@@ -439,6 +442,7 @@ export function FinancasPage() {
         <TransacoesSheet mes={mes} rotuloMes={rotuloMes} movimentos={movimentos ?? []} onSelecionar={(m) => { setSheet(null); setSelecionado(m) }} onFechar={() => setSheet(null)} />
       )}
       <MovimentoEditorSheet movimento={selecionado} onFechar={() => setSelecionado(null)} />
+      {movimentar && <MovimentarObjetivo objetivo={movimentar} contas={contas ?? []} onFechar={() => setMovimentar(null)} />}
     </div>
   )
 }

@@ -181,6 +181,38 @@ export async function criarObjetivo(dados: Partial<Objetivo> & { nome: string })
 export const atualizarObjetivo = (id: string, m: Partial<Objetivo>) => db.objetivos.update(id, m)
 export const excluirObjetivo = (id: string) => db.objetivos.delete(id)
 
+/* ---------- caixinhas: guardar / retirar / rendimento ---------- */
+
+/**
+ * Guarda dinheiro num objetivo, tirando de uma conta. É uma transferência
+ * interna (não é gasto): a conta cai e o objetivo sobe. Como o disponível é
+ * calculado pelo saldo das contas líquidas, guardar reduz o que dá pra gastar.
+ */
+export async function guardarNoObjetivo(objetivoId: string, contaId: string | undefined, centavos: number) {
+  if (centavos <= 0) return
+  await db.transaction('rw', db.objetivos, db.contas, async () => {
+    if (contaId) await db.contas.where('id').equals(contaId).modify((c) => { c.saldoCentavos -= centavos })
+    await db.objetivos.where('id').equals(objetivoId).modify((o) => { o.atualCentavos += centavos })
+  })
+}
+
+/** Retira dinheiro de um objetivo de volta para uma conta (o inverso de guardar). */
+export async function retirarDoObjetivo(objetivoId: string, contaId: string | undefined, centavos: number) {
+  if (centavos <= 0) return
+  await db.transaction('rw', db.objetivos, db.contas, async () => {
+    await db.objetivos.where('id').equals(objetivoId).modify((o) => {
+      o.atualCentavos = Math.max(0, o.atualCentavos - centavos)
+    })
+    if (contaId) await db.contas.where('id').equals(contaId).modify((c) => { c.saldoCentavos += centavos })
+  })
+}
+
+/** Rendimento: o objetivo cresce sozinho (juros/valorização), sem mexer em conta. */
+export async function renderNoObjetivo(objetivoId: string, centavos: number) {
+  if (centavos <= 0) return
+  await db.objetivos.where('id').equals(objetivoId).modify((o) => { o.atualCentavos += centavos })
+}
+
 /* ------------------------------ Recorrentes ------------------------------- */
 
 export async function criarRecorrente(dados: Partial<Recorrente> & { nome: string }): Promise<string> {
