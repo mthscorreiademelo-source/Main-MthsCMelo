@@ -27,14 +27,18 @@ export async function criarMovimento(dados: {
   descricao: string
   data: string
   categoria?: string
-}) {
-  if (!dados.descricao.trim() || dados.valorCentavos <= 0) return
+  /** Vínculo opcional com um pet (integração com o módulo Pets). */
+  petId?: string
+}): Promise<string | undefined> {
+  if (!dados.descricao.trim() || dados.valorCentavos <= 0) return undefined
+  const id = nanoid()
   await db.movimentos.add({
-    id: nanoid(),
+    id,
     ...dados,
     descricao: dados.descricao.trim(),
     criadoEm: Date.now(),
   })
+  return id
 }
 
 export async function atualizarMovimento(id: string, mudancas: Partial<Movimento>) {

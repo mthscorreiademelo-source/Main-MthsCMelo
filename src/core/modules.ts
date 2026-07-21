@@ -7,6 +7,7 @@ import {
   IconDocumento,
   IconHumor,
   IconLivro,
+  IconPata,
   IconSaude,
   IconSol,
 } from './components/Icons'
@@ -27,6 +28,8 @@ import { BibliotecaPage } from '../modules/biblioteca/BibliotecaPage'
 import { LivroPage } from '../modules/biblioteca/LivroPage'
 import { CompiladoPage } from '../modules/biblioteca/CompiladoPage'
 import { LeitorPage } from '../modules/biblioteca/leitor/LeitorPage'
+import { PetsPage } from '../modules/pets/PetsPage'
+import { PetWorkspacePage } from '../modules/pets/PetWorkspacePage'
 import { SecaoHoje as TarefasHoje } from '../modules/tarefas/SecaoHoje'
 import { SecaoHoje as NotasHoje } from '../modules/notas/SecaoHoje'
 import { SecaoHoje as HumorHoje } from '../modules/humor/SecaoHoje'
@@ -34,6 +37,8 @@ import { SecaoHoje as SaudeHoje } from '../modules/saude/SecaoHoje'
 import { SecaoHoje as FinancasHoje } from '../modules/financas/SecaoHoje'
 import { SecaoHoje as BibliotecaHoje } from '../modules/biblioteca/SecaoHoje'
 import { SecaoHoje as AgendaHoje } from '../modules/agenda/SecaoHoje'
+import { SecaoHoje as PetsHoje } from '../modules/pets/SecaoHoje'
+import { HojeResumo as PetsResumo } from '../modules/pets/HojeResumo'
 import { HojeResumo as TarefasResumo } from '../modules/tarefas/HojeResumo'
 import { HojeResumo as AgendaResumo } from '../modules/agenda/HojeResumo'
 import { HojeResumo as HabitosResumo } from '../modules/habitos/HojeResumo'
@@ -158,6 +163,17 @@ export const MODULOS: ModuloDef[] = [
       { caminho: '/biblioteca/:id', Pagina: LivroPage },
     ],
     SecaoHoje: BibliotecaHoje,
+    hojeTamanho: 'compacto',
+  },
+  {
+    id: 'pets',
+    nome: 'Pets',
+    rota: '/pets',
+    Icone: IconPata,
+    Pagina: PetsPage,
+    subRotas: [{ caminho: '/pets/:id', Pagina: PetWorkspacePage }],
+    SecaoHoje: PetsHoje,
+    HojeResumo: PetsResumo,
     hojeTamanho: 'compacto',
   },
 ]

@@ -72,6 +72,8 @@ export interface Evento {
   participantes?: string[]
   /** Custo estimado do evento em centavos — reservado no orçamento de Finanças. */
   custoCentavos?: number
+  /** Vínculo opcional com um pet (evento criado pelo módulo Pets). */
+  petId?: string
   descricao?: string
   /** Repetição do evento (gera ocorrências nas datas seguintes). */
   recorrencia?: RecorrenciaEvento

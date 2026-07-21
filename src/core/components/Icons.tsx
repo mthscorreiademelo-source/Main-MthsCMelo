@@ -516,3 +516,15 @@ export function IconLupa(props: IconProps) {
     </svg>
   )
 }
+
+export function IconPata(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <ellipse cx="12" cy="15.5" rx="4.2" ry="3.4" />
+      <circle cx="6.4" cy="10.6" r="1.7" />
+      <circle cx="10" cy="7.4" r="1.7" />
+      <circle cx="14" cy="7.4" r="1.7" />
+      <circle cx="17.6" cy="10.6" r="1.7" />
+    </svg>
+  )
+}

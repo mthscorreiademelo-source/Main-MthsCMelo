@@ -36,6 +36,21 @@ import type {
 } from '../../modules/saude/types'
 import type { ArquivoLivro, Destaque, Livro, NotaLivro } from '../../modules/biblioteca/types'
 import type { Contexto, Cronograma, Evento } from '../../modules/agenda/types'
+import type {
+  Pet,
+  PetAlimento,
+  PetArquivo,
+  PetCondicao,
+  PetConsulta,
+  PetCuidado,
+  PetCuidadoRegistro,
+  PetDocumento,
+  PetFoto,
+  PetItem,
+  PetMedicamento,
+  PetPeso,
+  PetVacina,
+} from '../../modules/pets/types'
 
 /** Conteúdo binário de um arquivo anexado a uma nota do tipo 'arquivos'. */
 export interface ArquivoDados {
@@ -93,6 +108,20 @@ class VidaDB extends Dexie {
   destaques!: Table<Destaque, string>
   /** Arquivos dos livros (blobs) — locais, não sincronizam. */
   arquivosLivros!: Table<ArquivoLivro, string>
+  pets!: Table<Pet, string>
+  petPesos!: Table<PetPeso, string>
+  petVacinas!: Table<PetVacina, string>
+  petConsultas!: Table<PetConsulta, string>
+  petCondicoes!: Table<PetCondicao, string>
+  petMedicamentos!: Table<PetMedicamento, string>
+  petAlimentos!: Table<PetAlimento, string>
+  petItens!: Table<PetItem, string>
+  petCuidados!: Table<PetCuidado, string>
+  petCuidadoRegistros!: Table<PetCuidadoRegistro, string>
+  petFotos!: Table<PetFoto, string>
+  petDocumentos!: Table<PetDocumento, string>
+  /** Blobs de fotos e documentos dos pets — locais, não sincronizam. */
+  petArquivos!: Table<PetArquivo, string>
   /** Espelho do último estado sincronizado (chave → atualizadoEm). */
   espelho!: Table<{ chave: string; atualizadoEm: number }, string>
 
@@ -233,6 +262,23 @@ class VidaDB extends Dexie {
       notasLivro: 'id, livroId, criadoEm',
       destaques: 'id, livroId, criadoEm',
     })
+    // v21: módulo Pets — cada animal é um workspace. Metadados sincronizam;
+    // `petArquivos` (blobs de fotos/documentos) é local.
+    this.version(21).stores({
+      pets: 'id, ordem, status, criadoEm, atualizadoEm',
+      petPesos: 'id, petId, data',
+      petVacinas: 'id, petId, data',
+      petConsultas: 'id, petId, data',
+      petCondicoes: 'id, petId',
+      petMedicamentos: 'id, petId',
+      petAlimentos: 'id, petId',
+      petItens: 'id, petId',
+      petCuidados: 'id, petId, ordem',
+      petCuidadoRegistros: 'id, petId, data',
+      petFotos: 'id, petId, criadoEm',
+      petDocumentos: 'id, petId, criadoEm',
+      petArquivos: 'id',
+    })
   }
 }
 
@@ -280,9 +326,20 @@ export async function exportarBackup() {
       dados: await blobParaBase64(a.blob),
     })),
   )
+  const petArquivos = await db.petArquivos.toArray()
+  const petArquivosSerial = await Promise.all(
+    petArquivos.map(async (a) => ({
+      id: a.id,
+      nome: a.nome,
+      tipo: a.tipo,
+      tamanho: a.tamanho,
+      criadoEm: a.criadoEm,
+      dados: await blobParaBase64(a.blob),
+    })),
+  )
   return {
     app: 'vida',
-    versao: 8,
+    versao: 9,
     exportadoEm: new Date().toISOString(),
     tasks: await db.tasks.toArray(),
     projetos: await db.projetos.toArray(),
@@ -322,6 +379,19 @@ export async function exportarBackup() {
     notasLivro: await db.notasLivro.toArray(),
     destaques: await db.destaques.toArray(),
     categoriasHabito: await db.categoriasHabito.toArray(),
+    pets: await db.pets.toArray(),
+    petPesos: await db.petPesos.toArray(),
+    petVacinas: await db.petVacinas.toArray(),
+    petConsultas: await db.petConsultas.toArray(),
+    petCondicoes: await db.petCondicoes.toArray(),
+    petMedicamentos: await db.petMedicamentos.toArray(),
+    petAlimentos: await db.petAlimentos.toArray(),
+    petItens: await db.petItens.toArray(),
+    petCuidados: await db.petCuidados.toArray(),
+    petCuidadoRegistros: await db.petCuidadoRegistros.toArray(),
+    petFotos: await db.petFotos.toArray(),
+    petDocumentos: await db.petDocumentos.toArray(),
+    petArquivos: petArquivosSerial,
   }
 }
 
@@ -376,6 +446,19 @@ export async function importarBackup(json: unknown) {
     notasLivro?: NotaLivro[]
     destaques?: Destaque[]
     categoriasHabito?: CategoriaHabito[]
+    pets?: Pet[]
+    petPesos?: PetPeso[]
+    petVacinas?: PetVacina[]
+    petConsultas?: PetConsulta[]
+    petCondicoes?: PetCondicao[]
+    petMedicamentos?: PetMedicamento[]
+    petAlimentos?: PetAlimento[]
+    petItens?: PetItem[]
+    petCuidados?: PetCuidado[]
+    petCuidadoRegistros?: PetCuidadoRegistro[]
+    petFotos?: PetFoto[]
+    petDocumentos?: PetDocumento[]
+    petArquivos?: ArquivoSerial[]
   }
   const temTasks = Array.isArray(dados?.tasks)
   const temPaginas = Array.isArray(dados?.paginas)
@@ -435,6 +518,30 @@ export async function importarBackup(json: unknown) {
   if (Array.isArray(dados.notasLivro)) await db.notasLivro.bulkPut(dados.notasLivro)
   if (Array.isArray(dados.destaques)) await db.destaques.bulkPut(dados.destaques)
   if (Array.isArray(dados.categoriasHabito)) await db.categoriasHabito.bulkPut(dados.categoriasHabito)
+  if (Array.isArray(dados.pets)) await db.pets.bulkPut(dados.pets)
+  if (Array.isArray(dados.petPesos)) await db.petPesos.bulkPut(dados.petPesos)
+  if (Array.isArray(dados.petVacinas)) await db.petVacinas.bulkPut(dados.petVacinas)
+  if (Array.isArray(dados.petConsultas)) await db.petConsultas.bulkPut(dados.petConsultas)
+  if (Array.isArray(dados.petCondicoes)) await db.petCondicoes.bulkPut(dados.petCondicoes)
+  if (Array.isArray(dados.petMedicamentos)) await db.petMedicamentos.bulkPut(dados.petMedicamentos)
+  if (Array.isArray(dados.petAlimentos)) await db.petAlimentos.bulkPut(dados.petAlimentos)
+  if (Array.isArray(dados.petItens)) await db.petItens.bulkPut(dados.petItens)
+  if (Array.isArray(dados.petCuidados)) await db.petCuidados.bulkPut(dados.petCuidados)
+  if (Array.isArray(dados.petCuidadoRegistros)) await db.petCuidadoRegistros.bulkPut(dados.petCuidadoRegistros)
+  if (Array.isArray(dados.petFotos)) await db.petFotos.bulkPut(dados.petFotos)
+  if (Array.isArray(dados.petDocumentos)) await db.petDocumentos.bulkPut(dados.petDocumentos)
+  if (Array.isArray(dados.petArquivos)) {
+    await db.petArquivos.bulkPut(
+      dados.petArquivos.map((a) => ({
+        id: a.id,
+        nome: a.nome,
+        tipo: a.tipo,
+        tamanho: a.tamanho,
+        criadoEm: a.criadoEm,
+        blob: base64ParaBlob(a.dados, a.tipo),
+      })),
+    )
+  }
   return {
     tasks: dados.tasks?.length ?? 0,
     paginas: dados.paginas?.length ?? 0,
