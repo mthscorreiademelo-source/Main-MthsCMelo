@@ -1,26 +1,22 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { IconMais } from '../../../core/components/Icons'
 import { FolhaInferior } from '../../../core/components/FolhaInferior'
 import { hojeISO } from '../../../core/dates'
 import { CartaoModulo, ROTULO, type ControleCartao } from './CartaoModulo'
-import {
-  CATEGORIAS_ITEM,
-  criarAlimento,
-  criarItem,
-  diasRestantesAlimento,
-  diasRestantesItem,
-  removerAlimento,
-  removerItem,
-} from '../db'
-import { useAlimentos, useItens } from '../hooks'
-import type { CategoriaItem, Pet } from '../types'
+import { criarAlimento, diasRestantesAlimento, removerAlimento } from '../db'
+import { useAlimentos } from '../hooks'
+import { criarDespensa, diasRestantes, excluirDespensa } from '../../compras/db'
+import { useDespensa } from '../../compras/hooks'
+import type { Pet } from '../types'
 
 const CAMPO = 'w-full rounded-xl border border-line bg-surface px-3 py-2 text-[14px] outline-none focus:border-muted/50'
 const ROT = 'text-[12px] font-medium text-muted'
 
 export function CardAlimentacao({ pet, controle }: { pet: Pet; controle: ControleCartao }) {
   const alimentos = useAlimentos(pet.id)
-  const itens = useItens(pet.id)
+  const despensa = useDespensa()
+  const itens = (despensa ?? []).filter((d) => d.petId === pet.id)
   const [sheet, setSheet] = useState<null | 'racao' | 'item'>(null)
 
   const principal = (alimentos ?? []).find((a) => a.principal) ?? (alimentos ?? []).find((a) => a.tipo === 'racao')
@@ -34,7 +30,6 @@ export function CardAlimentacao({ pet, controle }: { pet: Pet; controle: Control
   const [refeicoes, setRefeicoes] = useState('2')
   // form item
   const [itNome, setItNome] = useState('')
-  const [itCat, setItCat] = useState<CategoriaItem>('petisco')
   const [itQtd, setItQtd] = useState('')
   const [itUn, setItUn] = useState('un')
   const [itConsumo, setItConsumo] = useState('')
@@ -56,11 +51,12 @@ export function CardAlimentacao({ pet, controle }: { pet: Pet; controle: Control
   }
   async function salvarItem() {
     if (!itNome.trim() || !itQtd) return
-    await criarItem({
+    await criarDespensa({
       petId: pet.id,
-      categoria: itCat,
+      categoria: 'pet',
+      local: 'Área do pet',
       nome: itNome.trim(),
-      quantidade: Number(itQtd),
+      quantidadeFechados: Number(itQtd),
       unidade: itUn,
       consumoDia: itConsumo ? Number(itConsumo) : undefined,
     })
@@ -102,34 +98,34 @@ export function CardAlimentacao({ pet, controle }: { pet: Pet; controle: Control
         </button>
       )}
 
-      {/* Estoque de itens */}
+      {/* Estoque de itens (fonte única: Despensa do módulo Compras) */}
       <div className="mt-3 flex items-center justify-between">
         <span className={ROTULO}>Estoque</span>
         <button onClick={() => setSheet('item')} className="text-muted hover:text-ink"><IconMais width={15} height={15} /></button>
       </div>
-      {(itens ?? []).length === 0 ? (
+      {itens.length === 0 ? (
         <p className="mt-1 text-[12.5px] text-muted">Nenhum item no estoque.</p>
       ) : (
         <ul className="mt-1 grid grid-cols-2 gap-1.5">
-          {(itens ?? []).map((it) => {
-            const dias = diasRestantesItem(it)
-            const cat = CATEGORIAS_ITEM.find((c) => c.valor === it.categoria)
+          {itens.map((it) => {
+            const dias = diasRestantes(it, [])
             const baixo = dias != null && dias <= 5
             return (
               <li key={it.id} className="group flex items-center gap-2 rounded-xl border border-line px-2.5 py-1.5">
-                <span aria-hidden>{cat?.icone ?? '📦'}</span>
-                <div className="min-w-0 flex-1">
+                <span aria-hidden>🐾</span>
+                <Link to={`/compras/despensa/${it.id}`} className="min-w-0 flex-1">
                   <div className="truncate text-[12.5px] font-medium">{it.nome}</div>
                   <div className={`text-[10.5px] ${baixo ? 'text-danger' : 'text-muted'}`}>
-                    {it.quantidade} {it.unidade}{dias != null ? ` · ~${dias}d` : ''}
+                    {it.quantidadeFechados ?? 0} {it.unidade}{dias != null ? ` · ~${dias}d` : ''}
                   </div>
-                </div>
-                <button onClick={() => removerItem(it.id)} className="text-[14px] leading-none text-muted opacity-0 hover:text-danger group-hover:opacity-100">×</button>
+                </Link>
+                <button onClick={() => excluirDespensa(it.id)} className="text-[14px] leading-none text-muted opacity-0 hover:text-danger group-hover:opacity-100">×</button>
               </li>
             )
           })}
         </ul>
       )}
+      <p className="mt-1 text-[10.5px] text-muted">Estoque unificado com a Despensa (aba Compras).</p>
 
       {sheet === 'racao' && (
         <FolhaInferior titulo="Ração / comida" onFechar={() => setSheet(null)}>
@@ -149,14 +145,7 @@ export function CardAlimentacao({ pet, controle }: { pet: Pet; controle: Control
       {sheet === 'item' && (
         <FolhaInferior titulo="Item de estoque" onFechar={() => setSheet(null)}>
           <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap gap-1.5">
-              {CATEGORIAS_ITEM.map((c) => (
-                <button key={c.valor} onClick={() => setItCat(c.valor)} className={`flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-[12.5px] font-medium ${itCat === c.valor ? 'border-ink bg-ink text-surface' : 'border-line text-muted'}`}>
-                  <span aria-hidden>{c.icone}</span> {c.nome}
-                </button>
-              ))}
-            </div>
-            <label className="block"><span className={ROT}>Nome</span><input autoFocus className={`${CAMPO} mt-1`} value={itNome} onChange={(e) => setItNome(e.target.value)} placeholder="Ex.: Antipulgas" /></label>
+            <label className="block"><span className={ROT}>Nome</span><input autoFocus className={`${CAMPO} mt-1`} value={itNome} onChange={(e) => setItNome(e.target.value)} placeholder="Ex.: Antipulgas, petiscos…" /></label>
             <div className="grid grid-cols-3 gap-2">
               <label className="block"><span className={ROT}>Quantidade</span><input inputMode="decimal" className={`${CAMPO} mt-1`} value={itQtd} onChange={(e) => setItQtd(e.target.value)} placeholder="20" /></label>
               <label className="block"><span className={ROT}>Unidade</span><input className={`${CAMPO} mt-1`} value={itUn} onChange={(e) => setItUn(e.target.value)} placeholder="un" /></label>

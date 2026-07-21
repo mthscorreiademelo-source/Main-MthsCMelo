@@ -7,7 +7,7 @@ import { FolhaInferior } from '../../core/components/FolhaInferior'
 import { hojeISO } from '../../core/dates'
 import { formatarBRL, parsearValor } from '../financas/db'
 import { EditorDespensa } from './components/EditorDespensa'
-import { atualizarDespensa, catInfo, confiancaDe, consumoDiaEstim, diasRestantes, intervaloMedio, logMov, proximaReposicao, quantidadeEstim, type Confianca } from './db'
+import { atualizarDespensa, catInfo, confiancaDe, consumoDiaEstim, criarDespensa, diasRestantes, intervaloMedio, logMov, proximaReposicao, quantidadeEstim, type Confianca } from './db'
 import { useItemDespensa, useHistoricoDespensa } from './hooks'
 
 const ROTULO_CONF: Record<Confianca, string> = { alta: 'confiança alta', moderada: 'confiança moderada', poucos: 'poucos dados disponíveis' }
@@ -24,6 +24,8 @@ export function ItemDespensaPage() {
   const [qtd, setQtd] = useState('1')
   const [preco, setPreco] = useState('')
   const [loja, setLoja] = useState('')
+  const [marca, setMarca] = useState('')
+  const [substituir, setSubstituir] = useState<string | null>(null)
 
   if (item === undefined) return <p className="py-16 text-center text-[14px] text-muted">Carregando…</p>
   if (!item) return <div className="py-16 text-center"><p className="text-[15px] font-medium">Item não encontrado</p><Link to="/compras" className="mt-2 inline-block text-[13px] text-accent">← Voltar</Link></div>
@@ -39,14 +41,36 @@ export function ItemDespensaPage() {
   const compras = h.filter((x) => x.tipo === 'compra').sort((a, b) => b.data.localeCompare(a.data))
 
   async function registrarCompra() {
+    const marcaComprada = marca.trim() || item!.marca
     await logMov(item!.id, 'compra', {
       quantidade: qtd ? Number(qtd.replace(',', '.')) : 1,
       precoCentavos: preco ? parsearValor(preco) ?? undefined : undefined,
       loja: loja.trim() || undefined,
-      marca: item!.marca,
+      marca: marcaComprada,
     })
     await atualizarDespensa(item!.id, { quantidadeFechados: (item!.quantidadeFechados ?? 0) + (qtd ? Number(qtd.replace(',', '.')) : 1), ultimaCompraEm: hojeISO() })
+    const nova = marca.trim()
+    // Aprendizado de marca: se a marca comprada difere da habitual, pergunta.
+    if (nova && item!.marca && nova.toLowerCase() !== item!.marca.toLowerCase()) {
+      setSubstituir(nova)
+    } else {
+      if (nova && !item!.marca) await atualizarDespensa(item!.id, { marca: nova })
+      setMarca('')
+    }
     setQtd('1'); setPreco(''); setLoja(''); setAddCompra(false)
+  }
+
+  async function resolverSubstituicao(acao: 'preferir' | 'manter' | 'diferente') {
+    const nova = substituir!
+    if (acao === 'preferir') {
+      await atualizarDespensa(item!.id, { marca: nova })
+    } else if (acao === 'diferente') {
+      const novoId = await criarDespensa({ nome: item!.nome, marca: nova, categoria: item!.categoria, unidade: item!.unidade, local: item!.local, petId: item!.petId, quantidadeFechados: 1, ultimaCompraEm: hojeISO() })
+      // move a última compra para o produto novo
+      await logMov(novoId, 'compra', { quantidade: 1, marca: nova })
+      await atualizarDespensa(item!.id, { quantidadeFechados: Math.max(0, (item!.quantidadeFechados ?? 1) - 1) })
+    }
+    setSubstituir(null); setMarca('')
   }
 
   return (
@@ -118,7 +142,19 @@ export function ItemDespensaPage() {
               <label className="block"><span className="text-[12px] font-medium text-muted">Preço</span><input inputMode="decimal" className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-[14px] outline-none" value={preco} onChange={(e) => setPreco(e.target.value)} placeholder="R$" /></label>
               <label className="block"><span className="text-[12px] font-medium text-muted">Loja</span><input className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-[14px] outline-none" value={loja} onChange={(e) => setLoja(e.target.value)} /></label>
             </div>
+            <label className="block"><span className="text-[12px] font-medium text-muted">Marca {item.marca ? `(habitual: ${item.marca})` : ''}</span><input className="mt-1 w-full rounded-xl border border-line bg-surface px-3 py-2 text-[14px] outline-none" value={marca} onChange={(e) => setMarca(e.target.value)} placeholder={item.marca ?? 'Opcional'} /></label>
             <button onClick={registrarCompra} className="min-h-11 rounded-xl bg-ink text-[14px] font-semibold text-surface">Registrar</button>
+          </div>
+        </FolhaInferior>
+      )}
+
+      {substituir && (
+        <FolhaInferior titulo="Marca diferente" onFechar={() => resolverSubstituicao('manter')}>
+          <div className="flex flex-col gap-3">
+            <p className="text-[13.5px] leading-snug">Você comprou <b>{substituir}</b>, mas o habitual de “{item.nome}” é <b>{item.marca}</b>. O que fazer?</p>
+            <button onClick={() => resolverSubstituicao('preferir')} className="rounded-xl border border-line px-3 py-3 text-left text-[14px] hover:bg-hover">Passar a preferir <b>{substituir}</b></button>
+            <button onClick={() => resolverSubstituicao('manter')} className="rounded-xl border border-line px-3 py-3 text-left text-[14px] hover:bg-hover">Manter <b>{item.marca}</b> como habitual (só desta vez)</button>
+            <button onClick={() => resolverSubstituicao('diferente')} className="rounded-xl border border-line px-3 py-3 text-left text-[14px] hover:bg-hover">São produtos diferentes — criar item separado</button>
           </div>
         </FolhaInferior>
       )}

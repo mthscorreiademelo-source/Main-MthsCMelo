@@ -535,10 +535,10 @@ export async function semearPetsSePreciso(): Promise<void> {
     principal: true,
     criadoEm: Date.now(),
   })
-  // Estoque de itens
-  await db.petItens.bulkAdd([
-    { id: nanoid(), petId: id, categoria: 'petisco', nome: 'Biscoitos', quantidade: 20, unidade: 'un', consumoDia: 2, criadoEm: Date.now() },
-    { id: nanoid(), petId: id, categoria: 'antipulgas', nome: 'Bravecto', quantidade: 1, unidade: 'un', criadoEm: Date.now() },
+  // Estoque de itens — fonte única: a Despensa (módulo Compras), com petId.
+  await db.despensa.bulkAdd([
+    { id: nanoid(), petId: id, categoria: 'pet', local: 'Área do pet', nome: 'Biscoitos', quantidadeFechados: 20, unidade: 'un', consumoDia: 2, monitorarIA: true, criadoEm: Date.now() },
+    { id: nanoid(), petId: id, categoria: 'pet', local: 'Área do pet', nome: 'Bravecto', quantidadeFechados: 1, unidade: 'un', monitorarIA: true, criadoEm: Date.now() },
   ])
   // Gastos vinculados do mês (aparecem também em Finanças)
   const mes = format(hoje, 'yyyy-MM')

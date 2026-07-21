@@ -311,6 +311,28 @@ class VidaDB extends Dexie {
     this.version(23).stores({
       lugares: 'id, tipo, ordem',
     })
+    // v24: unificação — o estoque de itens do Pet (petItens) passa a viver na
+    // Despensa (fonte única), com petId. Migra os registros e esvazia petItens.
+    this.version(24).upgrade(async (tx) => {
+      const agora = Date.now()
+      const itens = await tx.table('petItens').toArray()
+      if (itens.length === 0) return
+      const migrados = itens.map((i: Record<string, unknown>) => ({
+        id: i.id,
+        nome: i.nome,
+        categoria: 'pet',
+        local: 'Área do pet',
+        unidade: i.unidade ?? 'un',
+        quantidadeFechados: i.quantidade,
+        consumoDia: i.consumoDia,
+        petId: i.petId,
+        monitorarIA: true,
+        criadoEm: i.criadoEm ?? agora,
+        atualizadoEm: agora,
+      }))
+      await tx.table('despensa').bulkAdd(migrados)
+      await tx.table('petItens').clear()
+    })
   }
 }
 

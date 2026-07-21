@@ -424,8 +424,7 @@ const CHAVE_SEED = 'lume-compras-semeado'
 export async function semearComprasSePreciso(): Promise<void> {
   if (typeof localStorage !== 'undefined' && localStorage.getItem(CHAVE_SEED)) return
   const nListas = await db.comprasListas.count()
-  const nDesp = await db.despensa.count()
-  if (nListas > 0 || nDesp > 0) {
+  if (nListas > 0) {
     localStorage?.setItem(CHAVE_SEED, '1')
     return
   }

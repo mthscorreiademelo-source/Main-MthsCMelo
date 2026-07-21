@@ -69,31 +69,39 @@ incorporados conforme houver dados.
 
 ---
 
-## Fase 2 — depende de IA/infra
+## Fase 2 — IMPLEMENTADO (real, client-side)
 
-- **Leitura de nota fiscal (OCR + IA)** — foto/PDF/NFC-e → estabelecimento,
-  data, total, itens, quantidade, preço unitário, desconto, categoria. Tela de
-  conferência item a item, com escolha por item: atualizar estoque / registrar
-  em Finanças / tirar da lista / relacionar a Pet/Saúde/Projeto. Uma importação,
-  vários efeitos.
-- **Foto de produto** — fotografar a embalagem; a IA tenta nome, marca,
-  categoria, volume/peso, unidade, código de barras. **Tela de confirmação
-  obrigatória** antes de salvar.
-- **Histórico de preços por produto** e **validade com alertas** (a estrutura de
-  dados já existe; a captura em massa vem com OCR).
-- **Localização dentro de casa** e integração mais profunda com **Pets** e
-  **Saúde** (medicamentos/suplementos — nunca sugerir uso, só reposição).
+- ✅ **Código de barras + Open Food Facts** — leitor pela câmera (`BarcodeDetector`
+  nativo) com fallback de digitação; busca nome/marca/categoria/imagem na Open
+  Food Facts (base pública, sem chave); folha de revisão obrigatória; guarda o
+  EAN. Ligado no menu Adicionar e no Modo mercado.
+- ✅ **OCR de nota fiscal / foto de produto** — Tesseract.js (WASM) no próprio
+  aparelho, carregado sob demanda; foto → leitura com progresso → revisão
+  obrigatória dos itens (nome/preço/checkbox) → adiciona à despensa (com histórico
+  de preço) ou à lista, e registra o total em Finanças. Nada sai do aparelho.
+- ✅ **Histórico de preços por produto** e **validade com alertas** (na página de
+  detalhe do item e nos filtros da despensa).
 
-## Fase 3 — avançado
+## Fase 3 — IMPLEMENTADO (real)
 
-- **Reconhecimento de vários produtos numa foto** (bancada/sacola/armário) →
-  lista de revisão.
-- **Código de barras** (o botão já existe no modo mercado, desabilitado).
-- **Geolocalização + Lugares**: ao chegar num mercado/farmácia/pet shop, sugerir
-  abrir a lista certa — opt-in, respeitando privacidade.
-- **Aprendizado de marcas e substituições** ("Camil substitui o Tio João
-  habitual?"), automações de reposição (opt-in) e integração com **receitas**
-  (Notas) → ingredientes na lista.
+- ✅ **Módulo Lugares + geolocalização** (opt-in): mercados, farmácias, pet shops,
+  parques, clínicas… com "Perto de mim" (Haversine) que sugere abrir a lista
+  certa ao chegar perto. Integra com Compras (lista associada) e Pets.
+- ✅ **Aprendizado de marcas e substituições**: ao comprar uma marca diferente da
+  habitual, o Lume pergunta se passa a preferir a nova, mantém a antiga, ou trata
+  como produto diferente (cria item separado).
+- ✅ **Unificação Pet ↔ Despensa**: o estoque do Workspace do Pet e a Despensa são
+  a **mesma fonte** (item da despensa com `petId`) — sem duplicação. Migração
+  automática (schema v24) move os `petItens` antigos para a despensa.
+
+### Ainda depende de infraestrutura (não implementável honestamente offline)
+
+- **Reconhecimento de VÁRIOS produtos numa foto** — precisa de modelo de detecção
+  de objetos; o OCR atual lê texto, não segmenta produtos numa bancada.
+- **Geolocalização com base de lojas externas** (POIs) e automações de reposição
+  automática — dependem de APIs de mapas/serviço.
+- **Open Finance / sincronização bancária** e **insights por LLM** — backend,
+  chaves de API e (no caso bancário) certificação regulatória.
 
 ---
 
