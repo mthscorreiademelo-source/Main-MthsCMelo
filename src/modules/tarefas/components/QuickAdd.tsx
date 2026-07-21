@@ -11,9 +11,12 @@ interface Props {
   /** Projeto aplicado quando o texto não traz `#projeto`. */
   projetoPadrao?: string
   placeholder?: string
+  /** Chamado após criar (ex.: para fechar o modal). */
+  aoConcluir?: () => void
+  autoFocus?: boolean
 }
 
-export function QuickAdd({ projetos, dataPadrao, projetoPadrao, placeholder = 'Adicionar tarefa…' }: Props) {
+export function QuickAdd({ projetos, dataPadrao, projetoPadrao, placeholder = 'Adicionar tarefa…', aoConcluir, autoFocus }: Props) {
   const [texto, setTexto] = useState('')
   const parsed = useMemo(() => interpretarEntrada(texto, projetos), [texto, projetos])
   const dataFinal = parsed.data ?? dataPadrao
@@ -30,6 +33,7 @@ export function QuickAdd({ projetos, dataPadrao, projetoPadrao, placeholder = 'A
       projetoId: projetoFinal,
     })
     setTexto('')
+    aoConcluir?.()
   }
 
   const temChips = !!(parsed.data || parsed.prioridade || parsed.projetoId)
@@ -48,6 +52,7 @@ export function QuickAdd({ projetos, dataPadrao, projetoPadrao, placeholder = 'A
           onChange={(e) => setTexto(e.target.value)}
           placeholder={placeholder}
           enterKeyHint="done"
+          autoFocus={autoFocus}
           className="min-w-0 flex-1 bg-transparent py-3 text-[15px] outline-none placeholder:text-muted/70"
         />
       </div>

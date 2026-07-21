@@ -17,6 +17,7 @@ import { paraHHMM } from '../agenda/db'
 import { useEventos } from '../agenda/hooks'
 import { CalendarioTarefas } from './components/CalendarioTarefas'
 import { EditorProjeto } from './components/EditorProjeto'
+import { ModalCentral } from '../../core/components/ModalCentral'
 import { QuickAdd } from './components/QuickAdd'
 import { TaskEditorSheet } from './components/TaskEditorSheet'
 import { TaskList } from './components/TaskList'
@@ -173,7 +174,11 @@ export function TarefasPage() {
       {buscaAberta && (
         <input autoFocus value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar tarefas, etiquetas…" className="min-h-11 rounded-xl border border-line bg-surface/60 px-4 text-[15px] outline-none focus:border-muted/50" />
       )}
-      {quickAberto && <QuickAdd projetos={ps} dataPadrao={hoje} placeholder="Adicionar tarefa…" />}
+      {quickAberto && (
+        <ModalCentral titulo="Nova tarefa" onFechar={() => setQuickAberto(false)}>
+          <QuickAdd projetos={ps} dataPadrao={hoje} placeholder="Adicionar tarefa…" autoFocus aoConcluir={() => setQuickAberto(false)} />
+        </ModalCentral>
+      )}
 
       {emBusca ? (
         <TaskList tarefas={resultadosBusca} todas={todas} projetos={ps} onAbrir={setSelecionada} mostrarProjeto vazio={<EmptyState icone={<IconLupa />} titulo="Nada encontrado" descricao="Tente outro termo ou etiqueta." />} />

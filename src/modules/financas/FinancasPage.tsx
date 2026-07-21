@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { addMonths, format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { FolhaInferior } from '../../core/components/FolhaInferior'
+import { ModalCentral } from '../../core/components/ModalCentral'
 import { IconEngrenagem, IconMais, IconSeta, IconSetaEsquerda } from '../../core/components/Icons'
 import { hojeISO, rotuloData } from '../../core/dates'
 import { AnelProgresso } from '../habitos/components/AnelProgresso'
@@ -182,7 +183,11 @@ export function FinancasPage() {
         </div>
       </div>
 
-      {addAberto && <AddMovimento />}
+      {addAberto && (
+        <ModalCentral titulo="Registrar movimentação" onFechar={() => setAddAberto(false)}>
+          <AddMovimento aoConcluir={() => setAddAberto(false)} />
+        </ModalCentral>
+      )}
 
       {/* 1. Suas contas — saldo atual de cada uma (prioridade da tela) */}
       <div className={CARTAO}>
