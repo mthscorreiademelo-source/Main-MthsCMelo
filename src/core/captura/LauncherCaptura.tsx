@@ -81,6 +81,7 @@ export function LauncherCaptura() {
   // Atalhos globais de teclado (desktop/tablet com teclado).
   useEffect(() => {
     async function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') { fecharLauncher(); fecharCaixa(); setFluxo(null); setEventoEdit(null); return }
       const mod = e.metaKey || e.ctrlKey
       if (!mod) return
       if (e.key.toLowerCase() === 'k' && !e.shiftKey) {

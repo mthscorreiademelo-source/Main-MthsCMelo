@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { IconButton } from './Button'
 import { IconFechar } from './Icons'
 
@@ -20,9 +21,9 @@ export function Sheet({ aberto, titulo, onFechar, children }: Props) {
     return () => window.removeEventListener('keydown', aoTeclar)
   }, [aberto, onFechar])
 
-  return (
+  return createPortal(
     <div
-      className={`fixed inset-0 z-40 ${aberto ? '' : 'pointer-events-none'}`}
+      className={`fixed inset-0 z-[65] ${aberto ? '' : 'pointer-events-none'}`}
       aria-hidden={!aberto}
     >
       <div
@@ -46,6 +47,7 @@ export function Sheet({ aberto, titulo, onFechar, children }: Props) {
         </header>
         <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
       </aside>
-    </div>
+    </div>,
+    document.body,
   )
 }
