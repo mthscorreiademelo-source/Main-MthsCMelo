@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { RecorteImagem } from '../components/RecorteImagem'
 import { Sheet } from '../components/Sheet'
-import { idadeDe, processarFotoPerfil, salvarPerfil, usePerfil } from './db'
+import { idadeDe, salvarPerfil, usePerfil } from './db'
 
 /** Avatar redondo com foto ou iniciais. */
 function Avatar({ foto, nome, tamanho }: { foto?: string; nome?: string; tamanho: number }) {
@@ -30,6 +31,7 @@ export function PerfilSheet({ aberto, email, onFechar }: { aberto: boolean; emai
   const [nascimento, setNascimento] = useState('')
   const [bio, setBio] = useState('')
   const [foto, setFoto] = useState<string | undefined>(undefined)
+  const [recortando, setRecortando] = useState<File | null>(null)
   const inputFoto = useRef<HTMLInputElement>(null)
 
   // Preenche ao abrir / quando o perfil carrega.
@@ -41,16 +43,6 @@ export function PerfilSheet({ aberto, email, onFechar }: { aberto: boolean; emai
     setBio(perfil?.bio ?? '')
     setFoto(perfil?.foto)
   }, [aberto, perfil?.id]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function aoEscolherFoto(arquivo: File) {
-    try {
-      const dataUrl = await processarFotoPerfil(arquivo)
-      setFoto(dataUrl)
-      salvarPerfil({ foto: dataUrl })
-    } catch {
-      /* imagem inválida: ignora */
-    }
-  }
 
   const idade = idadeDe(nascimento)
 
@@ -86,11 +78,22 @@ export function PerfilSheet({ aberto, email, onFechar }: { aberto: boolean; emai
             className="hidden"
             onChange={(e) => {
               const arquivo = e.target.files?.[0]
-              if (arquivo) aoEscolherFoto(arquivo)
+              if (arquivo) setRecortando(arquivo)
               e.target.value = ''
             }}
           />
         </div>
+
+        {recortando && (
+          <RecorteImagem
+            arquivo={recortando}
+            aspecto={1}
+            redondo
+            saidaLargura={256}
+            onConfirmar={(url) => { setFoto(url); salvarPerfil({ foto: url }); setRecortando(null) }}
+            onCancelar={() => setRecortando(null)}
+          />
+        )}
 
         {/* Nome */}
         <label className="flex flex-col gap-1.5">
