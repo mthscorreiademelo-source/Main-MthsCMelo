@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconLupa, IconMais } from '../../../core/components/Icons'
+import { IconChevron, IconLupa, IconMais } from '../../../core/components/Icons'
 import { useTheme } from '../../../core/theme/useTheme'
 import { useTarefas } from '../../tarefas/hooks'
 import type { Projeto } from '../../tarefas/types'
@@ -24,7 +24,7 @@ function capaTema(p: Projeto, tema: 'light' | 'dark') {
   return tema === 'dark' ? (p.capaDark ?? p.capa) : p.capa
 }
 
-export function ListaProjetos({ selecionadoId }: { selecionadoId?: string }) {
+export function ListaProjetos({ selecionadoId, onColapsar }: { selecionadoId?: string; onColapsar?: () => void }) {
   const projetos = useProjetosWS()
   const tarefas = useTarefas()
   const navigate = useNavigate()
@@ -70,6 +70,9 @@ export function ListaProjetos({ selecionadoId }: { selecionadoId?: string }) {
         <div className="flex items-center gap-1">
           <button onClick={() => setBuscaAberta((v) => !v)} aria-label="Buscar" className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-hover hover:text-ink"><IconLupa width={16} height={16} /></button>
           <button onClick={() => setCriar(true)} aria-label="Novo projeto" className="flex size-8 items-center justify-center rounded-full bg-accent text-white"><IconMais width={16} height={16} /></button>
+          {onColapsar && (
+            <button onClick={onColapsar} aria-label="Recolher painel" title="Recolher painel" className="ml-0.5 flex size-8 items-center justify-center rounded-full text-muted hover:bg-hover hover:text-ink"><IconChevron className="rotate-90" width={16} height={16} /></button>
+          )}
         </div>
       </div>
 
