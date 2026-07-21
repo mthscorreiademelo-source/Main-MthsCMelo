@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { IconLupa, IconMais, IconPata } from '../../core/components/Icons'
+import { IconLupa, IconMais } from '../../core/components/Icons'
 import { FolhaInferior } from '../../core/components/FolhaInferior'
 import { ConfirmarProduto } from './components/ConfirmarProduto'
 import { EditorAquisicao } from './components/EditorAquisicao'
 import { EditorDespensa } from './components/EditorDespensa'
+import { ImportarNotaFiscal } from './components/ImportarNotaFiscal'
 import { LeitorCodigoBarras } from './components/LeitorCodigoBarras'
 import { SecaoAquisicoes } from './components/SecaoAquisicoes'
 import { SecaoDespensa } from './components/SecaoDespensa'
@@ -196,20 +197,7 @@ export function ComprasPage() {
           </div>
         </FolhaInferior>
       )}
-      {sheet === 'importar' && (
-        <FolhaInferior titulo="Importar nota fiscal / foto" onFechar={() => setSheet(null)}>
-          <div className="flex flex-col gap-3">
-            <div className="flex items-start gap-2.5 rounded-xl bg-hover/60 p-3">
-              <IconPata width={18} height={18} className="mt-0.5 shrink-0 text-accent" />
-              <p className="text-[13px] leading-snug text-ink/80">
-                A leitura automática de <b>nota fiscal</b> (OCR) e o <b>reconhecimento de produtos por foto</b> (um ou vários itens) fazem parte da <b>Fase 2/3</b> — dependem da infraestrutura de IA do Lume. Quando chegarem, uma única importação vai atualizar estoque, registrar a despesa em Finanças, tirar itens da lista e alimentar as previsões. Por enquanto, adicione itens manualmente ou pela despensa.
-              </p>
-            </div>
-            <p className="text-[11px] text-muted">Nada é enviado para fora do aparelho sem a sua autorização — fotos e notas fiscais são dados privados.</p>
-            <button onClick={() => setSheet(null)} className="min-h-10 rounded-xl border border-line text-[14px] font-medium text-muted hover:text-ink">Entendi</button>
-          </div>
-        </FolhaInferior>
-      )}
+      {sheet === 'importar' && <ImportarNotaFiscal onFechar={() => setSheet(null)} />}
     </div>
   )
 }
