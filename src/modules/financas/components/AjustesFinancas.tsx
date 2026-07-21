@@ -22,10 +22,13 @@ import {
 import {
   useContas,
   useFinancasConfig,
+  useMovimentos,
   useObjetivos,
   useOrcamentoLinhas,
   useRecorrentes,
 } from '../hooks'
+import { mediaLinha } from '../orcamento'
+import { formatarBRL } from '../db'
 import type { TipoConta } from '../types'
 
 type Aba = 'geral' | 'contas' | 'objetivos' | 'recorrentes' | 'orcamento'
@@ -83,6 +86,8 @@ export function AjustesFinancas({ onFechar }: { onFechar: () => void }) {
   const objetivos = useObjetivos()
   const recorrentes = useRecorrentes()
   const linhas = useOrcamentoLinhas()
+  const movimentos = useMovimentos()
+  const mesRef = new Date().toISOString().slice(0, 7)
 
   return (
     <FolhaInferior titulo="Ajustes de Finanças" onFechar={onFechar}>
@@ -206,6 +211,19 @@ export function AjustesFinancas({ onFechar }: { onFechar: () => void }) {
                   <span className="text-[10px] text-muted">Limite mensal</span>
                   <CampoDinheiro centavos={l.limiteCentavos} onCommit={(v) => atualizarOrcamentoLinha(l.id, { limiteCentavos: v })} className="w-28" />
                 </label>
+                {(() => {
+                  const media = mediaLinha(l.categorias, movimentos ?? [], mesRef, 3)
+                  if (media <= 0) return null
+                  return (
+                    <button
+                      onClick={() => atualizarOrcamentoLinha(l.id, { limiteCentavos: media })}
+                      className="self-start rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-muted hover:text-ink"
+                      title="Usa a média dos últimos 3 meses com gasto nesta categoria"
+                    >
+                      Usar média 3m: {formatarBRL(media)}
+                    </button>
+                  )
+                })()}
                 <div className="flex flex-wrap gap-1">
                   {CATEGORIAS.map((c) => {
                     const ativo = l.categorias.includes(c)

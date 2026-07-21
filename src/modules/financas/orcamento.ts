@@ -191,6 +191,38 @@ export function distribuicao(linhas: OrcamentoLinha[], movimentos: Movimento[], 
     })
 }
 
+function mesDeslocado(mes: string, delta: number): string {
+  const ano = Number(mes.slice(0, 4))
+  const m = Number(mes.slice(5, 7))
+  const d = new Date(ano, m - 1 + delta, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/**
+ * Sugestão de limite para uma linha: média dos últimos N meses (antes do atual)
+ * que TIVERAM gasto na linha. Meses zerados são ignorados — assim um mês sem
+ * gasto não puxa a média para baixo artificialmente. 0 se nunca houve gasto.
+ */
+export function mediaLinha(
+  categorias: string[],
+  movimentos: Movimento[],
+  mesRef: string,
+  nMeses = 3,
+): number {
+  const set = new Set(categorias)
+  const casa = (m: Movimento) => (m.categoria ? set.has(m.categoria) : categorias.length === 0)
+  const comGasto: number[] = []
+  for (let i = 1; i <= nMeses; i++) {
+    const mes = mesDeslocado(mesRef, -i)
+    const total = movimentos
+      .filter((m) => m.tipo === 'saida' && m.data.startsWith(mes) && casa(m))
+      .reduce((s, m) => s + m.valorCentavos, 0)
+    if (total > 0) comGasto.push(total)
+  }
+  if (comGasto.length === 0) return 0
+  return Math.round(comGasto.reduce((a, b) => a + b, 0) / comGasto.length)
+}
+
 /* -------------------------------- objetivos ------------------------------- */
 
 /** Objetivo de reserva de emergência (o âncora), se existir. */

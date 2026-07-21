@@ -265,6 +265,32 @@ export function FinancasPage() {
         </div>
       </div>
 
+      {/* Alertas de categorias estouradas */}
+      {(() => {
+        const estouradas = dist.filter((d) => d.linha.limiteCentavos > 0 && d.pct > 1)
+        if (estouradas.length === 0) return null
+        return (
+          <div className="rounded-2xl border border-danger/30 bg-danger/[0.06] p-4">
+            <div className="flex items-center gap-2">
+              <span className="text-[15px]">⚠️</span>
+              <span className="text-[13px] font-semibold text-danger">
+                {estouradas.length === 1 ? 'Uma categoria passou do limite' : `${estouradas.length} categorias passaram do limite`}
+              </span>
+            </div>
+            <ul className="mt-2 flex flex-col gap-1.5">
+              {estouradas.map(({ linha, gastoCentavos }) => (
+                <li key={linha.id} className="flex items-center gap-2 text-[12.5px]">
+                  <span>{linha.icone}</span>
+                  <span className="flex-1 truncate font-medium">{linha.nome}</span>
+                  <span className="tabular-nums text-danger">{formatarBRL(gastoCentavos)} / {formatarBRL(linha.limiteCentavos)}</span>
+                  <span className="tabular-nums font-semibold text-danger">+{formatarBRL(gastoCentavos - linha.limiteCentavos)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      })()}
+
       {/* 3+4. Reserva + Patrimônio (patrimônio agora secundário) */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className={CARTAO}>
