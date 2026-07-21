@@ -259,9 +259,14 @@ function Coluna({
   }
 
   return (
-    <section className="lume-entrada flex min-w-0 flex-1 flex-col rounded-2xl border border-line bg-surface/40">
-      {/* Cabeçalho do dia — congelado ao rolar (sticky) */}
-      <header className={`sticky top-0 z-30 flex items-center gap-2 rounded-t-2xl border-b px-3 py-2.5 backdrop-blur-md ${ehHoje ? 'border-accent/40 bg-accent/15' : 'border-line bg-surface/90'}`}>
+    <section className="lume-entrada flex min-w-0 flex-1 flex-col">
+      {/* Cabeçalho do dia — congelado ao rolar (sticky). O header carrega as
+          bordas e cantos arredondados de cima, com fundo OPACO, para o topo
+          continuar arredondado e limpo mesmo rolando (sem vazar conteúdo). */}
+      <header
+        className={`sticky top-0 z-30 flex items-center gap-2 rounded-t-2xl border-x border-t border-b px-3 py-2.5 ${ehHoje ? 'border-accent/40' : 'border-line'}`}
+        style={{ backgroundColor: ehHoje ? 'color-mix(in srgb, var(--vida-accent) 12%, var(--vida-surface))' : 'var(--vida-surface)' }}
+      >
         <span className={`text-[22px] font-bold leading-none ${ehHoje ? 'text-accent' : ''}`}>{format(dt, 'd')}</span>
         <div className="flex min-w-0 flex-col leading-none">
           <span className="truncate text-[12px] font-semibold capitalize">{nomeDiaCurto(plano.dia)}</span>
@@ -269,6 +274,8 @@ function Coluna({
         </div>
       </header>
 
+      {/* Corpo do dia (rolável), com bordas laterais/inferior e canto inferior. */}
+      <div className="flex flex-col overflow-hidden rounded-b-2xl border-x border-b border-line bg-surface/40">
       {/* Faixa de dia inteiro */}
       {plano.diaInteiro.length > 0 && (
         <div className="flex flex-col gap-1 border-b border-line px-2 py-1.5">
@@ -388,6 +395,7 @@ function Coluna({
             </div>
           </div>
         )}
+      </div>
       </div>
     </section>
   )

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { addDays, addMonths, addYears, endOfMonth, format, parseISO, startOfMonth } from 'date-fns'
+import { addDays, addMonths, addYears, endOfMonth, format, parseISO, startOfMonth, startOfWeek } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { IconMais, IconRegua, IconSetaEsquerda } from '../../core/components/Icons'
 import { hojeISO, rotuloMes } from '../../core/dates'
@@ -89,8 +89,11 @@ export function AgendaPage() {
 
   const dias = useMemo(() => {
     if (!nDias) return []
-    return Array.from({ length: nDias }, (_, i) => format(addDays(parseISO(ancora), i), 'yyyy-MM-dd'))
-  }, [ancora, nDias])
+    // Semana: sempre começa no domingo da semana da âncora (mostra a semana
+    // inteira). Dia/3 dias/personalizado começam na própria âncora (hoje).
+    const base = modo === 'semana' ? startOfWeek(parseISO(ancora), { weekStartsOn: 0 }) : parseISO(ancora)
+    return Array.from({ length: nDias }, (_, i) => format(addDays(base, i), 'yyyy-MM-dd'))
+  }, [ancora, nDias, modo])
 
   const meses = useMemo(() => {
     if (modo !== 'ano') return []
@@ -115,6 +118,7 @@ export function AgendaPage() {
     let novo = d
     if (modo === 'mes' || modo === 'cronogramas') novo = addMonths(d, dir)
     else if (modo === 'ano') novo = addYears(d, dir)
+    else if (modo === 'semana') novo = addDays(d, dir * 7) // semana inteira por vez
     else novo = addDays(d, dir) // grades: 1 dia de cada vez (fluido)
     setAncora(format(novo, 'yyyy-MM-dd'))
   }
