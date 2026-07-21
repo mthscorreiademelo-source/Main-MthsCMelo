@@ -63,6 +63,8 @@ export interface ItemDespensa {
   categoria: string
   local?: string
   unidade: string
+  /** Código de barras (EAN) — preenchido ao escanear. */
+  ean?: string
   /** Unidades fechadas em estoque. */
   quantidadeFechados?: number
   /** Há uma unidade aberta em uso? */

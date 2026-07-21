@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import { IconCheck, IconSetaEsquerda } from '../../../core/components/Icons'
 import { formatarBRL, parsearValor } from '../../financas/db'
 import { catInfo, marcarComprado } from '../db'
+import { buscarProdutoOFF } from '../openfoodfacts'
+import { LeitorCodigoBarras } from './LeitorCodigoBarras'
 import type { ItemCompra, ListaCompra } from '../types'
 
 /** Modo de execução simplificado para usar durante as compras. */
@@ -10,6 +12,23 @@ export function ModoMercado({ lista, itens, onFechar }: { lista: ListaCompra; it
   const [pegos, setPegos] = useState<Set<string>>(new Set())
   const [precos, setPrecos] = useState<Record<string, string>>({})
   const [salvando, setSalvando] = useState(false)
+  const [scanning, setScanning] = useState(false)
+  const [aviso, setAviso] = useState<string | null>(null)
+
+  async function aoEscanear(ean: string) {
+    setScanning(false)
+    const p = await buscarProdutoOFF(ean)
+    const alvo = p?.nome
+      ? itens.find((i) => i.nome.toLowerCase().includes(p.nome!.toLowerCase()) || p.nome!.toLowerCase().includes(i.nome.toLowerCase()))
+      : undefined
+    if (alvo) {
+      setPegos((prev) => new Set(prev).add(alvo.id))
+      setAviso(`✓ ${alvo.nome} marcado`)
+    } else {
+      setAviso(p?.nome ? `Encontrado: ${p.nome} (não está na lista)` : `Código ${ean} não reconhecido`)
+    }
+    setTimeout(() => setAviso(null), 3000)
+  }
 
   const grupos = useMemo(() => {
     const mapa = new Map<string, ItemCompra[]>()
@@ -51,8 +70,10 @@ export function ModoMercado({ lista, itens, onFechar }: { lista: ListaCompra; it
           <h1 className="text-[16px] font-bold">{lista.icone} {lista.nome}</h1>
           <p className="text-[11px] text-muted">{pegos.size} de {itens.length} · modo mercado</p>
         </div>
-        <button disabled title="Leitura de código de barras chega na Fase 3" className="rounded-full border border-line px-2.5 py-1.5 text-[12px] font-medium text-muted opacity-50">📷 Código</button>
+        <button onClick={() => setScanning(true)} className="rounded-full border border-line px-2.5 py-1.5 text-[12px] font-medium text-muted hover:text-ink">📷 Código</button>
       </header>
+      {aviso && <div className="bg-accent/10 px-4 py-1.5 text-center text-[12.5px] font-medium text-accent">{aviso}</div>}
+      {scanning && <LeitorCodigoBarras onDetectado={aoEscanear} onFechar={() => setScanning(false)} />}
 
       <div className="flex-1 overflow-y-auto px-4 py-3">
         {grupos.map(([corredor, lista]) => (

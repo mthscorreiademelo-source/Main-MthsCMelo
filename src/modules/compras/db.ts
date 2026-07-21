@@ -218,6 +218,7 @@ export async function criarDespensa(dados: Partial<ItemDespensa> & { nome: strin
     categoria: dados.categoria,
     local: dados.local,
     unidade: dados.unidade,
+    ean: dados.ean,
     quantidadeFechados: dados.quantidadeFechados,
     emUso: dados.emUso,
     fracaoEmUso: dados.fracaoEmUso,

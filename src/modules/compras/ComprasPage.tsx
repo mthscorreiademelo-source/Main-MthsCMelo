@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { IconLupa, IconMais, IconPata } from '../../core/components/Icons'
 import { FolhaInferior } from '../../core/components/FolhaInferior'
+import { ConfirmarProduto } from './components/ConfirmarProduto'
 import { EditorAquisicao } from './components/EditorAquisicao'
 import { EditorDespensa } from './components/EditorDespensa'
+import { LeitorCodigoBarras } from './components/LeitorCodigoBarras'
 import { SecaoAquisicoes } from './components/SecaoAquisicoes'
 import { SecaoDespensa } from './components/SecaoDespensa'
 import { SecaoListas } from './components/SecaoListas'
@@ -29,6 +31,8 @@ export function ComprasPage() {
   const [personalizando, setPersonalizando] = useState(false)
   const [menu, setMenu] = useState(false)
   const [sheet, setSheet] = useState<null | 'estoque' | 'aquisicao' | 'compra' | 'importar'>(null)
+  const [scanning, setScanning] = useState(false)
+  const [eanConfirmar, setEanConfirmar] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
   const [listaAlvo, setListaAlvo] = useState('')
   const [nomeItem, setNomeItem] = useState('')
@@ -98,6 +102,7 @@ export function ComprasPage() {
                 <div className="fixed inset-0 z-40" onClick={() => setMenu(false)} />
                 <div className="absolute right-0 z-50 mt-1 w-60 overflow-hidden rounded-2xl border border-line bg-surface shadow-lg">
                   {[
+                    { r: 'Escanear código de barras', a: () => setScanning(true) },
                     { r: 'Novo item de compra', a: () => setSheet('compra') },
                     { r: 'Novo item de estoque', a: () => setSheet('estoque') },
                     { r: 'Nova aquisição planejada', a: () => setSheet('aquisicao') },
@@ -167,6 +172,10 @@ export function ComprasPage() {
           </div>
         </>
       )}
+
+      {/* Código de barras */}
+      {scanning && <LeitorCodigoBarras onDetectado={(e) => { setScanning(false); setEanConfirmar(e) }} onFechar={() => setScanning(false)} />}
+      {eanConfirmar && <ConfirmarProduto ean={eanConfirmar} onFechar={() => setEanConfirmar(null)} />}
 
       {/* Sheets do menu Adicionar */}
       {sheet === 'estoque' && <EditorDespensa onFechar={() => setSheet(null)} />}
