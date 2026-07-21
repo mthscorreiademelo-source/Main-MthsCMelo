@@ -14,6 +14,7 @@ import type {
 import { deveIgnorarHooks } from '../nuvem/sync/bandeira'
 import { NOMES_SYNC } from '../nuvem/sync/colecoes'
 import type { Perfil } from '../perfil/types'
+import type { Captura } from '../captura/types'
 import type {
   Categoria,
   Fator,
@@ -143,6 +144,8 @@ class VidaDB extends Dexie {
   lugares!: Table<Lugar, string>
   perfil!: Table<Perfil, string>
   projetoItens!: Table<ItemProjeto, string>
+  /** Caixa de entrada da Captura Rápida (Quick Actions). */
+  capturas!: Table<Captura, string>
   /** Espelho do último estado sincronizado (chave → atualizadoEm). */
   espelho!: Table<{ chave: string; atualizadoEm: number }, string>
 
@@ -350,6 +353,10 @@ class VidaDB extends Dexie {
       movimentos: 'id, data, criadoEm, projetoId',
       paginas: 'id, atualizadaEm, criadaEm, grupoId, projetoId',
     })
+    // v28: Captura Rápida (Quick Actions) — caixa de entrada.
+    this.version(28).stores({
+      capturas: 'id, criadoEm, status',
+    })
   }
 }
 
@@ -473,6 +480,7 @@ export async function exportarBackup() {
     lugares: await db.lugares.toArray(),
     perfil: await db.perfil.toArray(),
     projetoItens: await db.projetoItens.toArray(),
+    capturas: await db.capturas.toArray(),
   }
 }
 
@@ -550,6 +558,7 @@ export async function importarBackup(json: unknown) {
     lugares?: Lugar[]
     perfil?: Perfil[]
     projetoItens?: ItemProjeto[]
+    capturas?: Captura[]
   }
   const temTasks = Array.isArray(dados?.tasks)
   const temPaginas = Array.isArray(dados?.paginas)
@@ -643,6 +652,7 @@ export async function importarBackup(json: unknown) {
   if (Array.isArray(dados.lugares)) await db.lugares.bulkPut(dados.lugares)
   if (Array.isArray(dados.perfil)) await db.perfil.bulkPut(dados.perfil)
   if (Array.isArray(dados.projetoItens)) await db.projetoItens.bulkPut(dados.projetoItens)
+  if (Array.isArray(dados.capturas)) await db.capturas.bulkPut(dados.capturas)
   return {
     tasks: dados.tasks?.length ?? 0,
     paginas: dados.paginas?.length ?? 0,

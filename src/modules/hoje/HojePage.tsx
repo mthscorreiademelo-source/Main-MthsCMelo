@@ -27,6 +27,7 @@ import { useTarefas } from '../tarefas/hooks'
 import type { Tamanho } from './CartaoHoje'
 import { CartaoHoje } from './CartaoHoje'
 import { faixaDoDia, FAIXAS, hhmmParaMin, minutosDoDia, useAgora } from './agora'
+import { SecaoAcoesRapidas } from '../../core/captura/SecaoAcoesRapidas'
 
 /** Um bloco do dashboard: prioridade decide a ordem; render recebe o tamanho. */
 interface Bloco {
@@ -463,6 +464,8 @@ export function HojePage() {
         </div>
         <p className="mt-1 text-sm text-muted">{dataPorExtenso(agora)}</p>
       </header>
+
+      <SecaoAcoesRapidas />
 
       {carregando ? (
         <p className="py-16 text-center text-sm text-muted">Organizando o seu dia…</p>

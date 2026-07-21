@@ -66,6 +66,7 @@ export const COLECOES: ColecaoSync[] = [
   { colecao: 'lugares', chave: 'id' },
   { colecao: 'perfil', chave: 'id' },
   { colecao: 'projetoItens', chave: 'id' },
+  { colecao: 'capturas', chave: 'id' },
 ]
 
 export const NOMES_SYNC = COLECOES.map((c) => c.colecao)

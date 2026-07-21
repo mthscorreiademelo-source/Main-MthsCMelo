@@ -6,6 +6,9 @@ import { MODULOS } from '../modules'
 import { useSessao } from '../nuvem/auth'
 import { useSincronizacao } from '../nuvem/sync'
 import { RodapeConta } from './RodapeConta'
+import { BotaoGlobal } from '../captura/BotaoGlobal'
+import { LauncherCaptura } from '../captura/LauncherCaptura'
+import { ToastCaptura } from '../captura/ToastCaptura'
 
 const CHAVE_SIDEBAR = 'vida:sidebar'
 
@@ -81,6 +84,11 @@ export function AppShell() {
           </div>
         )}
       </main>
+
+      {/* Captura Rápida (Quick Actions) — global em todas as páginas. */}
+      <BotaoGlobal />
+      <LauncherCaptura />
+      <ToastCaptura />
     </div>
   )
 }

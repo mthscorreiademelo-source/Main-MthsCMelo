@@ -11,13 +11,15 @@ interface Props {
   /** Projeto aplicado quando o texto não traz `#projeto`. */
   projetoPadrao?: string
   placeholder?: string
-  /** Chamado após criar (ex.: para fechar o modal). */
-  aoConcluir?: () => void
+  /** Texto inicial (ex.: vindo de uma captura rápida). */
+  textoInicial?: string
+  /** Chamado após criar (recebe o id criado, ex.: para fechar o modal / desfazer). */
+  aoConcluir?: (id?: string) => void
   autoFocus?: boolean
 }
 
-export function QuickAdd({ projetos, dataPadrao, projetoPadrao, placeholder = 'Adicionar tarefa…', aoConcluir, autoFocus }: Props) {
-  const [texto, setTexto] = useState('')
+export function QuickAdd({ projetos, dataPadrao, projetoPadrao, placeholder = 'Adicionar tarefa…', textoInicial, aoConcluir, autoFocus }: Props) {
+  const [texto, setTexto] = useState(textoInicial ?? '')
   const parsed = useMemo(() => interpretarEntrada(texto, projetos), [texto, projetos])
   const dataFinal = parsed.data ?? dataPadrao
   const projetoFinal = parsed.projetoId ?? projetoPadrao
@@ -26,14 +28,14 @@ export function QuickAdd({ projetos, dataPadrao, projetoPadrao, placeholder = 'A
   async function aoEnviar(e: FormEvent) {
     e.preventDefault()
     if (!parsed.titulo.trim()) return
-    await criarTarefa({
+    const id = await criarTarefa({
       titulo: parsed.titulo,
       data: dataFinal,
       prioridade: parsed.prioridade,
       projetoId: projetoFinal,
     })
     setTexto('')
-    aoConcluir?.()
+    aoConcluir?.(id)
   }
 
   const temChips = !!(parsed.data || parsed.prioridade || parsed.projetoId)

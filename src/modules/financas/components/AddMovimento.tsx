@@ -4,10 +4,18 @@ import { criarMovimento, parsearValor } from '../db'
 import { useContas } from '../hooks'
 import type { TipoMovimento } from '../types'
 
-export function AddMovimento({ aoConcluir }: { aoConcluir?: () => void }) {
+export function AddMovimento({
+  aoConcluir,
+  tipoInicial = 'saida',
+  descricaoInicial = '',
+}: {
+  aoConcluir?: (id?: string) => void
+  tipoInicial?: TipoMovimento
+  descricaoInicial?: string
+}) {
   const contas = useContas()
-  const [tipo, setTipo] = useState<TipoMovimento>('saida')
-  const [descricao, setDescricao] = useState('')
+  const [tipo, setTipo] = useState<TipoMovimento>(tipoInicial)
+  const [descricao, setDescricao] = useState(descricaoInicial)
   const [valor, setValor] = useState('')
   const [contaId, setContaId] = useState('')
   const [erro, setErro] = useState(false)
@@ -30,7 +38,7 @@ export function AddMovimento({ aoConcluir }: { aoConcluir?: () => void }) {
       return
     }
     setErro(false)
-    await criarMovimento({
+    const id = await criarMovimento({
       tipo,
       valorCentavos: centavos,
       descricao,
@@ -39,7 +47,7 @@ export function AddMovimento({ aoConcluir }: { aoConcluir?: () => void }) {
     })
     setDescricao('')
     setValor('')
-    aoConcluir?.()
+    aoConcluir?.(id)
   }
 
   return (
