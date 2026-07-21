@@ -9,6 +9,7 @@ import {
   IconHumor,
   IconLivro,
   IconLocal,
+  IconPasta,
   IconPata,
   IconSaude,
   IconSol,
@@ -30,6 +31,8 @@ import { BibliotecaPage } from '../modules/biblioteca/BibliotecaPage'
 import { LivroPage } from '../modules/biblioteca/LivroPage'
 import { CompiladoPage } from '../modules/biblioteca/CompiladoPage'
 import { LeitorPage } from '../modules/biblioteca/leitor/LeitorPage'
+import { ProjetosPage } from '../modules/projetos/ProjetosPage'
+import { ProjetoWorkspacePage } from '../modules/projetos/ProjetoWorkspacePage'
 import { PetsPage } from '../modules/pets/PetsPage'
 import { PetWorkspacePage } from '../modules/pets/PetWorkspacePage'
 import { ComprasPage } from '../modules/compras/ComprasPage'
@@ -172,6 +175,14 @@ export const MODULOS: ModuloDef[] = [
     ],
     SecaoHoje: BibliotecaHoje,
     hojeTamanho: 'compacto',
+  },
+  {
+    id: 'projetos',
+    nome: 'Projetos',
+    rota: '/projetos',
+    Icone: IconPasta,
+    Pagina: ProjetosPage,
+    subRotas: [{ caminho: '/projetos/:id', Pagina: ProjetoWorkspacePage }],
   },
   {
     id: 'pets',

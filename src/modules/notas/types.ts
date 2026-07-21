@@ -92,6 +92,8 @@ export interface Pagina {
   atualizadaEm: number
   /** Grupo (categoria) ao qual a nota pertence; ausente = nota solta */
   grupoId?: string
+  /** Vínculo opcional com um projeto (Workspace de Projetos). */
+  projetoId?: string
   /** Tipo da nota; ausente = 'texto' */
   tipo?: 'texto' | 'desenho' | 'arquivos'
   /** Traços do desenho (somente tipo 'desenho') */

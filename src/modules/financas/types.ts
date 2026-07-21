@@ -11,6 +11,8 @@ export interface Movimento {
   contaId?: string
   /** Vínculo opcional com um pet (gasto atribuído ao módulo Pets). */
   petId?: string
+  /** Vínculo opcional com um projeto (Workspace de Projetos). */
+  projetoId?: string
   /** Dia do movimento no formato ISO yyyy-MM-dd */
   data: string
   criadoEm: number

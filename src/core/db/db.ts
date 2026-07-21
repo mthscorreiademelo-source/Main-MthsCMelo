@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie'
-import type { Projeto, Task } from '../../modules/tarefas/types'
+import type { ItemProjeto, Projeto, Task } from '../../modules/tarefas/types'
 import type { Grupo, Pagina } from '../../modules/notas/types'
 import type { CategoriaHabito, Habito, HabitoRegistro } from '../../modules/habitos/types'
 import type {
@@ -142,6 +142,7 @@ class VidaDB extends Dexie {
   comprasConfig!: Table<ComprasConfig, string>
   lugares!: Table<Lugar, string>
   perfil!: Table<Perfil, string>
+  projetoItens!: Table<ItemProjeto, string>
   /** Espelho do último estado sincronizado (chave → atualizadoEm). */
   espelho!: Table<{ chave: string; atualizadoEm: number }, string>
 
@@ -339,6 +340,16 @@ class VidaDB extends Dexie {
     this.version(25).stores({
       perfil: 'id',
     })
+    // v26: itens locais dos módulos do Workspace de Projetos (ideias, links…).
+    this.version(26).stores({
+      projetoItens: 'id, projetoId, modulo',
+    })
+    // v27: índice projetoId para vincular eventos/movimentos/notas a projetos.
+    this.version(27).stores({
+      eventos: 'id, data, cronogramaId, atualizadoEm, projetoId',
+      movimentos: 'id, data, criadoEm, projetoId',
+      paginas: 'id, atualizadaEm, criadaEm, grupoId, projetoId',
+    })
   }
 }
 
@@ -461,6 +472,7 @@ export async function exportarBackup() {
     comprasConfig: await db.comprasConfig.toArray(),
     lugares: await db.lugares.toArray(),
     perfil: await db.perfil.toArray(),
+    projetoItens: await db.projetoItens.toArray(),
   }
 }
 
@@ -537,6 +549,7 @@ export async function importarBackup(json: unknown) {
     comprasConfig?: ComprasConfig[]
     lugares?: Lugar[]
     perfil?: Perfil[]
+    projetoItens?: ItemProjeto[]
   }
   const temTasks = Array.isArray(dados?.tasks)
   const temPaginas = Array.isArray(dados?.paginas)
@@ -629,6 +642,7 @@ export async function importarBackup(json: unknown) {
   if (Array.isArray(dados.comprasConfig)) await db.comprasConfig.bulkPut(dados.comprasConfig)
   if (Array.isArray(dados.lugares)) await db.lugares.bulkPut(dados.lugares)
   if (Array.isArray(dados.perfil)) await db.perfil.bulkPut(dados.perfil)
+  if (Array.isArray(dados.projetoItens)) await db.projetoItens.bulkPut(dados.projetoItens)
   return {
     tasks: dados.tasks?.length ?? 0,
     paginas: dados.paginas?.length ?? 0,

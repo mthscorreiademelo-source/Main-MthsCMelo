@@ -74,6 +74,8 @@ export interface Evento {
   custoCentavos?: number
   /** Vínculo opcional com um pet (evento criado pelo módulo Pets). */
   petId?: string
+  /** Vínculo opcional com um projeto (Workspace de Projetos). */
+  projetoId?: string
   descricao?: string
   /** Repetição do evento (gera ocorrências nas datas seguintes). */
   recorrencia?: RecorrenciaEvento

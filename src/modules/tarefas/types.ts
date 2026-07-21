@@ -54,6 +54,16 @@ export interface Task {
   atualizadoEm?: number
 }
 
+export type StatusProjeto = 'ideia' | 'andamento' | 'pausado' | 'concluido'
+
+/** Um bloco/módulo do Workspace do projeto (visível, recolhido, ordem). */
+export interface ModuloProjeto {
+  id: string
+  visivel: boolean
+  recolhido?: boolean
+  ordem: number
+}
+
 export interface Projeto {
   id: string
   nome: string
@@ -61,6 +71,37 @@ export interface Projeto {
   favorito?: boolean
   ordem: number
   arquivado?: boolean
+  criadoEm: number
+  atualizadoEm?: number
+  /* ---- Workspace (redesign Projetos) ---- */
+  icone?: string
+  descricao?: string
+  /** Capa em dataURL (clara/padrão). */
+  capa?: string
+  /** Capa alternativa para o modo escuro. */
+  capaDark?: string
+  categoria?: string
+  status?: StatusProjeto
+  tags?: string[]
+  /** Módulos ativos do Workspace e sua ordem. Vazio = usa o padrão. */
+  modulos?: ModuloProjeto[]
+  /** Última atividade (timestamp) para ordenar/mostrar na biblioteca. */
+  ultimaAtividade?: number
+}
+
+/** Item genérico de um módulo local do Workspace (ideias, links, pessoas…). */
+export interface ItemProjeto {
+  id: string
+  projetoId: string
+  /** módulo dono: 'ideias' | 'links' | 'pessoas' | 'aprendizados' | 'base' … */
+  modulo: string
+  titulo?: string
+  texto?: string
+  url?: string
+  /** dados livres (ex.: colunas da base de dados). */
+  dados?: Record<string, unknown>
+  concluido?: boolean
+  ordem: number
   criadoEm: number
   atualizadoEm?: number
 }
