@@ -7,6 +7,8 @@ export interface Movimento {
   valorCentavos: number
   descricao: string
   categoria?: string
+  /** Conta de onde saiu (saída) ou entrou (entrada) o dinheiro. */
+  contaId?: string
   /** Vínculo opcional com um pet (gasto atribuído ao módulo Pets). */
   petId?: string
   /** Dia do movimento no formato ISO yyyy-MM-dd */

@@ -28,6 +28,16 @@ export function patrimonioLiquido(contas: Conta[]): number {
   return total
 }
 
+/** Tipos de conta considerados "dinheiro para gastar agora" (líquido). */
+export const TIPOS_LIQUIDOS = ['corrente', 'carteira'] as const
+
+/** Saldo disponível de verdade: soma das contas líquidas (corrente + carteira). */
+export function saldoDisponivel(contas: Conta[]): number {
+  return contas
+    .filter((c) => (TIPOS_LIQUIDOS as readonly string[]).includes(c.tipo))
+    .reduce((s, c) => s + c.saldoCentavos, 0)
+}
+
 /** Série do gráfico de evolução: snapshots ordenados + o valor atual no mês corrente. */
 export function serieEvolucao(
   snapshots: PatrimonioSnapshot[],
@@ -46,6 +56,8 @@ export function serieEvolucao(
 
 export interface OrcamentoInteligente {
   rendaMensal: number
+  /** Saldo líquido de verdade: soma das contas corrente + carteira. */
+  saldoLiquido: number
   gastoMes: number
   gastoHoje: number
   entradasMes: number
@@ -53,7 +65,9 @@ export interface OrcamentoInteligente {
   eventosReservados: number
   aportesReservados: number
   investimentoReservado: number
-  /** disponível para o RESTO do mês, depois de todas as reservas. */
+  /** Soma de tudo que ainda vai sair/guardar no mês (bills + eventos + aportes). */
+  comprometido: number
+  /** disponível de verdade = saldo líquido − comprometido (pode ficar negativo). */
   disponivelMes: number
   diasRestantes: number
   /** recomendação diária inteligente. */
@@ -82,12 +96,13 @@ function somaEntradas(movs: Movimento[]): number {
 export function orcamentoInteligente(args: {
   hoje: string
   movimentos: Movimento[]
+  contas: Conta[]
   recorrentes: Recorrente[]
   objetivos: Objetivo[]
   eventos: Evento[]
   config: FinancasConfig | undefined
 }): OrcamentoInteligente {
-  const { hoje, movimentos, recorrentes, objetivos, eventos, config } = args
+  const { hoje, movimentos, contas, recorrentes, objetivos, eventos, config } = args
   const mes = mesDe(hoje)
   const ano = Number(hoje.slice(0, 4))
   const mesNum = Number(hoje.slice(5, 7))
@@ -96,6 +111,7 @@ export function orcamentoInteligente(args: {
   const diasRestantes = Math.max(1, totalDias - diaHoje + 1)
 
   const rendaMensal = config?.rendaMensalCentavos ?? 0
+  const saldoLiquido = saldoDisponivel(contas)
   const movMes = movimentos.filter((m) => m.data.startsWith(mes))
   const gastoMes = somaSaidas(movMes)
   const entradasMes = somaEntradas(movMes)
@@ -114,20 +130,27 @@ export function orcamentoInteligente(args: {
   const aportesReservados = objetivos.reduce((s, o) => s + (o.aporteMensalCentavos ?? 0), 0)
   const investimentoReservado = config?.investimentoMensalCentavos ?? 0
 
-  const disponivelMes = Math.max(
-    0,
-    rendaMensal - gastoMes - recorrentesReservados - eventosReservados - aportesReservados - investimentoReservado,
-  )
-  const orcamentoDiario = disponivelMes / diasRestantes
+  // Tudo que ainda vai sair (ou ser guardado) até o fim do mês.
+  const comprometido =
+    recorrentesReservados + eventosReservados + aportesReservados + investimentoReservado
+
+  // Disponível de verdade: o que HÁ na conta menos os compromissos do mês.
+  // (Não depende do salário — depende do dinheiro que você realmente tem.)
+  const disponivelMes = saldoLiquido - comprometido
+
+  // Orçamento diário: divide o que sobra pelos dias restantes, devolvendo o
+  // gasto de hoje ao bolo para que "hoje" receba uma fatia cheia como os demais.
+  const orcamentoDiario = Math.max(0, disponivelMes + gastoHoje) / diasRestantes
   const disponivelHoje = orcamentoDiario - gastoHoje
 
   const mediaDiaria = diaHoje > 0 ? gastoMes / diaHoje : 0
-  // Projeção: se mantiver a média diária até o fim do mês.
-  const gastoProjetadoMes = mediaDiaria * totalDias + recorrentesReservados + eventosReservados
-  const economiaProjetada = rendaMensal - gastoProjetadoMes - aportesReservados - investimentoReservado
+  // Projeção: se mantiver a média diária, quanto sobra do disponível no fim do mês.
+  const gastoRestanteProjetado = mediaDiaria * (diasRestantes - 1)
+  const economiaProjetada = disponivelMes - gastoRestanteProjetado
 
   return {
     rendaMensal,
+    saldoLiquido,
     gastoMes,
     gastoHoje,
     entradasMes,
@@ -135,6 +158,7 @@ export function orcamentoInteligente(args: {
     eventosReservados,
     aportesReservados,
     investimentoReservado,
+    comprometido,
     disponivelMes,
     diasRestantes,
     orcamentoDiario,

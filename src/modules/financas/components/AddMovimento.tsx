@@ -1,14 +1,27 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { IconMais } from '../../../core/components/Icons'
 import { hojeISO } from '../../../core/dates'
 import { criarMovimento, parsearValor } from '../db'
+import { useContas } from '../hooks'
 import type { TipoMovimento } from '../types'
 
 export function AddMovimento() {
+  const contas = useContas()
   const [tipo, setTipo] = useState<TipoMovimento>('saida')
   const [descricao, setDescricao] = useState('')
   const [valor, setValor] = useState('')
+  const [contaId, setContaId] = useState('')
   const [erro, setErro] = useState(false)
+
+  // Pré-seleciona a primeira conta corrente/carteira assim que as contas chegam.
+  useEffect(() => {
+    if (contaId || !contas || contas.length === 0) return
+    const preferida =
+      contas.find((c) => c.tipo === 'corrente') ??
+      contas.find((c) => c.tipo === 'carteira') ??
+      contas[0]
+    setContaId(preferida.id)
+  }, [contas, contaId])
 
   async function aoEnviar(e: FormEvent) {
     e.preventDefault()
@@ -23,6 +36,7 @@ export function AddMovimento() {
       valorCentavos: centavos,
       descricao,
       data: hojeISO(),
+      contaId: contaId || undefined,
     })
     setDescricao('')
     setValor('')
@@ -69,6 +83,19 @@ export function AddMovimento() {
         aria-label="Valor"
         className="w-24 bg-transparent px-1 py-2.5 text-right text-[15px] outline-none placeholder:text-muted/70"
       />
+      {contas && contas.length > 0 && (
+        <select
+          value={contaId}
+          onChange={(e) => setContaId(e.target.value)}
+          aria-label={tipo === 'saida' ? 'Conta de origem' : 'Conta de destino'}
+          title={tipo === 'saida' ? 'De onde saiu o dinheiro' : 'Para onde entrou o dinheiro'}
+          className="min-h-10 max-w-36 rounded-lg border border-line bg-transparent px-2 text-[13px] text-muted outline-none focus:text-ink"
+        >
+          {contas.map((c) => (
+            <option key={c.id} value={c.id}>{c.icone ? `${c.icone} ` : ''}{c.nome}</option>
+          ))}
+        </select>
+      )}
       <button
         type="submit"
         aria-label="Adicionar movimento"

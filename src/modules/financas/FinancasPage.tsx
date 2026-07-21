@@ -89,12 +89,13 @@ export function FinancasPage() {
       orcamentoInteligente({
         hoje,
         movimentos: movimentos ?? [],
+        contas: contas ?? [],
         recorrentes: recorrentes ?? [],
         objetivos: objetivos ?? [],
         eventos: eventos ?? [],
         config,
       }),
-    [hoje, movimentos, recorrentes, objetivos, eventos, config],
+    [hoje, movimentos, contas, recorrentes, objetivos, eventos, config],
   )
 
   const dist = useMemo(() => distribuicao(linhas ?? [], movimentos ?? [], mes), [linhas, movimentos, mes])
@@ -134,20 +135,20 @@ export function FinancasPage() {
     [movimentos],
   )
   const objetivosVis = (objetivos ?? []).slice(0, 3)
+  const contasOrdenadas = useMemo(
+    () => [...(contas ?? [])].sort((a, b) => a.ordem - b.ordem),
+    [contas],
+  )
 
   const rotuloMes = (() => {
     const t = format(parseISO(`${mes}-01`), "MMMM 'de' yyyy", { locale: ptBR })
     return t.charAt(0).toUpperCase() + t.slice(1)
   })()
 
-  const [heroI, heroC] = reaisPartes(Math.max(0, orc.disponivelHoje))
+  const dispNegativo = orc.disponivelMes < 0
+  const [heroI, heroC] = reaisPartes(Math.abs(orc.disponivelMes))
   const restanteHoje = Math.max(0, orc.orcamentoDiario - orc.gastoHoje)
   const usadoFrac = orc.orcamentoDiario > 0 ? Math.min(1, orc.gastoHoje / orc.orcamentoDiario) : 0
-  const pctRestante = orc.orcamentoDiario > 0 ? Math.round((restanteHoje / orc.orcamentoDiario) * 100) : 0
-  const contexto =
-    orc.disponivelHoje >= 0
-      ? `Você ainda tem ${pctRestante}% do orçamento de hoje.`
-      : `Você passou ${formatarBRL(-Math.round(orc.disponivelHoje))} do orçamento de hoje.`
 
   if (!pronto) {
     return <div className="mx-auto max-w-5xl p-6 text-[14px] text-muted">Carregando…</div>
@@ -181,22 +182,71 @@ export function FinancasPage() {
 
       {addAberto && <AddMovimento />}
 
-      {/* 1+2. Disponível hoje + Orçamento diário */}
+      {/* 1. Suas contas — saldo atual de cada uma (prioridade da tela) */}
+      <div className={CARTAO}>
+        <div className="mb-3 flex items-center justify-between">
+          <span className={ROTULO}>Suas contas</span>
+          <button onClick={() => setSheet('ajustes')} className="text-[12px] font-medium text-muted hover:text-ink">Gerenciar</button>
+        </div>
+        {contasOrdenadas.length === 0 ? (
+          <p className="text-[13px] text-muted">Cadastre suas contas nos ajustes para acompanhar cada saldo.</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+            {contasOrdenadas.map((c) => {
+              const divida = c.tipo === 'divida'
+              return (
+                <div key={c.id} className="rounded-xl border border-line p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg text-[15px]" style={{ backgroundColor: c.cor ? `color-mix(in srgb, ${c.cor} 16%, transparent)` : 'var(--vida-hover)' }}>{c.icone ?? '🏦'}</span>
+                    <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium">{c.nome}</span>
+                  </div>
+                  <div className={`mt-2 text-[18px] font-bold leading-none tabular-nums ${divida ? 'text-danger' : ''}`}>
+                    {divida ? '− ' : ''}{formatarBRL(c.saldoCentavos)}
+                  </div>
+                  <div className="mt-1 text-[10.5px] uppercase tracking-wide text-muted">{rotuloTipoConta(c.tipo)}</div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 2. Disponível para gastar — cálculo transparente a partir do saldo real */}
       <div className="grid grid-cols-1 gap-4 rounded-2xl border border-line bg-surface/50 p-5 md:grid-cols-2">
         <div className="flex flex-col justify-center md:border-r md:border-line md:pr-5">
-          <div className="flex items-center gap-2">
-            <span className={ROTULO}>Disponível para gastar</span>
-            <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase text-accent">Hoje</span>
-          </div>
+          <span className={ROTULO}>Disponível para gastar</span>
           <div className="mt-1 flex items-baseline gap-0.5">
-            <span className={`text-[46px] font-bold leading-none ${orc.disponivelHoje < 0 ? 'text-danger' : 'text-accent'}`}>{heroI}</span>
-            <span className={`text-[22px] font-bold ${orc.disponivelHoje < 0 ? 'text-danger' : 'text-accent'}`}>,{heroC}</span>
+            <span className={`text-[46px] font-bold leading-none ${dispNegativo ? 'text-danger' : 'text-accent'}`}>{dispNegativo ? '−' : ''}{heroI}</span>
+            <span className={`text-[22px] font-bold ${dispNegativo ? 'text-danger' : 'text-accent'}`}>,{heroC}</span>
           </div>
-          <p className="mt-2 text-[13px] text-muted">{contexto}</p>
+          <p className="mt-2 text-[13px] text-muted">
+            {dispNegativo
+              ? 'Seus compromissos do mês passam do que há em conta. Atenção aos gastos.'
+              : `Livre para gastar até o fim do mês, depois dos compromissos. Dá ${formatarBRL(orc.orcamentoDiario)}/dia.`}
+          </p>
+          {/* Como chegamos nesse número */}
+          <div className="mt-3 flex flex-col gap-1 rounded-xl bg-hover/60 px-3 py-2.5 text-[12px]">
+            <div className="flex items-center justify-between">
+              <span className="text-muted">Saldo em conta (líquido)</span>
+              <span className="font-semibold tabular-nums">{formatarBRL(orc.saldoLiquido)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted">− Compromissos do mês</span>
+              <span className="font-semibold tabular-nums text-danger">{formatarBRL(orc.comprometido)}</span>
+            </div>
+            <div className="mt-0.5 flex items-center justify-between border-t border-line pt-1.5">
+              <span className="font-medium">= Disponível</span>
+              <span className={`font-bold tabular-nums ${dispNegativo ? 'text-danger' : 'text-accent'}`}>{formatarBRL(orc.disponivelMes)}</span>
+            </div>
+          </div>
         </div>
         <div className="flex flex-col justify-center gap-3 md:pl-1">
+          <div className="flex items-center gap-2">
+            <span className={ROTULO}>Orçamento de hoje</span>
+            <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase text-accent">{orc.diasRestantes}d restantes</span>
+          </div>
           <div className="flex items-center justify-between text-[13px]">
-            <span className="text-muted">Orçamento diário</span>
+            <span className="text-muted">Meta diária</span>
             <span className="font-semibold">{formatarBRL(orc.orcamentoDiario)}</span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-hover">
@@ -207,27 +257,14 @@ export function FinancasPage() {
             <span className="font-semibold">{formatarBRL(orc.gastoHoje)}</span>
           </div>
           <div className="flex items-center justify-between text-[13px]">
-            <span className="text-muted">Restante</span>
-            <span className="font-semibold text-accent">{formatarBRL(restanteHoje)}</span>
+            <span className="text-muted">Ainda dá pra gastar hoje</span>
+            <span className={`font-semibold ${orc.disponivelHoje < 0 ? 'text-danger' : 'text-accent'}`}>{formatarBRL(restanteHoje)}</span>
           </div>
         </div>
       </div>
 
-      {/* 3+4. Patrimônio + Reserva */}
+      {/* 3+4. Reserva + Patrimônio (patrimônio agora secundário) */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className={CARTAO}>
-          <span className={ROTULO}>Patrimônio líquido</span>
-          <div className="mt-2 flex items-end justify-between gap-3">
-            <div>
-              <div className="text-[26px] font-bold leading-none">{formatarBRL(patrimonio)}</div>
-              <div className={`mt-1.5 flex items-center gap-1 text-[13px] font-medium ${varMes >= 0 ? 'text-accent' : 'text-danger'}`}>
-                {varMes >= 0 ? '↑' : '↓'} {varMes >= 0 ? '+' : ''}{varMes.toFixed(1)}% este mês
-              </div>
-            </div>
-            <Sparkline valores={serie.map((s) => s.valor)} />
-          </div>
-        </div>
-
         <div className={CARTAO}>
           <span className={ROTULO}>Reserva de emergência</span>
           {reserva ? (
@@ -248,6 +285,20 @@ export function FinancasPage() {
           ) : (
             <p className="mt-3 text-[13px] text-muted">Defina sua reserva de emergência nos ajustes.</p>
           )}
+        </div>
+
+        <div className={CARTAO}>
+          <span className={ROTULO}>Patrimônio líquido</span>
+          <div className="mt-2 flex items-end justify-between gap-3">
+            <div>
+              <div className="text-[24px] font-bold leading-none">{formatarBRL(patrimonio)}</div>
+              <div className={`mt-1.5 flex items-center gap-1 text-[12.5px] font-medium ${varMes >= 0 ? 'text-accent' : 'text-danger'}`}>
+                {varMes >= 0 ? '↑' : '↓'} {varMes >= 0 ? '+' : ''}{varMes.toFixed(1)}% este mês
+              </div>
+            </div>
+            <Sparkline valores={serie.map((s) => s.valor)} />
+          </div>
+          <p className="mt-2 text-[11.5px] text-muted">Soma de todas as contas, menos dívidas.</p>
         </div>
       </div>
 
@@ -440,6 +491,16 @@ function TransacoesSheet({
 
 /* --------------------------------- ícones --------------------------------- */
 
+function rotuloTipoConta(tipo: string): string {
+  switch (tipo) {
+    case 'corrente': return 'Conta corrente'
+    case 'poupanca': return 'Poupança'
+    case 'investimento': return 'Investimento'
+    case 'carteira': return 'Carteira'
+    case 'divida': return 'Dívida'
+    default: return 'Conta'
+  }
+}
 function iconeCategoria(cat?: string): string {
   switch (cat) {
     case 'Alimentação': return '🍽️'

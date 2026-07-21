@@ -21,32 +21,62 @@ export const CATEGORIAS = [
   'Outros',
 ] as const
 
+/** Quanto um movimento soma (+) ou subtrai (−) do saldo da sua conta. */
+function deltaMov(tipo: TipoMovimento, valorCentavos: number): number {
+  return tipo === 'entrada' ? valorCentavos : -valorCentavos
+}
+
+/** Aplica um delta ao saldo de uma conta (sem deixar o campo negativo travar nada). */
+async function ajustarSaldo(contaId: string | undefined, delta: number) {
+  if (!contaId || delta === 0) return
+  await db.contas.where('id').equals(contaId).modify((c) => {
+    c.saldoCentavos = c.saldoCentavos + delta
+  })
+}
+
 export async function criarMovimento(dados: {
   tipo: TipoMovimento
   valorCentavos: number
   descricao: string
   data: string
   categoria?: string
+  /** Conta de onde saiu/entrou o dinheiro; ajusta o saldo dela. */
+  contaId?: string
   /** Vínculo opcional com um pet (integração com o módulo Pets). */
   petId?: string
 }): Promise<string | undefined> {
   if (!dados.descricao.trim() || dados.valorCentavos <= 0) return undefined
   const id = nanoid()
-  await db.movimentos.add({
-    id,
-    ...dados,
-    descricao: dados.descricao.trim(),
-    criadoEm: Date.now(),
+  await db.transaction('rw', db.movimentos, db.contas, async () => {
+    await db.movimentos.add({
+      id,
+      ...dados,
+      descricao: dados.descricao.trim(),
+      criadoEm: Date.now(),
+    })
+    await ajustarSaldo(dados.contaId, deltaMov(dados.tipo, dados.valorCentavos))
   })
   return id
 }
 
 export async function atualizarMovimento(id: string, mudancas: Partial<Movimento>) {
-  await db.movimentos.update(id, mudancas)
+  await db.transaction('rw', db.movimentos, db.contas, async () => {
+    const antigo = await db.movimentos.get(id)
+    if (!antigo) return
+    const novo = { ...antigo, ...mudancas }
+    // Reverte o efeito antigo e aplica o novo (cobre troca de conta, valor ou tipo).
+    await ajustarSaldo(antigo.contaId, -deltaMov(antigo.tipo, antigo.valorCentavos))
+    await ajustarSaldo(novo.contaId, deltaMov(novo.tipo, novo.valorCentavos))
+    await db.movimentos.update(id, mudancas)
+  })
 }
 
 export async function excluirMovimento(id: string) {
-  await db.movimentos.delete(id)
+  await db.transaction('rw', db.movimentos, db.contas, async () => {
+    const antigo = await db.movimentos.get(id)
+    if (antigo) await ajustarSaldo(antigo.contaId, -deltaMov(antigo.tipo, antigo.valorCentavos))
+    await db.movimentos.delete(id)
+  })
 }
 
 /* ---------- valores ---------- */

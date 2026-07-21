@@ -9,6 +9,7 @@ import {
   parsearValor,
   valorParaTexto,
 } from '../db'
+import { useContas } from '../hooks'
 import type { Movimento, TipoMovimento } from '../types'
 
 interface Props {
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export function MovimentoEditorSheet({ movimento, onFechar }: Props) {
+  const contas = useContas()
   const [descricao, setDescricao] = useState('')
   const [valor, setValor] = useState('')
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
@@ -130,6 +132,22 @@ export function MovimentoEditorSheet({ movimento, onFechar }: Props) {
             ))}
           </div>
         </div>
+
+        {contas && contas.length > 0 && (
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium text-muted">{movimento?.tipo === 'entrada' ? 'Entrou na conta' : 'Saiu da conta'}</span>
+            <select
+              value={movimento?.contaId ?? ''}
+              onChange={(e) => movimento && atualizarMovimento(movimento.id, { contaId: e.target.value || undefined })}
+              className="min-h-11 self-start rounded-lg border border-line bg-transparent px-3 text-[15px] outline-none focus:border-muted/50"
+            >
+              <option value="">Nenhuma (não altera saldo)</option>
+              {contas.map((c) => (
+                <option key={c.id} value={c.id}>{c.icone ? `${c.icone} ` : ''}{c.nome}</option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <label className="flex flex-col gap-1.5">
           <span className="text-[13px] font-medium text-muted">Data</span>
