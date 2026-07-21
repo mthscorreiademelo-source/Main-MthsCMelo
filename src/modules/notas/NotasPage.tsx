@@ -8,6 +8,7 @@ import { ListaNotas } from './components/ListaNotas'
 import { buscarNotas, ordenarNotas } from './acoes'
 import { criarPagina, ordenarGrupos, textoResumo } from './db'
 import { criarPaginaDeTemplate, TEMPLATES_NOTA } from './templates'
+import { importarMarkdown } from './markdown'
 import { FolhaInferior } from '../../core/components/FolhaInferior'
 import { useGrupos, usePaginas } from './hooks'
 import { capaDoGrupo, type Pagina } from './types'
@@ -67,6 +68,10 @@ export function NotasPage() {
         <h1 className="text-2xl font-bold tracking-tight">Notas e Cadernos</h1>
         <div className="flex items-center gap-1">
           <button onClick={() => { setAba('todas'); setBuscaAberta((v) => !v) }} aria-label="Buscar" className="flex size-10 items-center justify-center rounded-full text-muted hover:bg-hover hover:text-ink"><IconLupa width={18} height={18} /></button>
+          <label aria-label="Importar Markdown" title="Importar .md / .txt" className="flex size-10 cursor-pointer items-center justify-center rounded-full text-[16px] text-muted hover:bg-hover hover:text-ink">
+            ⬆
+            <input type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) navigate(`/notas/${await importarMarkdown(f)}`) }} />
+          </label>
           <button onClick={() => novaPagina('texto')} className="flex min-h-10 items-center gap-1.5 rounded-full bg-ink px-4 text-[14px] font-medium text-surface hover:opacity-90"><IconMais width={16} height={16} /> Nota</button>
         </div>
       </div>

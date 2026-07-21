@@ -7,6 +7,7 @@ import { ArquivosPainel } from './components/ArquivosPainel'
 import { BlocoEditor } from './components/BlocoEditor'
 import { ChipsRelacao } from './components/RelacoesNota'
 import { ExtrairAcoes } from './components/ExtrairAcoes'
+import { baixarNotaMd } from './markdown'
 import { DesenhoTela } from './components/DesenhoTela'
 import { excluirPagina, novoBloco, ordenarGrupos, salvarPagina } from './db'
 import { useGrupos } from './hooks'
@@ -117,9 +118,12 @@ export function EditorNotaPage() {
         </IconButton>
         <div className="flex items-center gap-1">
           {(pagina.tipo ?? 'texto') === 'texto' && (
-            <button onClick={() => setExtrair(true)} className="flex min-h-9 items-center gap-1 rounded-full border border-line px-3 text-[12.5px] font-medium text-muted hover:text-ink" title="Extrair tarefas/eventos/compras">
-              ⚡ Extrair
-            </button>
+            <>
+              <button onClick={() => setExtrair(true)} className="flex min-h-9 items-center gap-1 rounded-full border border-line px-3 text-[12.5px] font-medium text-muted hover:text-ink" title="Extrair tarefas/eventos/compras">
+                ⚡ Extrair
+              </button>
+              <button onClick={() => pagina && baixarNotaMd(pagina)} aria-label="Exportar Markdown" title="Exportar .md" className="flex size-10 items-center justify-center rounded-full text-[15px] text-muted hover:bg-hover">⬇</button>
+            </>
           )}
           <button
             onClick={() => setPagina((p) => (p ? { ...p, favorito: !p.favorito } : p))}
