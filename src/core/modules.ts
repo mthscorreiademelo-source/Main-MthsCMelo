@@ -119,7 +119,7 @@ export const MODULOS: ModuloDef[] = [
   },
   {
     id: 'habitos',
-    nome: 'Hábitos',
+    nome: 'Hábitos e Rotinas',
     rota: '/habitos',
     Icone: IconChama,
     Pagina: HabitosPage,

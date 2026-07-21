@@ -15,6 +15,7 @@ import { deveIgnorarHooks } from '../nuvem/sync/bandeira'
 import { NOMES_SYNC } from '../nuvem/sync/colecoes'
 import type { Perfil } from '../perfil/types'
 import type { Captura } from '../captura/types'
+import type { ExecucaoRotina, Rotina } from '../../modules/habitos/rotinas/types'
 import type {
   Categoria,
   Fator,
@@ -146,6 +147,9 @@ class VidaDB extends Dexie {
   projetoItens!: Table<ItemProjeto, string>
   /** Caixa de entrada da Captura Rápida (Quick Actions). */
   capturas!: Table<Captura, string>
+  /** Rotinas (sequências reutilizáveis) e seu histórico de execução. */
+  rotinas!: Table<Rotina, string>
+  rotinaExecucoes!: Table<ExecucaoRotina, string>
   /** Espelho do último estado sincronizado (chave → atualizadoEm). */
   espelho!: Table<{ chave: string; atualizadoEm: number }, string>
 
@@ -357,6 +361,11 @@ class VidaDB extends Dexie {
     this.version(28).stores({
       capturas: 'id, criadoEm, status',
     })
+    // v29: Rotinas (Hábitos e Rotinas) + histórico de execução.
+    this.version(29).stores({
+      rotinas: 'id, ordem, criadoEm',
+      rotinaExecucoes: 'id, rotinaId, data',
+    })
   }
 }
 
@@ -481,6 +490,8 @@ export async function exportarBackup() {
     perfil: await db.perfil.toArray(),
     projetoItens: await db.projetoItens.toArray(),
     capturas: await db.capturas.toArray(),
+    rotinas: await db.rotinas.toArray(),
+    rotinaExecucoes: await db.rotinaExecucoes.toArray(),
   }
 }
 
@@ -559,6 +570,8 @@ export async function importarBackup(json: unknown) {
     perfil?: Perfil[]
     projetoItens?: ItemProjeto[]
     capturas?: Captura[]
+    rotinas?: Rotina[]
+    rotinaExecucoes?: ExecucaoRotina[]
   }
   const temTasks = Array.isArray(dados?.tasks)
   const temPaginas = Array.isArray(dados?.paginas)
@@ -653,6 +666,8 @@ export async function importarBackup(json: unknown) {
   if (Array.isArray(dados.perfil)) await db.perfil.bulkPut(dados.perfil)
   if (Array.isArray(dados.projetoItens)) await db.projetoItens.bulkPut(dados.projetoItens)
   if (Array.isArray(dados.capturas)) await db.capturas.bulkPut(dados.capturas)
+  if (Array.isArray(dados.rotinas)) await db.rotinas.bulkPut(dados.rotinas)
+  if (Array.isArray(dados.rotinaExecucoes)) await db.rotinaExecucoes.bulkPut(dados.rotinaExecucoes)
   return {
     tasks: dados.tasks?.length ?? 0,
     paginas: dados.paginas?.length ?? 0,
