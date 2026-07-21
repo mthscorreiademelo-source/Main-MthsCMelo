@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { format, isToday, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { IconMais } from '../../../core/components/Icons'
@@ -173,7 +173,28 @@ function GrupoBloco({
   )
 }
 
-function Coluna({
+/**
+ * Cabeçalho do dia. Fica numa faixa FIXA acima da área rolável (não é sticky
+ * sobreposto ao conteúdo). Assim os cantos superiores arredondados nunca têm
+ * nada rolando por trás — some a "ponta" que aparecia atrás do título ao rolar.
+ */
+function CabecalhoDia({ plano, ehHoje }: { plano: PlanoDia; ehHoje: boolean }) {
+  const dt = parseISO(plano.dia)
+  return (
+    <header
+      className={`flex items-center gap-2 rounded-t-2xl border-x border-t border-b px-3 py-2.5 ${ehHoje ? 'border-accent/40' : 'border-line'}`}
+      style={{ backgroundColor: ehHoje ? 'color-mix(in srgb, var(--vida-accent) 12%, var(--vida-surface))' : 'var(--vida-surface)' }}
+    >
+      <span className={`text-[22px] font-bold leading-none ${ehHoje ? 'text-accent' : ''}`}>{format(dt, 'd')}</span>
+      <div className="flex min-w-0 flex-col leading-none">
+        <span className="truncate text-[12px] font-semibold capitalize">{nomeDiaCurto(plano.dia)}</span>
+        <span className="text-[10px] uppercase tracking-wide text-muted">{format(dt, 'MMM', { locale: ptBR })}</span>
+      </div>
+    </header>
+  )
+}
+
+function CorpoDia({
   plano,
   ini,
   fim,
@@ -196,7 +217,6 @@ function Coluna({
   onCriar: (data: string, iniMin: number, fimMin: number) => void
   onAbrirContextos: () => void
 }) {
-  const dt = parseISO(plano.dia)
   const altura = ((fim - ini) / 60) * hpx
   const horas: number[] = []
   for (let h = Math.ceil(ini / 60); h <= fim / 60; h += 1) horas.push(h)
@@ -259,23 +279,7 @@ function Coluna({
   }
 
   return (
-    <section className="lume-entrada flex min-w-0 flex-1 flex-col">
-      {/* Cabeçalho do dia — congelado ao rolar (sticky). O header carrega as
-          bordas e cantos arredondados de cima, com fundo OPACO, para o topo
-          continuar arredondado e limpo mesmo rolando (sem vazar conteúdo). */}
-      <header
-        className={`sticky top-0 z-30 flex items-center gap-2 rounded-t-2xl border-x border-t border-b px-3 py-2.5 ${ehHoje ? 'border-accent/40' : 'border-line'}`}
-        style={{ backgroundColor: ehHoje ? 'color-mix(in srgb, var(--vida-accent) 12%, var(--vida-surface))' : 'var(--vida-surface)' }}
-      >
-        <span className={`text-[22px] font-bold leading-none ${ehHoje ? 'text-accent' : ''}`}>{format(dt, 'd')}</span>
-        <div className="flex min-w-0 flex-col leading-none">
-          <span className="truncate text-[12px] font-semibold capitalize">{nomeDiaCurto(plano.dia)}</span>
-          <span className="text-[10px] uppercase tracking-wide text-muted">{format(dt, 'MMM', { locale: ptBR })}</span>
-        </div>
-      </header>
-
-      {/* Corpo do dia (rolável), com bordas laterais/inferior e canto inferior. */}
-      <div className="flex flex-col overflow-hidden rounded-b-2xl border-x border-b border-line bg-surface/40">
+    <div className="lume-entrada flex flex-col overflow-hidden rounded-b-2xl border-x border-b border-line bg-surface/40">
       {/* Faixa de dia inteiro */}
       {plano.diaInteiro.length > 0 && (
         <div className="flex flex-col gap-1 border-b border-line px-2 py-1.5">
@@ -396,8 +400,7 @@ function Coluna({
           </div>
         )}
       </div>
-      </div>
-    </section>
+    </div>
   )
 }
 
@@ -608,6 +611,9 @@ export function PlannerTresDias({
     return salvo >= ZOOM_MIN && salvo <= ZOOM_MAX ? salvo : ZOOM_PADRAO
   })
   const scrollRef = useRef<HTMLDivElement>(null)
+  // Largura da barra de rolagem do corpo — reservada também no cabeçalho fixo
+  // para que as colunas de título fiquem alinhadas com as colunas de eventos.
+  const [sbw, setSbw] = useState(0)
 
   function ajustarZoom(fator: number) {
     setHoraPx((z) => {
@@ -636,6 +642,17 @@ export function PlannerTresDias({
   const iniH = Math.floor(ini / 60)
   const fimH = Math.ceil(fim / 60)
 
+  // Mede a barra de rolagem (0 em navegadores com overlay). Reavalia quando o
+  // conteúdo muda de altura (dias/zoom) e ao redimensionar a janela.
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const medir = () => setSbw(el.offsetWidth - el.clientWidth)
+    medir()
+    window.addEventListener('resize', medir)
+    return () => window.removeEventListener('resize', medir)
+  }, [planos, horaPx])
+
   return (
     <div className="flex flex-col gap-3">
       {/* Controle de zoom (proporção dos blocos), estilo Google Agenda */}
@@ -645,27 +662,52 @@ export function PlannerTresDias({
         <button onClick={() => ajustarZoom(1.3)} disabled={horaPx >= ZOOM_MAX} aria-label="Aumentar zoom" className="flex size-7 items-center justify-center rounded-full border border-line text-[15px] font-medium text-muted hover:text-ink disabled:opacity-40">+</button>
       </div>
       <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <div ref={scrollRef} className="overflow-y-auto overflow-x-hidden pb-1" style={{ maxHeight: 'calc(100vh - 210px)' }}>
-            <div className={`flex ${planos.length > 4 ? 'gap-1' : 'gap-2.5'}`}>
-              {planos.map((p) => (
-                <div key={p.dia} className={`min-w-0 flex-1 ${planos.length === 1 ? 'sm:max-w-2xl' : ''}`}>
-                  <Coluna
-                    plano={p}
-                    ini={ini}
-                    fim={fim}
-                    hpx={horaPx}
-                    agoraMin={agoraMin}
-                    ehHoje={p.dia === hoje}
-                    onAbrirEvento={onAbrirEvento}
-                    onAbrirTarefa={onAbrirTarefa}
-                    onCriar={onCriar}
-                    onAbrirContextos={onAbrirContextos}
-                  />
+        {/* Caixa da grade com ALTURA FIXA: o cabeçalho fica no topo (não rola)
+            e só o corpo rola por dentro. Assim os títulos ficam sempre
+            visíveis e nada passa por trás dos cantos arredondados. */}
+        <div className="flex min-w-0 flex-1 flex-col" style={{ height: 'calc(100vh - 210px)' }}>
+          {(() => {
+            const gapCls = planos.length > 4 ? 'gap-1' : 'gap-2.5'
+            const colCls = `min-w-0 flex-1 ${planos.length === 1 ? 'sm:max-w-2xl' : ''}`
+            return (
+              <>
+                {/* Faixa de cabeçalhos — reserva a largura da barra de rolagem
+                    à direita para alinhar com o corpo rolável. */}
+                <div className={`flex shrink-0 ${gapCls}`} style={{ paddingRight: sbw }}>
+                  {planos.map((p) => (
+                    <div key={p.dia} className={colCls}>
+                      <CabecalhoDia plano={p} ehHoje={p.dia === hoje} />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
+                {/* Corpo rolável — só os eventos rolam. */}
+                <div
+                  ref={scrollRef}
+                  className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-1"
+                  style={{ scrollbarGutter: 'stable' }}
+                >
+                  <div className={`flex ${gapCls}`}>
+                    {planos.map((p) => (
+                      <div key={p.dia} className={colCls}>
+                        <CorpoDia
+                          plano={p}
+                          ini={ini}
+                          fim={fim}
+                          hpx={horaPx}
+                          agoraMin={agoraMin}
+                          ehHoje={p.dia === hoje}
+                          onAbrirEvento={onAbrirEvento}
+                          onAbrirTarefa={onAbrirTarefa}
+                          onCriar={onCriar}
+                          onAbrirContextos={onAbrirContextos}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )
+          })()}
         </div>
         {mostrarPainel && !painelMin && (
           <aside className="hidden w-72 shrink-0 lg:block">
