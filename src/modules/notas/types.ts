@@ -84,6 +84,15 @@ export interface ArquivoRef {
   criadoEm: number
 }
 
+/** Tipo de entidade a que uma nota pode se relacionar (sem duplicar o dado). */
+export type TipoRelacao = 'projeto' | 'evento' | 'tarefa' | 'livro' | 'pet' | 'lugar' | 'nota'
+
+/** Uma relação leve: só o par tipo+id; o nome/link são resolvidos na hora. */
+export interface RelacaoNota {
+  tipo: TipoRelacao
+  id: string
+}
+
 export interface Pagina {
   id: string
   titulo: string
@@ -94,6 +103,16 @@ export interface Pagina {
   grupoId?: string
   /** Vínculo opcional com um projeto (Workspace de Projetos). */
   projetoId?: string
+  /** Marcada como favorita. */
+  favorito?: boolean
+  /** Fixada no topo. */
+  fixado?: boolean
+  /** Arquivada (fora das listas principais, sem excluir). */
+  arquivado?: boolean
+  /** Etiquetas livres. */
+  tags?: string[]
+  /** Relações com outras entidades do Lume (a nota aparece nesses contextos). */
+  relacoes?: RelacaoNota[]
   /** Tipo da nota; ausente = 'texto' */
   tipo?: 'texto' | 'desenho' | 'arquivos'
   /** Traços do desenho (somente tipo 'desenho') */

@@ -5,6 +5,7 @@ import { IconLixeira, IconSetaEsquerda } from '../../core/components/Icons'
 import { db } from '../../core/db/db'
 import { ArquivosPainel } from './components/ArquivosPainel'
 import { BlocoEditor } from './components/BlocoEditor'
+import { ChipsRelacao } from './components/RelacoesNota'
 import { DesenhoTela } from './components/DesenhoTela'
 import { excluirPagina, novoBloco, ordenarGrupos, salvarPagina } from './db'
 import { useGrupos } from './hooks'
@@ -112,10 +113,19 @@ export function EditorNotaPage() {
         <IconButton onClick={() => navigate(rotaVoltar)} aria-label="Voltar para Notas">
           <IconSetaEsquerda />
         </IconButton>
-        <Button variante="perigo" onClick={aoExcluirPagina}>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setPagina((p) => (p ? { ...p, favorito: !p.favorito } : p))}
+            aria-label={pagina.favorito ? 'Remover favorito' : 'Favoritar'}
+            className="flex size-10 items-center justify-center rounded-full text-[18px] text-muted hover:bg-hover"
+          >
+            {pagina.favorito ? '⭐' : '☆'}
+          </button>
+          <Button variante="perigo" onClick={aoExcluirPagina}>
           <IconLixeira width={16} height={16} />
           {confirmandoExclusao ? 'Confirmar exclusão' : 'Excluir'}
         </Button>
+        </div>
       </div>
 
       <textarea
@@ -176,9 +186,13 @@ export function EditorNotaPage() {
         </>
       )}
 
+      <div className="mt-2 border-t border-line pt-3">
+        <ChipsRelacao pagina={pagina} onAtualizar={(m) => setPagina((p) => (p ? { ...p, ...m } : p))} />
+      </div>
+
       {(grupos?.length ?? 0) > 0 && (
         <div className="flex items-center gap-1.5 overflow-x-auto border-t border-line py-3">
-          <span className="shrink-0 text-[13px] text-muted">Grupo:</span>
+          <span className="shrink-0 text-[13px] text-muted">Caderno:</span>
           <button
             onClick={() => moverParaGrupo(undefined)}
             className={`min-h-9 shrink-0 cursor-pointer rounded-full border px-3 text-[13px] font-medium transition-colors ${

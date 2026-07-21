@@ -106,7 +106,7 @@ export const MODULOS: ModuloDef[] = [
   },
   {
     id: 'notas',
-    nome: 'Notas',
+    nome: 'Notas e Cadernos',
     rota: '/notas',
     Icone: IconDocumento,
     Pagina: NotasPage,
