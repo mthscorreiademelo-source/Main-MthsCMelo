@@ -48,6 +48,17 @@ export async function sair() {
   sairSaudeAndroid()
 }
 
+/** Envia o e-mail de redefinição de senha (fluxo padrão do Supabase). */
+export async function recuperarSenha(email: string): Promise<Resultado> {
+  const cliente = await obterCliente()
+  if (!cliente) return { ok: false, mensagem: 'Nuvem não configurada.' }
+  const { error } = await cliente.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: window.location.origin + window.location.pathname,
+  })
+  if (error) return { ok: false, mensagem: traduzir(error.message) }
+  return { ok: true, mensagem: 'Enviamos um e-mail com o link para redefinir sua senha.' }
+}
+
 export interface EstadoSessao {
   pronta: boolean
   sessao: Session | null
