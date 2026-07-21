@@ -231,7 +231,9 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     const { x, y, escala } = cam.current
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.fillStyle = '#ffffff'
+    // Fundo do quadro = "papel" escolhido no app (transparência das imagens
+    // PNG passa a mostrar essa cor, deixando ícones/figuras orgânicos).
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--vida-bg').trim() || '#ffffff'
     ctx.fillRect(0, 0, w, h)
 
     let passo = 64

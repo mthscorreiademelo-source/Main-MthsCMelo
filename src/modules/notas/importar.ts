@@ -5,6 +5,21 @@ const LARGURA_MAX_PIXELS = 1600
 const LARGURA_MUNDO = 900
 const MAX_PAGINAS_PDF = 30
 
+/** Detecta se algum pixel do canvas não é totalmente opaco (tem alfa < 255). */
+function temTransparencia(ctx: CanvasRenderingContext2D, w: number, h: number): boolean {
+  try {
+    const dados = ctx.getImageData(0, 0, w, h).data
+    // amostra o canal alfa (cada 4º byte); passo largo para ser rápido
+    const passo = Math.max(4, Math.floor(dados.length / 4 / 4000) * 4)
+    for (let i = 3; i < dados.length; i += passo) {
+      if (dados[i] < 250) return true
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
 function carregarImagem(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const el = new Image()
@@ -39,13 +54,18 @@ export async function imagemDeUrl(
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(img.width * escala)
   canvas.height = Math.round(img.height * escala)
-  canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
   const largura = Math.min(LARGURA_MUNDO, img.width)
   const altura = largura * (img.height / img.width)
+  // Preserva transparência (ícones/PNG orgânicos): se a imagem tem algum pixel
+  // não-opaco, exporta PNG (com alfa); senão, JPEG (arquivo menor para fotos).
   return {
     id: nanoid(),
     tipo: 'imagem',
-    dataUrl: canvas.toDataURL('image/jpeg', 0.85),
+    dataUrl: temTransparencia(ctx, canvas.width, canvas.height)
+      ? canvas.toDataURL('image/png')
+      : canvas.toDataURL('image/jpeg', 0.85),
     x: centroX,
     y: centroY,
     largura,

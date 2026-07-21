@@ -1,22 +1,11 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { IconButton } from '../components/Button'
-import {
-  IconDownload,
-  IconLixeira,
-  IconLua,
-  IconMenu,
-  IconSol,
-  IconUpload,
-} from '../components/Icons'
-import { exportarBackup, importarBackup } from '../db/db'
-import { limparDadosExemplo } from '../db/exemplos'
+import { IconMenu } from '../components/Icons'
 import { MODULOS } from '../modules'
 import { useSessao } from '../nuvem/auth'
-import { ContaSidebar } from '../nuvem/ContaSidebar'
 import { useSincronizacao } from '../nuvem/sync'
-import { useTheme } from '../theme/useTheme'
-import { AparenciaSheet } from '../theme/AparenciaSheet'
+import { RodapeConta } from './RodapeConta'
 
 const CHAVE_SIDEBAR = 'vida:sidebar'
 
@@ -97,46 +86,6 @@ export function AppShell() {
 }
 
 function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
-  const { tema, alternar } = useTheme()
-  const [status, setStatus] = useState('')
-  const [aparencia, setAparencia] = useState(false)
-  const inputArquivo = useRef<HTMLInputElement>(null)
-
-  function avisar(msg: string) {
-    setStatus(msg)
-    setTimeout(() => setStatus(''), 4000)
-  }
-
-  async function exportar() {
-    const dados = await exportarBackup()
-    const blob = new Blob([JSON.stringify(dados, null, 2)], {
-      type: 'application/json',
-    })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `lume-backup-${dados.exportadoEm.slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-    avisar('Backup exportado')
-  }
-
-  async function limparExemplos() {
-    if (!confirm('Apagar os dados de exemplo (Oli, itens de exemplo da despensa, "Ovos" e "Notebook novo")?\n\nNão apaga nada que você já tenha criado ou editado.')) return
-    const n = await limparDadosExemplo()
-    avisar(n > 0 ? `${n} registro(s) de exemplo apagado(s)` : 'Nenhum dado de exemplo encontrado')
-  }
-
-  async function importar(arquivo: File) {
-    try {
-      const json = JSON.parse(await arquivo.text())
-      const { tasks, paginas } = await importarBackup(json)
-      avisar(`Restaurado: ${tasks} tarefa(s), ${paginas} página(s)`)
-    } catch {
-      avisar('Arquivo de backup inválido')
-    }
-  }
-
   return (
     <aside className="flex h-full w-64 flex-col border-r border-line bg-surface">
       <div className="px-4 pt-5 pb-3">
@@ -162,57 +111,7 @@ function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
         ))}
       </nav>
 
-      <footer className="flex flex-col gap-0.5 border-t border-line px-2 py-3">
-        <ContaSidebar />
-        <button
-          onClick={alternar}
-          className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm font-medium text-muted transition-colors hover:bg-hover/70"
-        >
-          {tema === 'dark' ? <IconSol width={17} height={17} /> : <IconLua width={17} height={17} />}
-          {tema === 'dark' ? 'Modo claro' : 'Modo escuro'}
-        </button>
-        <button
-          onClick={() => setAparencia(true)}
-          className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm font-medium text-muted transition-colors hover:bg-hover/70"
-        >
-          <span className="text-[16px] leading-none">🎨</span>
-          Aparência
-        </button>
-        {aparencia && <AparenciaSheet tema={tema} alternar={alternar} onFechar={() => setAparencia(false)} />}
-        <button
-          onClick={exportar}
-          className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm font-medium text-muted transition-colors hover:bg-hover/70"
-        >
-          <IconDownload width={17} height={17} />
-          Exportar backup
-        </button>
-        <button
-          onClick={() => inputArquivo.current?.click()}
-          className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm font-medium text-muted transition-colors hover:bg-hover/70"
-        >
-          <IconUpload width={17} height={17} />
-          Importar backup
-        </button>
-        <input
-          ref={inputArquivo}
-          type="file"
-          accept="application/json"
-          className="hidden"
-          onChange={(e) => {
-            const arquivo = e.target.files?.[0]
-            if (arquivo) importar(arquivo)
-            e.target.value = ''
-          }}
-        />
-        <button
-          onClick={limparExemplos}
-          className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm font-medium text-muted transition-colors hover:bg-hover/70 hover:text-danger"
-        >
-          <IconLixeira width={17} height={17} />
-          Apagar dados de exemplo
-        </button>
-        {status && <p className="px-3 pt-1 text-xs text-muted">{status}</p>}
-      </footer>
+      <RodapeConta />
     </aside>
   )
 }

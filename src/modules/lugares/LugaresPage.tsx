@@ -50,7 +50,18 @@ export function LugaresPage() {
           <IconLocal width={22} height={22} className="text-accent" />
           <h1 className="text-[22px] font-bold">Lugares</h1>
         </div>
-        <button onClick={() => setCriar(true)} className="flex min-h-9 items-center gap-1.5 rounded-full bg-ink px-3.5 text-[14px] font-medium text-surface"><IconMais width={16} height={16} /> Novo lugar</button>
+        <div className="flex items-center gap-1.5">
+          <a
+            href="https://www.google.com/maps/saved"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex min-h-9 items-center gap-1.5 rounded-full border border-line px-3 text-[13px] font-medium text-muted hover:text-ink"
+            title="Abre a lista de lugares salvos no Google Maps"
+          >
+            🗺️ Google Maps
+          </a>
+          <button onClick={() => setCriar(true)} className="flex min-h-9 items-center gap-1.5 rounded-full bg-ink px-3.5 text-[14px] font-medium text-surface"><IconMais width={16} height={16} /> Novo lugar</button>
+        </div>
       </div>
 
       {/* Perto de mim */}
