@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { FolhaInferior } from '../../../core/components/FolhaInferior'
-import { IconLixeira, IconMais } from '../../../core/components/Icons'
+import { IconLapis, IconLixeira, IconMais } from '../../../core/components/Icons'
 import { hojeISO, rotuloData } from '../../../core/dates'
 import { criarEvento } from '../../agenda/db'
 import { CartaoMetrica } from './CartaoMetrica'
@@ -25,11 +25,14 @@ import {
   criarProfissional,
   criarRefeicao,
   criarVacina,
+  atualizarProfissional,
   excluirAtividade,
   excluirConsulta,
   excluirDoacao,
   excluirExame,
   excluirMedicamento,
+  excluirMedida,
+  excluirProfissional,
   excluirRefeicao,
   excluirVacina,
   formatarMedida,
@@ -420,6 +423,7 @@ export function AbaConsultas() {
   const profissionais = useProfissionais() ?? []
   const [novaConsulta, setNovaConsulta] = useState(false)
   const [novoProf, setNovoProf] = useState(false)
+  const [editarProf, setEditarProf] = useState<import('../types').Profissional | null>(null)
   const hoje = hojeISO()
   const agendadas = consultas.filter((c) => c.status === 'agendada').sort((a, b) => (a.data < b.data ? -1 : 1))
   const passadas = consultas.filter((c) => c.status !== 'agendada').sort((a, b) => (a.data < b.data ? 1 : -1))
@@ -466,10 +470,12 @@ export function AbaConsultas() {
         {profissionais.map((p) => (
           <div key={p.id} className="flex items-center gap-3 rounded-2xl border border-line p-3">
             <span className="flex size-9 items-center justify-center rounded-full bg-hover text-[15px]">👩‍⚕️</span>
-            <div className="min-w-0 flex-1">
+            <button onClick={() => setEditarProf(p)} className="min-w-0 flex-1 text-left">
               <div className="truncate text-[13.5px] font-medium">{p.nome}</div>
               <div className="text-[11px] text-muted">{[p.especialidade, p.clinica, p.telefone].filter(Boolean).join(' · ')}</div>
-            </div>
+            </button>
+            <button onClick={() => setEditarProf(p)} aria-label="Editar" className="shrink-0 text-muted hover:text-ink"><IconLapis width={15} height={15} /></button>
+            <BotaoExcluir onClick={() => { if (confirm(`Excluir ${p.nome}?`)) excluirProfissional(p.id) }} />
           </div>
         ))}
         <button onClick={() => setNovoProf(true)} className={BTNADD}><IconMais width={15} height={15} /> Adicionar profissional</button>
@@ -477,18 +483,32 @@ export function AbaConsultas() {
 
       {novaConsulta && <EditorConsulta profissionais={profissionais} onFechar={() => setNovaConsulta(false)} />}
       {novoProf && <EditorProfissional onFechar={() => setNovoProf(false)} />}
+      {editarProf && <EditorProfissional prof={editarProf} onFechar={() => setEditarProf(null)} />}
     </div>
   )
 }
 
-function EditorProfissional({ onFechar }: { onFechar: () => void }) {
-  const [nome, setNome] = useState('')
-  const [esp, setEsp] = useState('')
-  const [clinica, setClinica] = useState('')
-  const [tel, setTel] = useState('')
-  async function salvar() { await criarProfissional({ nome, especialidade: esp || undefined, clinica: clinica || undefined, telefone: tel || undefined }); onFechar() }
+function EditorProfissional({ prof, onFechar }: { prof?: import('../types').Profissional; onFechar: () => void }) {
+  const editando = !!prof
+  const [nome, setNome] = useState(prof?.nome ?? '')
+  const [esp, setEsp] = useState(prof?.especialidade ?? '')
+  const [clinica, setClinica] = useState(prof?.clinica ?? '')
+  const [tel, setTel] = useState(prof?.telefone ?? '')
+  async function salvar() {
+    if (!nome.trim()) return
+    const dados = { nome: nome.trim(), especialidade: esp || undefined, clinica: clinica || undefined, telefone: tel || undefined }
+    if (editando && prof) await atualizarProfissional(prof.id, dados)
+    else await criarProfissional(dados)
+    onFechar()
+  }
+  async function apagar() {
+    if (!prof) return
+    if (!confirm(`Excluir ${prof.nome}?`)) return
+    await excluirProfissional(prof.id)
+    onFechar()
+  }
   return (
-    <FolhaInferior titulo="Novo profissional" onFechar={onFechar}>
+    <FolhaInferior titulo={editando ? 'Editar profissional' : 'Novo profissional'} onFechar={onFechar}>
       <Campo rotulo="Nome"><input value={nome} onChange={(e) => setNome(e.target.value)} className={CAMPO} /></Campo>
       <Campo rotulo="Especialidade"><input value={esp} onChange={(e) => setEsp(e.target.value)} className={CAMPO} placeholder="Cardiologista…" /></Campo>
       <div className="flex gap-3">
@@ -496,6 +516,7 @@ function EditorProfissional({ onFechar }: { onFechar: () => void }) {
         <Campo rotulo="Telefone"><input value={tel} onChange={(e) => setTel(e.target.value)} className={CAMPO} /></Campo>
       </div>
       <button onClick={salvar} className={BTNSALVAR}>Salvar</button>
+      {editando && <button onClick={apagar} className="min-h-10 rounded-xl text-[13px] font-medium text-danger hover:bg-danger/10">Excluir profissional</button>}
     </FolhaInferior>
   )
 }
@@ -763,7 +784,9 @@ function EditorMedida({ tipo, onFechar }: { tipo: TipoMedida; onFechar: () => vo
   const def = DEF_MEDIDA.get(tipo)!
   const [data, setData] = useState(hojeISO())
   const [valor, setValor] = useState('')
-  async function salvar() { const v = num(valor); if (v != null) await salvarMedida(tipo, data, v); onFechar() }
+  const medidas = useMedidas() ?? []
+  const serie = medidas.filter((m) => m.tipo === tipo).sort((a, b) => (a.data < b.data ? 1 : -1))
+  async function salvar() { const v = num(valor); if (v != null) { await salvarMedida(tipo, data, v); setValor('') } }
   return (
     <FolhaInferior titulo={`${def.icone} ${def.nome}`} onFechar={onFechar}>
       <div className="flex gap-3">
@@ -771,6 +794,20 @@ function EditorMedida({ tipo, onFechar }: { tipo: TipoMedida; onFechar: () => vo
         <Campo rotulo={`Valor (${def.unidade})`}><input autoFocus inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} className={CAMPO} /></Campo>
       </div>
       <button onClick={salvar} className={BTNSALVAR}>Salvar</button>
+      {serie.length > 0 && (
+        <div className="mt-1">
+          <span className={ROTULO}>Registros ({serie.length})</span>
+          <ul className="mt-1.5 divide-y divide-line">
+            {serie.map((m) => (
+              <li key={m.id} className="flex items-center gap-2 py-1.5 text-[13px]">
+                <span className="w-20 tabular-nums text-muted">{format(parseISO(m.data), 'dd/MM/yy')}</span>
+                <span className="flex-1 font-medium">{formatarMedida(tipo, m.valor)}</span>
+                <BotaoExcluir onClick={() => excluirMedida(m.id)} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </FolhaInferior>
   )
 }
