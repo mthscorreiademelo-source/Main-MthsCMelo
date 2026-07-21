@@ -3,8 +3,9 @@ import { EmptyState } from '../../../core/components/EmptyState'
 import { FolhaInferior } from '../../../core/components/FolhaInferior'
 import { IconMais } from '../../../core/components/Icons'
 import { db } from '../../../core/db/db'
+import { mostrarToast } from '../../../core/captura/store'
 import { useHabitos } from '../hooks'
-import { arquivarRotina, criarRotinaDeTemplate, excluirRotina, TEMPLATES_ROTINA, useRotinas } from './db'
+import { agendarRotina, arquivarRotina, criarRotinaDeTemplate, excluirRotina, TEMPLATES_ROTINA, useRotinas } from './db'
 import { EditorRotina } from './EditorRotina'
 import { ExecucaoGuiada } from './ExecucaoGuiada'
 import { ROTULO_PERIODO, type Rotina } from './types'
@@ -30,6 +31,7 @@ function CartaoRotina({ rotina, onIniciar, onEditar }: { rotina: Rotina; onInici
           {menu && (
             <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-xl border border-line bg-surface p-1 shadow-xl">
               <button onClick={() => { onEditar(); setMenu(false) }} className="block w-full rounded-lg px-3 py-1.5 text-left text-[13px] hover:bg-hover">Editar</button>
+              <button onClick={async () => { await agendarRotina(rotina); setMenu(false); mostrarToast('Rotina reservada na Agenda de hoje') }} className="block w-full rounded-lg px-3 py-1.5 text-left text-[13px] hover:bg-hover">Agendar na Agenda</button>
               <button onClick={() => { arquivarRotina(rotina.id); setMenu(false) }} className="block w-full rounded-lg px-3 py-1.5 text-left text-[13px] hover:bg-hover">Arquivar</button>
               <button onClick={() => { if (confirm('Excluir esta rotina?')) excluirRotina(rotina.id); setMenu(false) }} className="block w-full rounded-lg px-3 py-1.5 text-left text-[13px] text-danger hover:bg-hover">Excluir</button>
             </div>

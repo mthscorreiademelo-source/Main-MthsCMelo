@@ -2,6 +2,7 @@ import { nanoid } from 'nanoid'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../../core/db/db'
 import { hojeISO } from '../../../core/dates'
+import { criarEvento } from '../../agenda/db'
 import type { EtapaRotina, ExecucaoRotina, PeriodoDia, Rotina, TipoEtapa } from './types'
 
 export const CORES_ROTINA = ['#7c9885', '#4073ff', '#884dff', '#eb8909', '#0f9b9b', '#c0405e']
@@ -161,6 +162,20 @@ export const pularEtapa = (execId: string, etapaId: string) =>
 
 export const encerrarExecucao = (execId: string) =>
   alterarExec(execId, () => ({ concluidoEm: Date.now() }))
+
+/* --------------------------- Reserva na Agenda --------------------------- */
+
+const HORA_PADRAO: Record<PeriodoDia, string> = { manha: '07:00', tarde: '14:00', noite: '21:00', qualquer: '09:00' }
+
+/** Cria um evento na Agenda reservando o tempo da rotina (hoje). */
+export async function agendarRotina(rotina: Rotina): Promise<string> {
+  const dur = Math.max(15, rotina.etapas.reduce((s, e) => s + (e.duracaoMin ?? 0), 0) || 30)
+  const inicio = rotina.horario || HORA_PADRAO[rotina.periodo ?? 'qualquer']
+  const [h, m] = inicio.split(':').map(Number)
+  const fimMin = h * 60 + m + dur
+  const fim = `${String(Math.floor(fimMin / 60) % 24).padStart(2, '0')}:${String(fimMin % 60).padStart(2, '0')}`
+  return criarEvento({ titulo: `Rotina: ${rotina.nome}`, data: hojeISO(), inicio, fim, cor: rotina.cor })
+}
 
 /* --------------------------------- Hooks --------------------------------- */
 

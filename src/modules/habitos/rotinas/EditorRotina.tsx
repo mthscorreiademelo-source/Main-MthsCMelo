@@ -11,6 +11,7 @@ import {
   removerEtapa,
 } from './db'
 import { IconeFator } from '../../../core/components/icones'
+import { NOMES_DIA } from '../freq'
 import type { Habito } from '../types'
 import { EMOJI_TIPO_ETAPA, ROTULO_PERIODO, type PeriodoDia, type Rotina, type TipoEtapa } from './types'
 
@@ -58,13 +59,37 @@ export function EditorRotina({ rotina, habitos = [], onFechar }: { rotina: Rotin
           </div>
         </div>
 
-        {/* Sugestão de período */}
+        {/* Sugestão de período + horário */}
         <div>
           <span className="text-[13px] font-medium text-muted">Quando (sugestão)</span>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {PERIODOS.map((p) => (
               <button key={p} onClick={() => atualizarRotina(rotina.id, { periodo: p })} className={`rounded-full px-3 py-1.5 text-[12.5px] font-medium transition-colors ${rotina.periodo === p ? 'bg-hover text-ink' : 'border border-line text-muted hover:text-ink'}`}>{ROTULO_PERIODO[p]}</button>
             ))}
+            <input type="time" value={rotina.horario ?? ''} onChange={(e) => atualizarRotina(rotina.id, { horario: e.target.value || undefined })} className="min-h-8 rounded-lg border border-line bg-transparent px-2 text-[12.5px] outline-none" title="Horário" />
+          </div>
+        </div>
+
+        {/* Gatilho por dia da semana */}
+        <div>
+          <span className="text-[13px] font-medium text-muted">Dias <span className="font-normal text-muted/60">(vazio = qualquer dia)</span></span>
+          <div className="mt-1.5 flex gap-1">
+            {NOMES_DIA.map((nome, dow) => {
+              const ativo = (rotina.dias ?? []).includes(dow)
+              return (
+                <button
+                  key={dow}
+                  onClick={() => {
+                    const atual = rotina.dias ?? []
+                    const novos = ativo ? atual.filter((d) => d !== dow) : [...atual, dow].sort((a, b) => a - b)
+                    atualizarRotina(rotina.id, { dias: novos.length ? novos : undefined })
+                  }}
+                  className={`flex size-9 items-center justify-center rounded-full text-[11.5px] font-medium capitalize transition-colors ${ativo ? 'bg-ink text-surface' : 'border border-line text-muted hover:bg-hover'}`}
+                >
+                  {nome.charAt(0)}
+                </button>
+              )
+            })}
           </div>
         </div>
 

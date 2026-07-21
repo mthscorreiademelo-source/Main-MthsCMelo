@@ -14,6 +14,8 @@ export type IdAcao =
   | 'despesa'
   | 'receita'
   | 'compra'
+  | 'habito'
+  | 'rotina'
 
 export type GrupoAcao = 'criar' | 'registrar' | 'comprar' | 'capturar' | 'executar'
 
@@ -32,6 +34,7 @@ export const GRUPOS: { id: GrupoAcao; nome: string }[] = [
   { id: 'criar', nome: 'Criar' },
   { id: 'registrar', nome: 'Registrar' },
   { id: 'comprar', nome: 'Comprar e armazenar' },
+  { id: 'executar', nome: 'Executar' },
 ]
 
 export const ACOES: AcaoRapida[] = [
@@ -42,6 +45,8 @@ export const ACOES: AcaoRapida[] = [
   { id: 'despesa', grupo: 'registrar', nome: 'Despesa', descricao: 'Registrar uma saída de dinheiro.', emoji: '💸', cor: '#c0405e' },
   { id: 'receita', grupo: 'registrar', nome: 'Receita', descricao: 'Registrar uma entrada de dinheiro.', emoji: '💰', cor: '#299438' },
   { id: 'compra', grupo: 'comprar', nome: 'Item de compra', descricao: 'Adicionar à lista de compras.', emoji: '🛒', cor: '#eb8909' },
+  { id: 'habito', grupo: 'executar', nome: 'Concluir hábito', descricao: 'Marcar um hábito de hoje.', emoji: '🔁', cor: '#0f9b9b' },
+  { id: 'rotina', grupo: 'executar', nome: 'Iniciar rotina', descricao: 'Executar uma rotina guiada.', emoji: '▶️', cor: '#884dff' },
 ]
 
 export const acaoPorId = (id: IdAcao) => ACOES.find((a) => a.id === id)

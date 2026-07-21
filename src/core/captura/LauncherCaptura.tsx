@@ -13,6 +13,7 @@ import { criarEvento } from '../../modules/agenda/db'
 import { criarPagina } from '../../modules/notas/db'
 import { criarItemCompra, criarLista } from '../../modules/compras/db'
 import { useListas } from '../../modules/compras/hooks'
+import { CompletarRapido } from '../../modules/habitos/CompletarRapido'
 import type { Evento } from '../../modules/agenda/types'
 import { ACOES, GRUPOS, type IdAcao } from './acoes'
 import { desfazer } from './fluxos'
@@ -130,6 +131,11 @@ export function LauncherCaptura() {
         setEventoEdit(ev ?? null)
         break
       }
+      case 'rotina': {
+        fecharTudo()
+        navigate('/habitos')
+        break
+      }
       default:
         setFluxo(id)
     }
@@ -153,6 +159,7 @@ export function LauncherCaptura() {
   const tituloFluxo: Record<IdAcao, string> = {
     tarefa: 'Nova tarefa', evento: 'Novo evento', nota: 'Nova nota', desenho: 'Novo desenho',
     despesa: 'Nova despesa', receita: 'Nova receita', compra: 'Item de compra',
+    habito: 'Concluir hábito', rotina: 'Iniciar rotina',
   }
 
   return createPortal(
@@ -176,6 +183,7 @@ export function LauncherCaptura() {
             {fluxo === 'compra' && (
               <FormCompra aoConcluir={(id) => confirmar('Item adicionado à lista', 'comprasItens', id)} />
             )}
+            {fluxo === 'habito' && <CompletarRapido aoConcluir={fecharTudo} />}
           </>
         ) : (
           <>
