@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { IconLua, IconSol } from '../components/Icons'
 import { useTheme } from '../theme/useTheme'
-import { cadastrar, entrar, recuperarSenha } from './auth'
+import { cadastrar, entrar, recuperarSenha, reenviarConfirmacao } from './auth'
 
-type Modo = 'entrar' | 'cadastrar' | 'recuperar'
+type Modo = 'entrar' | 'cadastrar' | 'recuperar' | 'confirmar'
 
 /**
  * Tela de entrada em tela cheia — o app inteiro fica atrás dela até o login.
@@ -20,13 +20,21 @@ export function TelaLogin() {
   const [ocupado, setOcupado] = useState(false)
 
   const titulo =
-    modo === 'entrar' ? 'Bem-vindo de volta' : modo === 'cadastrar' ? 'Crie sua conta' : 'Recuperar acesso'
+    modo === 'entrar'
+      ? 'Bem-vindo de volta'
+      : modo === 'cadastrar'
+        ? 'Crie sua conta'
+        : modo === 'recuperar'
+          ? 'Recuperar acesso'
+          : 'Confirme seu e-mail'
   const subtitulo =
     modo === 'entrar'
       ? 'Entre para acessar tudo, guardado com segurança na sua conta.'
       : modo === 'cadastrar'
         ? 'Uma conta para guardar seus dados na nuvem e acessar de qualquer aparelho.'
-        : 'Informe seu e-mail e enviaremos um link para redefinir a senha.'
+        : modo === 'recuperar'
+          ? 'Informe seu e-mail e enviaremos um link para redefinir a senha.'
+          : 'Falta um passo para ativar sua conta.'
 
   async function enviar() {
     setMsg(null)
@@ -52,12 +60,28 @@ export function TelaLogin() {
       setMsg(r.mensagem ?? 'Não foi possível continuar.')
       return
     }
-    // Sucesso: se veio mensagem (confirme e-mail / link enviado), mostra;
-    // senão a sessão foi criada e o app aparece sozinho (o gate reage).
+    // Cadastro que exige confirmação de e-mail → estado dedicado.
+    if (r.precisaConfirmar) {
+      setModo('confirmar')
+      setErro(false)
+      setMsg(null)
+      return
+    }
+    // Sucesso: se veio mensagem (ex.: link enviado), mostra; senão a sessão
+    // foi criada e o app aparece sozinho (o gate reage).
     if (r.mensagem) {
       setErro(false)
       setMsg(r.mensagem)
     }
+  }
+
+  async function reenviar() {
+    setOcupado(true)
+    setErro(false)
+    const r = await reenviarConfirmacao(email)
+    setOcupado(false)
+    setErro(!r.ok)
+    setMsg(r.mensagem ?? null)
   }
 
   return (
@@ -88,6 +112,30 @@ export function TelaLogin() {
           <h1 className="text-[19px] font-bold">{titulo}</h1>
           <p className="mt-1 text-[13px] leading-snug text-muted">{subtitulo}</p>
 
+          {modo === 'confirmar' ? (
+            <div className="mt-5 flex flex-col gap-3">
+              <div className="flex items-center gap-3 rounded-2xl bg-accent/10 p-3.5">
+                <span className="text-[26px]" aria-hidden>📬</span>
+                <p className="text-[13px] leading-snug">
+                  Enviamos um link de confirmação para <span className="font-semibold">{email}</span>. Abra o e-mail e clique no link para ativar sua conta e entrar.
+                </p>
+              </div>
+              {msg && <p className={`px-1 text-[13px] ${erro ? 'text-danger' : 'text-accent'}`}>{msg}</p>}
+              <button
+                onClick={reenviar}
+                disabled={ocupado}
+                className="flex min-h-11 cursor-pointer items-center justify-center rounded-full border border-line text-[14px] font-medium text-muted transition-colors hover:text-ink disabled:opacity-50"
+              >
+                {ocupado ? 'Reenviando…' : 'Reenviar e-mail de confirmação'}
+              </button>
+              <button
+                onClick={() => { setModo('entrar'); setMsg(null); setErro(false) }}
+                className="flex min-h-11 cursor-pointer items-center justify-center rounded-full bg-ink text-[14px] font-semibold text-bg"
+              >
+                Já confirmei — entrar
+              </button>
+            </div>
+          ) : (
           <div className="mt-5 flex flex-col gap-2.5">
             <label className="flex flex-col gap-1">
               <span className="px-1 text-[12px] font-medium text-muted">E-mail</span>
@@ -154,9 +202,11 @@ export function TelaLogin() {
               </button>
             )}
           </div>
+          )}
         </div>
 
         {/* alternar entrar / cadastrar */}
+        {modo !== 'confirmar' && (
         <div className="mt-4 text-center text-[13px] text-muted">
           {modo === 'recuperar' ? (
             <button onClick={() => { setModo('entrar'); setMsg(null); setErro(false) }} className="cursor-pointer font-medium text-ink hover:underline">
@@ -178,6 +228,7 @@ export function TelaLogin() {
             </>
           )}
         </div>
+        )}
       </div>
     </div>
   )

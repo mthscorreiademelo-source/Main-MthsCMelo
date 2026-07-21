@@ -8,6 +8,8 @@ export interface Resultado {
   ok: boolean
   /** Mensagem amigável quando algo falha, ou aviso (ex.: confirme o e-mail). */
   mensagem?: string
+  /** true quando o cadastro exige confirmação por e-mail antes de entrar. */
+  precisaConfirmar?: boolean
 }
 
 function traduzir(msg: string): string {
@@ -36,7 +38,7 @@ export async function cadastrar(email: string, senha: string): Promise<Resultado
   if (error) return { ok: false, mensagem: traduzir(error.message) }
   // Sem sessão = o projeto exige confirmação por e-mail.
   if (!data.session) {
-    return { ok: true, mensagem: 'Conta criada! Confirme o e-mail que enviamos para entrar.' }
+    return { ok: true, precisaConfirmar: true, mensagem: 'Conta criada! Confirme o e-mail que enviamos para entrar.' }
   }
   loginSaudeAndroid(email.trim(), senha)
   return { ok: true }
@@ -57,6 +59,15 @@ export async function recuperarSenha(email: string): Promise<Resultado> {
   })
   if (error) return { ok: false, mensagem: traduzir(error.message) }
   return { ok: true, mensagem: 'Enviamos um e-mail com o link para redefinir sua senha.' }
+}
+
+/** Reenvia o e-mail de confirmação de cadastro. */
+export async function reenviarConfirmacao(email: string): Promise<Resultado> {
+  const cliente = await obterCliente()
+  if (!cliente) return { ok: false, mensagem: 'Nuvem não configurada.' }
+  const { error } = await cliente.auth.resend({ type: 'signup', email: email.trim() })
+  if (error) return { ok: false, mensagem: traduzir(error.message) }
+  return { ok: true, mensagem: 'Reenviamos o e-mail de confirmação.' }
 }
 
 export interface EstadoSessao {
