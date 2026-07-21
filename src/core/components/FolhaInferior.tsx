@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 /** Folha inferior (bottom sheet) reutilizável — backdrop + painel deslizante. */
 export function FolhaInferior({
@@ -16,7 +17,9 @@ export function FolhaInferior({
     return () => window.removeEventListener('keydown', esc)
   }, [onFechar])
 
-  return (
+  // Portal no body: escapa de contextos que contêm `position: fixed`
+  // (ex.: containers com CSS `columns` nos workspaces modulares).
+  return createPortal(
     <div className="fixed inset-0 z-[60] flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/30" onClick={onFechar} />
       <div className="animar-passo relative max-h-[88%] overflow-y-auto rounded-t-3xl bg-bg px-5 pt-4 pb-[calc(env(safe-area-inset-bottom)+20px)]">
@@ -26,6 +29,7 @@ export function FolhaInferior({
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

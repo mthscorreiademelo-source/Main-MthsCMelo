@@ -51,6 +51,15 @@ import type {
   PetPeso,
   PetVacina,
 } from '../../modules/pets/types'
+import type {
+  Aquisicao,
+  ComprasConfig,
+  ItemCompra,
+  ItemDespensa,
+  ListaCompra,
+  MovDespensa,
+  PrecoAquisicao,
+} from '../../modules/compras/types'
 
 /** Conteúdo binário de um arquivo anexado a uma nota do tipo 'arquivos'. */
 export interface ArquivoDados {
@@ -122,6 +131,13 @@ class VidaDB extends Dexie {
   petDocumentos!: Table<PetDocumento, string>
   /** Blobs de fotos e documentos dos pets — locais, não sincronizam. */
   petArquivos!: Table<PetArquivo, string>
+  comprasListas!: Table<ListaCompra, string>
+  comprasItens!: Table<ItemCompra, string>
+  despensa!: Table<ItemDespensa, string>
+  despensaHistorico!: Table<MovDespensa, string>
+  aquisicoes!: Table<Aquisicao, string>
+  aquisicaoPrecos!: Table<PrecoAquisicao, string>
+  comprasConfig!: Table<ComprasConfig, string>
   /** Espelho do último estado sincronizado (chave → atualizadoEm). */
   espelho!: Table<{ chave: string; atualizadoEm: number }, string>
 
@@ -279,6 +295,16 @@ class VidaDB extends Dexie {
       petDocumentos: 'id, petId, criadoEm',
       petArquivos: 'id',
     })
+    // v22: módulo Compras + Despensa Inteligente.
+    this.version(22).stores({
+      comprasListas: 'id, ordem',
+      comprasItens: 'id, listaId, status, despensaId',
+      despensa: 'id, categoria, local, favorito',
+      despensaHistorico: 'id, despensaId, data',
+      aquisicoes: 'id, status, ordem',
+      aquisicaoPrecos: 'id, aquisicaoId, data',
+      comprasConfig: 'id',
+    })
   }
 }
 
@@ -392,6 +418,13 @@ export async function exportarBackup() {
     petFotos: await db.petFotos.toArray(),
     petDocumentos: await db.petDocumentos.toArray(),
     petArquivos: petArquivosSerial,
+    comprasListas: await db.comprasListas.toArray(),
+    comprasItens: await db.comprasItens.toArray(),
+    despensa: await db.despensa.toArray(),
+    despensaHistorico: await db.despensaHistorico.toArray(),
+    aquisicoes: await db.aquisicoes.toArray(),
+    aquisicaoPrecos: await db.aquisicaoPrecos.toArray(),
+    comprasConfig: await db.comprasConfig.toArray(),
   }
 }
 
@@ -459,6 +492,13 @@ export async function importarBackup(json: unknown) {
     petFotos?: PetFoto[]
     petDocumentos?: PetDocumento[]
     petArquivos?: ArquivoSerial[]
+    comprasListas?: ListaCompra[]
+    comprasItens?: ItemCompra[]
+    despensa?: ItemDespensa[]
+    despensaHistorico?: MovDespensa[]
+    aquisicoes?: Aquisicao[]
+    aquisicaoPrecos?: PrecoAquisicao[]
+    comprasConfig?: ComprasConfig[]
   }
   const temTasks = Array.isArray(dados?.tasks)
   const temPaginas = Array.isArray(dados?.paginas)
@@ -542,6 +582,13 @@ export async function importarBackup(json: unknown) {
       })),
     )
   }
+  if (Array.isArray(dados.comprasListas)) await db.comprasListas.bulkPut(dados.comprasListas)
+  if (Array.isArray(dados.comprasItens)) await db.comprasItens.bulkPut(dados.comprasItens)
+  if (Array.isArray(dados.despensa)) await db.despensa.bulkPut(dados.despensa)
+  if (Array.isArray(dados.despensaHistorico)) await db.despensaHistorico.bulkPut(dados.despensaHistorico)
+  if (Array.isArray(dados.aquisicoes)) await db.aquisicoes.bulkPut(dados.aquisicoes)
+  if (Array.isArray(dados.aquisicaoPrecos)) await db.aquisicaoPrecos.bulkPut(dados.aquisicaoPrecos)
+  if (Array.isArray(dados.comprasConfig)) await db.comprasConfig.bulkPut(dados.comprasConfig)
   return {
     tasks: dados.tasks?.length ?? 0,
     paginas: dados.paginas?.length ?? 0,

@@ -1,6 +1,7 @@
 import type { ComponentType, SVGProps } from 'react'
 import {
   IconCalendario,
+  IconCarrinho,
   IconChama,
   IconCheckCircle,
   IconCifrao,
@@ -30,6 +31,9 @@ import { CompiladoPage } from '../modules/biblioteca/CompiladoPage'
 import { LeitorPage } from '../modules/biblioteca/leitor/LeitorPage'
 import { PetsPage } from '../modules/pets/PetsPage'
 import { PetWorkspacePage } from '../modules/pets/PetWorkspacePage'
+import { ComprasPage } from '../modules/compras/ComprasPage'
+import { ItemDespensaPage } from '../modules/compras/ItemDespensaPage'
+import { AquisicaoPage } from '../modules/compras/AquisicaoPage'
 import { SecaoHoje as TarefasHoje } from '../modules/tarefas/SecaoHoje'
 import { SecaoHoje as NotasHoje } from '../modules/notas/SecaoHoje'
 import { SecaoHoje as HumorHoje } from '../modules/humor/SecaoHoje'
@@ -39,6 +43,8 @@ import { SecaoHoje as BibliotecaHoje } from '../modules/biblioteca/SecaoHoje'
 import { SecaoHoje as AgendaHoje } from '../modules/agenda/SecaoHoje'
 import { SecaoHoje as PetsHoje } from '../modules/pets/SecaoHoje'
 import { HojeResumo as PetsResumo } from '../modules/pets/HojeResumo'
+import { SecaoHoje as ComprasHoje } from '../modules/compras/SecaoHoje'
+import { HojeResumo as ComprasResumo } from '../modules/compras/HojeResumo'
 import { HojeResumo as TarefasResumo } from '../modules/tarefas/HojeResumo'
 import { HojeResumo as AgendaResumo } from '../modules/agenda/HojeResumo'
 import { HojeResumo as HabitosResumo } from '../modules/habitos/HojeResumo'
@@ -174,6 +180,20 @@ export const MODULOS: ModuloDef[] = [
     subRotas: [{ caminho: '/pets/:id', Pagina: PetWorkspacePage }],
     SecaoHoje: PetsHoje,
     HojeResumo: PetsResumo,
+    hojeTamanho: 'compacto',
+  },
+  {
+    id: 'compras',
+    nome: 'Compras',
+    rota: '/compras',
+    Icone: IconCarrinho,
+    Pagina: ComprasPage,
+    subRotas: [
+      { caminho: '/compras/despensa/:id', Pagina: ItemDespensaPage },
+      { caminho: '/compras/aquisicao/:id', Pagina: AquisicaoPage },
+    ],
+    SecaoHoje: ComprasHoje,
+    HojeResumo: ComprasResumo,
     hojeTamanho: 'compacto',
   },
 ]
