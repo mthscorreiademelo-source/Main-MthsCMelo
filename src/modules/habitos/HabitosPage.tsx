@@ -11,8 +11,8 @@ import { EditorHabito } from './components/EditorHabito'
 import { GerenciarCategorias } from './components/GerenciarCategorias'
 import { Heatmap } from './components/Heatmap'
 import { NavegadorData } from './components/NavegadorData'
-import { alternarRecolhida, garantirSeedsHabitos, ordenarHabitos } from './db'
-import { devidoNoDia } from './freq'
+import { alternarRecolhida, garantirSeedsHabitos, ordenarHabitos, ultimosDias } from './db'
+import { devidoNoDia, NOMES_DIA } from './freq'
 import { sincronizarIntegracoes } from './integracoes'
 import { agendarLembretes } from './lembretes'
 import { useCategoriasHabito, useContagemSaude, useHabitos, useRegistros } from './hooks'
@@ -264,6 +264,27 @@ function Biblioteca({ cats, ativos, regsDia, semanaInfo, data, semCatRecolhida, 
 function AbaInsights({ ativos, registros, streak }: { ativos: Habito[]; registros: HabitoRegistro[]; streak: number }) {
   const g = useMemo(() => estatGlobais(ativos, registros, 30), [ativos, registros])
   const ranking = useMemo(() => rankingHabitos(ativos, registros, 30).slice(0, 5), [ativos, registros])
+
+  // Leitura observacional (heurística): qual dia da semana costuma ser mais
+  // consistente, nas últimas 8 semanas. Correlação, não causa.
+  const padraoDia = useMemo(() => {
+    if (ativos.length === 0) return null
+    const dias = ultimosDias(56)
+    const soma = Array(7).fill(0)
+    const cont = Array(7).fill(0)
+    for (const d of dias) {
+      const devidos = ativos.filter((h) => devidoNoDia(h, d))
+      if (devidos.length === 0) continue
+      const dow = getDay(parseISO(d))
+      soma[dow] += resumoDoDia(ativos, registros, d).fracao
+      cont[dow] += 1
+    }
+    const medias = soma.map((s, i) => (cont[i] >= 2 ? s / cont[i] : -1))
+    let melhor = -1, valor = -1
+    medias.forEach((m, i) => { if (m > valor) { valor = m; melhor = i } })
+    if (melhor < 0 || valor <= 0) return null
+    return { dia: NOMES_DIA[melhor], pct: Math.round(valor * 100) }
+  }, [ativos, registros])
   const tiles = [
     { rot: 'Hábitos ativos', val: String(g.ativos) },
     { rot: 'Conclusão (30d)', val: `${Math.round(g.taxa * 100)}%` },
@@ -299,11 +320,17 @@ function AbaInsights({ ativos, registros, streak }: { ativos: Habito[]; registro
       )}
 
       <div className="rounded-2xl border border-line bg-accent/[0.06] p-4">
-        <span className="text-[12px] font-semibold uppercase tracking-wide text-muted">Leitura</span>
+        <div className="flex items-center justify-between">
+          <span className="text-[12px] font-semibold uppercase tracking-wide text-muted">Leitura</span>
+          <span className="text-[10px] text-muted/70">observacional · correlação, não causa</span>
+        </div>
         <p className="mt-1.5 text-[13.5px] leading-snug">
           {g.ativos === 0 ? 'Crie hábitos para o Lume acompanhar sua consistência ao longo do tempo.'
             : `Nos últimos 30 dias você concluiu ${Math.round(g.taxa * 100)}% do que estava previsto, com ${g.diasPerfeitos} dia${g.diasPerfeitos === 1 ? '' : 's'} completo${g.diasPerfeitos === 1 ? '' : 's'}. A sequência não deve pesar: um dia de folga não apaga o seu progresso.`}
         </p>
+        {padraoDia && (
+          <p className="mt-1.5 text-[13.5px] leading-snug">📅 Observando as últimas semanas, <b className="capitalize">{padraoDia.dia}</b> tende a ser o seu dia mais consistente ({padraoDia.pct}%).</p>
+        )}
         <Link to="/habitos/estatisticas" className="mt-2 inline-block text-[12.5px] font-medium text-accent">Ver estatísticas completas →</Link>
       </div>
     </div>

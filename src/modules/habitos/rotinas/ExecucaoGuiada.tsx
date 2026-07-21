@@ -4,8 +4,10 @@ import { AnelProgresso } from '../components/AnelProgresso'
 import { hojeISO } from '../../../core/dates'
 import { definirEstadoSimNao, definirValor, ehMedido } from '../db'
 import { useHabitos } from '../hooks'
-import { EMOJI_TIPO_ETAPA, type EtapaRotina, type Rotina } from './types'
+import { EMOJI_TIPO_ETAPA, etapasDaVersao, ROTULO_VERSAO, temVersoes, type EtapaRotina, type Rotina, type VersaoRotina } from './types'
 import { encerrarExecucao, iniciarExecucao, marcarEtapa, pularEtapa, useExecucaoHoje } from './db'
+
+const VERSOES: VersaoRotina[] = ['minima', 'rapida', 'completa']
 
 /** Registra o hábito vinculado a uma etapa concluída — sem duplicar dados. */
 async function registrarHabitoDaEtapa(habitoId: string, habitos: ReturnType<typeof useHabitos>) {
@@ -41,16 +43,19 @@ function Cronometro({ minutos, onFim }: { minutos: number; onFim: () => void }) 
 export function ExecucaoGuiada({ rotina, onFechar }: { rotina: Rotina; onFechar: () => void }) {
   const habitos = useHabitos()
   const [execId, setExecId] = useState<string | null>(null)
+  const [versao, setVersao] = useState<VersaoRotina>('completa')
   const exec = useExecucaoHoje(rotina.id)
 
   useEffect(() => { iniciarExecucao(rotina.id).then(setExecId) }, [rotina.id])
 
+  const adaptativa = temVersoes(rotina.etapas)
+  const etapas = useMemo(() => (adaptativa ? etapasDaVersao(rotina.etapas, versao) : rotina.etapas), [rotina.etapas, versao, adaptativa])
   const feitas = useMemo(() => new Set(exec?.feitas ?? []), [exec])
   const puladas = useMemo(() => new Set(exec?.puladas ?? []), [exec])
-  const pendentes = rotina.etapas.filter((e) => !feitas.has(e.id) && !puladas.has(e.id))
+  const pendentes = etapas.filter((e) => !feitas.has(e.id) && !puladas.has(e.id))
   const atual: EtapaRotina | undefined = pendentes[0]
-  const total = rotina.etapas.length
-  const concluidas = feitas.size + puladas.size
+  const total = etapas.length
+  const concluidas = etapas.filter((e) => feitas.has(e.id) || puladas.has(e.id)).length
   const frac = total ? concluidas / total : 1
 
   async function concluir(et: EtapaRotina) {
@@ -70,6 +75,17 @@ export function ExecucaoGuiada({ rotina, onFechar }: { rotina: Rotina; onFechar:
   return (
     <FolhaInferior titulo={rotina.nome} onFechar={onFechar}>
       <div className="flex flex-col gap-4">
+        {/* Versão adaptativa */}
+        {adaptativa && (
+          <div className="flex items-center gap-1 rounded-full border border-line p-0.5 text-[12.5px]">
+            {VERSOES.map((v) => (
+              <button key={v} onClick={() => setVersao(v)} className={`flex-1 rounded-full py-1.5 font-medium transition-colors ${versao === v ? 'bg-ink text-surface' : 'text-muted hover:bg-hover'}`}>
+                {ROTULO_VERSAO[v]}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Progresso */}
         <div className="flex items-center gap-3">
           <AnelProgresso fracao={frac} tamanho={44} espessura={4} cor={rotina.cor ?? 'var(--vida-accent)'}>
@@ -107,7 +123,7 @@ export function ExecucaoGuiada({ rotina, onFechar }: { rotina: Rotina; onFechar:
 
         {/* Lista de etapas */}
         <ul className="flex flex-col gap-1">
-          {rotina.etapas.map((e) => {
+          {etapas.map((e) => {
             const done = feitas.has(e.id)
             const skip = puladas.has(e.id)
             return (

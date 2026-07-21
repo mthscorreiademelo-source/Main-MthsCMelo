@@ -13,7 +13,7 @@ import {
 import { IconeFator } from '../../../core/components/icones'
 import { NOMES_DIA } from '../freq'
 import type { Habito } from '../types'
-import { EMOJI_TIPO_ETAPA, ROTULO_PERIODO, type PeriodoDia, type Rotina, type TipoEtapa } from './types'
+import { EMOJI_TIPO_ETAPA, ROTULO_NIVEL, ROTULO_PERIODO, temVersoes, type PeriodoDia, type Rotina, type TipoEtapa } from './types'
 
 const TIPOS: { id: TipoEtapa; nome: string }[] = [
   { id: 'checklist', nome: 'Checklist' },
@@ -96,6 +96,11 @@ export function EditorRotina({ rotina, habitos = [], onFechar }: { rotina: Rotin
         {/* Etapas */}
         <div>
           <span className="text-[12px] font-semibold uppercase tracking-wide text-muted">Etapas</span>
+          {rotina.etapas.length > 1 && (
+            <p className="mb-1 mt-0.5 text-[11px] text-muted/80">
+              Toque em <b>Essencial/Rápida/Extra</b> para montar versões mínima, rápida e completa.{temVersoes(rotina.etapas) ? '' : ' Por padrão, toda etapa é essencial.'}
+            </p>
+          )}
           <ul className="mt-2 flex flex-col gap-1.5">
             {rotina.etapas.map((et, idx) => (
               <li key={et.id} className="flex items-center gap-2 rounded-xl border border-line px-2.5 py-2">
@@ -114,6 +119,13 @@ export function EditorRotina({ rotina, habitos = [], onFechar }: { rotina: Rotin
                     title="minutos"
                   />
                 )}
+                <button
+                  onClick={() => atualizarEtapa(rotina, et.id, { nivel: (((et.nivel ?? 1) % 3) + 1) as 1 | 2 | 3 })}
+                  title="Versão em que a etapa entra"
+                  className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${(et.nivel ?? 1) === 1 ? 'bg-hover text-muted' : (et.nivel === 2 ? 'bg-accent/15 text-accent' : 'bg-danger/10 text-danger')}`}
+                >
+                  {ROTULO_NIVEL[et.nivel ?? 1]}
+                </button>
                 <button onClick={() => moverEtapa(rotina, et.id, -1)} disabled={idx === 0} className="flex size-6 items-center justify-center rounded text-muted hover:bg-hover disabled:opacity-30">↑</button>
                 <button onClick={() => moverEtapa(rotina, et.id, 1)} disabled={idx === rotina.etapas.length - 1} className="flex size-6 items-center justify-center rounded text-muted hover:bg-hover disabled:opacity-30">↓</button>
                 <button onClick={() => removerEtapa(rotina, et.id)} className="flex size-6 items-center justify-center rounded text-muted hover:bg-hover hover:text-danger">×</button>

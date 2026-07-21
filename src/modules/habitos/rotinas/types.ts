@@ -22,6 +22,26 @@ export interface EtapaRotina {
   instrucao?: string
   /** Etapa que pode ser pulada sem "quebrar" a rotina. */
   opcional?: boolean
+  /** Nível para versões adaptativas: 1 essencial (mínima), 2 rápida, 3 extra (só completa). Ausente = 1. */
+  nivel?: 1 | 2 | 3
+}
+
+export type VersaoRotina = 'minima' | 'rapida' | 'completa'
+
+export const ROTULO_NIVEL: Record<1 | 2 | 3, string> = { 1: 'Essencial', 2: 'Rápida', 3: 'Extra' }
+export const ROTULO_VERSAO: Record<VersaoRotina, string> = { minima: 'Mínima', rapida: 'Rápida', completa: 'Completa' }
+
+const TETO_VERSAO: Record<VersaoRotina, number> = { minima: 1, rapida: 2, completa: 3 }
+
+/** Etapas incluídas numa versão da rotina (mínima ⊆ rápida ⊆ completa). */
+export function etapasDaVersao(etapas: EtapaRotina[], versao: VersaoRotina): EtapaRotina[] {
+  const teto = TETO_VERSAO[versao]
+  return etapas.filter((e) => (e.nivel ?? 1) <= teto)
+}
+
+/** A rotina tem versões distintas? (alguma etapa acima do essencial) */
+export function temVersoes(etapas: EtapaRotina[]): boolean {
+  return etapas.some((e) => (e.nivel ?? 1) > 1)
 }
 
 export interface Rotina {
