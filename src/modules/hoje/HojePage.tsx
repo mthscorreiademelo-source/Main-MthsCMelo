@@ -443,35 +443,47 @@ export function HojePage() {
   }
 
   /* ------------------------------ Montagem ------------------------------- */
+  // Prioridade decide a ordem. O primeiro bloco é o "foco" (linha inteira, a
+  // matéria de capa); o restante flui numa grade que se empacota (masonry),
+  // sem os vãos brancos de uma grade rígida — e se reorganiza quando o
+  // conteúdo dos blocos muda ao longo do dia.
   blocos.sort((a, b) => b.prioridade - a.prioridade)
-  // promove o mais importante a linha inteira (a "matéria de capa")
-  const ordem = ['hero', 'grande', 'medio', 'pequeno'] as const
-  const nodes = blocos.map((bl, idx) => {
-    let t = bl.tamanho
-    if (idx === 0 && ordem.indexOf(t) > ordem.indexOf('grande')) t = 'grande'
-    return <div key={bl.id}>{bl.render(t)}</div>
-  })
+  const foco = blocos[0]
+  const resto = blocos.slice(1)
 
   const carregando = eventos === undefined && tarefas === undefined && habitos === undefined
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
       <header className="lume-entrada pt-1">
-        <div className="flex items-baseline justify-between">
+        <div className="flex items-baseline justify-between gap-3">
           <h1 className="text-2xl font-bold tracking-tight">{saudacao(agora)}</h1>
-          <span className="text-[12px] font-medium text-muted/70">{FAIXAS[faixa].rotulo}</span>
+          <span className="shrink-0 text-[12px] font-medium text-muted/70">{FAIXAS[faixa].rotulo}</span>
         </div>
         <p className="mt-1 text-sm text-muted">{dataPorExtenso(agora)}</p>
       </header>
 
+      {!carregando && <RibbonDia eventos={cronologicos} agora={agora} agoraMin={agoraMin} faixa={faixa} />}
+
       {carregando ? (
         <p className="py-16 text-center text-sm text-muted">Organizando o seu dia…</p>
-      ) : nodes.length === 0 ? (
-        <p className="py-16 text-center text-sm text-muted">
+      ) : !foco ? (
+        <p className="py-12 text-center text-sm text-muted">
           Nada urgente agora. Aproveite para respirar. 🌿
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{nodes}</div>
+        <>
+          <div className="lume-entrada">{foco.render(foco.tamanho)}</div>
+          {resto.length > 0 && (
+            <div className="gap-4 sm:columns-2">
+              {resto.map((bl) => (
+                <div key={bl.id} className="mb-4 break-inside-avoid">
+                  {bl.render(bl.tamanho === 'hero' || bl.tamanho === 'grande' ? 'medio' : bl.tamanho)}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <MensagemIA
@@ -479,6 +491,68 @@ export function HojePage() {
         eventos={cronologicos.length}
         tarefas={tarefasHoje.length}
       />
+    </div>
+  )
+}
+
+/**
+ * "Seu dia" — fita de tempo que mostra, de forma calma, onde você está no dia:
+ * uma trilha do início ao fim, com o marcador de agora e pontos para os
+ * compromissos com horário. É o elemento-assinatura do Hoje, ancorado no que o
+ * Lume tem de mais característico: o tempo.
+ */
+function RibbonDia({
+  eventos,
+  agora,
+  agoraMin,
+  faixa,
+}: {
+  eventos: ReturnType<typeof eventosDoDia>
+  agora: Date
+  agoraMin: number
+  faixa: ReturnType<typeof faixaDoDia>
+}) {
+  const comHora = eventos
+    .map((e) => ({ e, i: hhmmParaMin(e.inicio), f: hhmmParaMin(e.fim) }))
+    .filter((x): x is { e: typeof x.e; i: number; f: number | null } => x.i != null)
+
+  const inicios = comHora.map((x) => x.i)
+  const fins = comHora.map((x) => x.f ?? x.i + 60)
+  const inicioDia = Math.max(0, Math.min(6 * 60, agoraMin, ...inicios))
+  const fimDia = Math.min(24 * 60, Math.max(23 * 60, agoraMin, ...fins))
+  const vao = Math.max(1, fimDia - inicioDia)
+  const pos = (m: number) => Math.max(0, Math.min(100, ((m - inicioDia) / vao) * 100))
+  const hh = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}h`
+  const horaAgora = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`
+
+  return (
+    <div className="lume-entrada rounded-2xl border border-line bg-surface/70 px-4 py-3.5">
+      <div className="mb-3 flex items-baseline justify-between text-[12px]">
+        <span className="font-semibold">Seu dia</span>
+        <span className="tabular-nums text-muted/70">{horaAgora} · {FAIXAS[faixa].rotulo.toLowerCase()}</span>
+      </div>
+      <div className="relative h-2 rounded-full bg-line">
+        <div
+          className="absolute inset-y-0 left-0 rounded-full"
+          style={{ width: `${pos(agoraMin)}%`, background: 'linear-gradient(90deg, color-mix(in srgb, var(--vida-accent) 25%, transparent), var(--vida-accent))' }}
+        />
+        {comHora.map(({ e, i }) => (
+          <span
+            key={e.id}
+            className="absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-bg"
+            style={{ left: `${pos(i)}%`, backgroundColor: e.cor ?? ACENTO }}
+            title={`${e.inicio} · ${e.titulo}`}
+          />
+        ))}
+        <span
+          className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent ring-2 ring-bg"
+          style={{ left: `${pos(agoraMin)}%` }}
+        />
+      </div>
+      <div className="mt-1.5 flex justify-between text-[10px] tabular-nums text-muted/60">
+        <span>{hh(inicioDia)}</span>
+        <span>{hh(fimDia)}</span>
+      </div>
     </div>
   )
 }
