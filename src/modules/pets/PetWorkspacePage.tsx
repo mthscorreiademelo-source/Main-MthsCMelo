@@ -9,6 +9,7 @@ import { CardCuidados } from './components/CardCuidados'
 import { CardDocumentos } from './components/CardDocumentos'
 import { CardFotos } from './components/CardFotos'
 import { CardGastos } from './components/CardGastos'
+import { CardHabitos } from './components/CardHabitos'
 import { CardHistorico } from './components/CardHistorico'
 import { CardInsights } from './components/CardInsights'
 import { CardSaude } from './components/CardSaude'
@@ -20,6 +21,7 @@ import type { ModuloWorkspace, Pet } from './types'
 
 const REGISTRO: Record<string, ComponentType<{ pet: Pet; controle: ControleCartao }>> = {
   cuidados: CardCuidados,
+  habitos: CardHabitos,
   compromissos: CardCompromissos,
   vacinacao: CardVacinacao,
   historico: CardHistorico,

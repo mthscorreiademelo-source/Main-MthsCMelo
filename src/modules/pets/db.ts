@@ -42,6 +42,7 @@ export function nomeEspecie(e: Especie): string {
 /** Cards do workspace, na ordem padrão. Nenhum é obrigatório. */
 export const CARDS_WORKSPACE: { id: string; nome: string; emoji: string }[] = [
   { id: 'cuidados', nome: 'Cuidados de hoje', emoji: '✅' },
+  { id: 'habitos', nome: 'Rotina do pet (hábitos)', emoji: '🦮' },
   { id: 'compromissos', nome: 'Próximos compromissos', emoji: '📅' },
   { id: 'vacinacao', nome: 'Carteira de vacinação', emoji: '💉' },
   { id: 'historico', nome: 'Histórico veterinário', emoji: '🩺' },

@@ -3,6 +3,8 @@ import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { hojeISO } from '../../../core/dates'
 import { useRegistros } from '../../humor/hooks'
+import { useHabitos, useRegistros as useRegistrosHabito } from '../../habitos/hooks'
+import { somaAguaHabitos } from '../../habitos/vinculos'
 import {
   energia,
   gerarInsightsSaude,
@@ -47,7 +49,7 @@ const RotStatus: Record<StatusExame, string> = { normal: 'Normal', atencao: 'Ate
 
 export function VisaoGeralSaude({ onIrAba, onEditarDia }: { onIrAba: (a: AbaSaude) => void; onEditarDia: () => void }) {
   const hoje = hojeISO()
-  const dias = useSaude() ?? []
+  const diasBrutos = useSaude() ?? []
   const medidas = useMedidas() ?? []
   const consultas = useConsultas() ?? []
   const medicamentos = useMedicamentos() ?? []
@@ -58,6 +60,23 @@ export function VisaoGeralSaude({ onIrAba, onEditarDia }: { onIrAba: (a: AbaSaud
   const atividades = useAtividades() ?? []
   const config = useSaudeConfig()
   const registrosHumor = useRegistros() ?? []
+
+  // Água registrada por hábitos ("tomar água") soma na hidratação da Saúde.
+  const habitos = useHabitos() ?? []
+  const registrosHabito = useRegistrosHabito() ?? []
+  const aguaHabitosMl = useMemo(
+    () => somaAguaHabitos(habitos, registrosHabito, hoje),
+    [habitos, registrosHabito, hoje],
+  )
+  // dias "efetivos": o dia de hoje ganha a água dos hábitos somada à manual.
+  const dias = useMemo(() => {
+    if (!aguaHabitosMl) return diasBrutos
+    const achou = diasBrutos.some((d) => d.data === hoje)
+    const ajustado = diasBrutos.map((d) =>
+      d.data === hoje ? { ...d, aguaMl: (d.aguaMl ?? 0) + aguaHabitosMl } : d,
+    )
+    return achou ? ajustado : [...ajustado, { data: hoje, aguaMl: aguaHabitosMl } as (typeof diasBrutos)[number]]
+  }, [diasBrutos, aguaHabitosMl, hoje])
 
   const diaHoje = dias.find((d) => d.data === hoje)
   const mediaFc = useMemo(() => mediaMetrica(dias, 'fcRepouso'), [dias])

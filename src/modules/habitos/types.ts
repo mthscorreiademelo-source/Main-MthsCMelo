@@ -47,6 +47,12 @@ export interface Habito {
   lembretes?: string[]
   /** id de uma fonte de integração (ex.: 'saude:passos') — valor automático. */
   fonteId?: string
+  /** Vínculo com um pet: o hábito aparece no workspace desse pet (ex.: passear). */
+  vinculoPetId?: string
+  /** Conta como água na Saúde: o valor do dia soma na hidratação. */
+  vinculoAgua?: boolean
+  /** Quantos ml cada unidade do hábito representa (copo = 250; ml = 1). */
+  mlPorUnidade?: number
   /** 1 (alta) … 4 (baixa). */
   prioridade?: number
   ordem: number

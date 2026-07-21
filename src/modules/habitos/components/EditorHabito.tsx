@@ -13,6 +13,7 @@ import {
 } from '../db'
 import { NOMES_DIA } from '../freq'
 import { FONTES, fonteDe } from '../integracoes'
+import { usePets } from '../../pets/hooks'
 import { estadoNotificacoes, pedirPermissaoNotificacoes, type EstadoNotif } from '../lembretes'
 import type {
   CategoriaHabito,
@@ -60,6 +61,10 @@ export function EditorHabito({
   const horario = habito?.horario ?? ''
   const [prioridade, setPrioridade] = useState<number | undefined>(habito?.prioridade)
   const [fonteId, setFonteId] = useState(habito?.fonteId ?? '')
+  const [vinculoPetId, setVinculoPetId] = useState(habito?.vinculoPetId ?? '')
+  const [vinculoAgua, setVinculoAgua] = useState(!!habito?.vinculoAgua)
+  const [mlPorUnidade, setMlPorUnidade] = useState(habito?.mlPorUnidade != null ? String(habito.mlPorUnidade) : '')
+  const pets = usePets() ?? []
   const [lembretes, setLembretes] = useState<string[]>(
     habito?.lembretes ?? (habito?.horario ? [habito.horario] : []),
   )
@@ -146,6 +151,9 @@ export function EditorHabito({
       lembretes: lembretes.length ? lembretes : undefined,
       fonteId: fonteId || undefined,
       prioridade,
+      vinculoPetId: vinculoPetId || undefined,
+      vinculoAgua: vinculoAgua || undefined,
+      mlPorUnidade: vinculoAgua && Number(mlPorUnidade) > 0 ? Number(mlPorUnidade) : undefined,
       unidade: medido ? unidade.trim() || undefined : undefined,
       meta: medido ? Math.max(1, Number(meta) || 1) : undefined,
       passo: medido ? Math.max(1, Number(passo) || 1) : undefined,
@@ -449,6 +457,45 @@ export function EditorHabito({
             )}
             <span>Os avisos chegam enquanto o app está aberto (PWA local, sem servidor).</span>
           </div>
+        )}
+      </div>
+
+      {/* Vínculos entre módulos */}
+      <div className="flex flex-col gap-2.5 rounded-xl border border-line bg-surface/40 p-3">
+        <span className={ROTULO}>Vínculos (aparecer em outros módulos)</span>
+        {pets.length > 0 && (
+          <label className="flex items-center justify-between gap-2 text-[14px]">
+            <span className="text-muted">🐾 Aparece no pet</span>
+            <select
+              value={vinculoPetId}
+              onChange={(e) => setVinculoPetId(e.target.value)}
+              className={`${CAMPO} max-w-[55%]`}
+            >
+              <option value="">Nenhum</option>
+              {pets.map((p) => (
+                <option key={p.id} value={p.id}>{p.nome}</option>
+              ))}
+            </select>
+          </label>
+        )}
+        <label className="flex items-center justify-between gap-2 text-[14px]">
+          <span className="text-muted">💧 Conta como água na Saúde</span>
+          <input type="checkbox" checked={vinculoAgua} onChange={(e) => setVinculoAgua(e.target.checked)} className="size-4" />
+        </label>
+        {vinculoAgua && (
+          <label className="flex items-center justify-between gap-2 text-[13px]">
+            <span className="text-muted">ml por {unidade.trim() || 'unidade'}</span>
+            <input
+              value={mlPorUnidade}
+              onChange={(e) => setMlPorUnidade(e.target.value)}
+              inputMode="numeric"
+              placeholder="250"
+              className={`${CAMPO} w-24 text-right`}
+            />
+          </label>
+        )}
+        {pets.length === 0 && !vinculoAgua && (
+          <p className="text-[12px] text-muted/70">Cadastre um pet para vincular hábitos como “passear”.</p>
         )}
       </div>
 
