@@ -60,6 +60,7 @@ import type {
   MovDespensa,
   PrecoAquisicao,
 } from '../../modules/compras/types'
+import type { Lugar } from '../../modules/lugares/types'
 
 /** Conteúdo binário de um arquivo anexado a uma nota do tipo 'arquivos'. */
 export interface ArquivoDados {
@@ -138,6 +139,7 @@ class VidaDB extends Dexie {
   aquisicoes!: Table<Aquisicao, string>
   aquisicaoPrecos!: Table<PrecoAquisicao, string>
   comprasConfig!: Table<ComprasConfig, string>
+  lugares!: Table<Lugar, string>
   /** Espelho do último estado sincronizado (chave → atualizadoEm). */
   espelho!: Table<{ chave: string; atualizadoEm: number }, string>
 
@@ -305,6 +307,10 @@ class VidaDB extends Dexie {
       aquisicaoPrecos: 'id, aquisicaoId, data',
       comprasConfig: 'id',
     })
+    // v23: módulo Lugares.
+    this.version(23).stores({
+      lugares: 'id, tipo, ordem',
+    })
   }
 }
 
@@ -425,6 +431,7 @@ export async function exportarBackup() {
     aquisicoes: await db.aquisicoes.toArray(),
     aquisicaoPrecos: await db.aquisicaoPrecos.toArray(),
     comprasConfig: await db.comprasConfig.toArray(),
+    lugares: await db.lugares.toArray(),
   }
 }
 
@@ -499,6 +506,7 @@ export async function importarBackup(json: unknown) {
     aquisicoes?: Aquisicao[]
     aquisicaoPrecos?: PrecoAquisicao[]
     comprasConfig?: ComprasConfig[]
+    lugares?: Lugar[]
   }
   const temTasks = Array.isArray(dados?.tasks)
   const temPaginas = Array.isArray(dados?.paginas)
@@ -589,6 +597,7 @@ export async function importarBackup(json: unknown) {
   if (Array.isArray(dados.aquisicoes)) await db.aquisicoes.bulkPut(dados.aquisicoes)
   if (Array.isArray(dados.aquisicaoPrecos)) await db.aquisicaoPrecos.bulkPut(dados.aquisicaoPrecos)
   if (Array.isArray(dados.comprasConfig)) await db.comprasConfig.bulkPut(dados.comprasConfig)
+  if (Array.isArray(dados.lugares)) await db.lugares.bulkPut(dados.lugares)
   return {
     tasks: dados.tasks?.length ?? 0,
     paginas: dados.paginas?.length ?? 0,

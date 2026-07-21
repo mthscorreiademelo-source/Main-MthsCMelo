@@ -517,6 +517,15 @@ export function IconLupa(props: IconProps) {
   )
 }
 
+export function IconLocal(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10Z" />
+      <circle cx="12" cy="11" r="2.3" />
+    </svg>
+  )
+}
+
 export function IconCarrinho(props: IconProps) {
   return (
     <svg {...base(props)}>

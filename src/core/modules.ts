@@ -8,6 +8,7 @@ import {
   IconDocumento,
   IconHumor,
   IconLivro,
+  IconLocal,
   IconPata,
   IconSaude,
   IconSol,
@@ -34,6 +35,7 @@ import { PetWorkspacePage } from '../modules/pets/PetWorkspacePage'
 import { ComprasPage } from '../modules/compras/ComprasPage'
 import { ItemDespensaPage } from '../modules/compras/ItemDespensaPage'
 import { AquisicaoPage } from '../modules/compras/AquisicaoPage'
+import { LugaresPage } from '../modules/lugares/LugaresPage'
 import { SecaoHoje as TarefasHoje } from '../modules/tarefas/SecaoHoje'
 import { SecaoHoje as NotasHoje } from '../modules/notas/SecaoHoje'
 import { SecaoHoje as HumorHoje } from '../modules/humor/SecaoHoje'
@@ -195,5 +197,12 @@ export const MODULOS: ModuloDef[] = [
     SecaoHoje: ComprasHoje,
     HojeResumo: ComprasResumo,
     hojeTamanho: 'compacto',
+  },
+  {
+    id: 'lugares',
+    nome: 'Lugares',
+    rota: '/lugares',
+    Icone: IconLocal,
+    Pagina: LugaresPage,
   },
 ]
