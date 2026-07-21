@@ -18,13 +18,16 @@ export function GrupoEditorSheet({ aberto, grupo, onFechar, onExcluido }: Props)
   const criando = !grupo
   const [nome, setNome] = useState('')
   const [capa, setCapa] = useState<string | undefined>(undefined)
+  const [capaDark, setCapaDark] = useState<string | undefined>(undefined)
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false)
-  const inputArquivo = useRef<HTMLInputElement>(null)
+  const inputClara = useRef<HTMLInputElement>(null)
+  const inputEscura = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (aberto) {
       setNome(grupo?.nome ?? '')
       setCapa(grupo?.capa)
+      setCapaDark(grupo?.capaDark)
       setConfirmandoExclusao(false)
     }
   }, [aberto, grupo?.id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -34,24 +37,34 @@ export function GrupoEditorSheet({ aberto, grupo, onFechar, onExcluido }: Props)
     if (grupo && valor.trim()) atualizarGrupo(grupo.id, { nome: valor.trim() })
   }
 
-  async function aoEscolherCapa(arquivo: File) {
+  async function aoEscolherCapa(arquivo: File, tema: 'light' | 'dark') {
     try {
       const dataUrl = await processarCapa(arquivo)
-      setCapa(dataUrl)
-      if (grupo) atualizarGrupo(grupo.id, { capa: dataUrl })
+      if (tema === 'dark') {
+        setCapaDark(dataUrl)
+        if (grupo) atualizarGrupo(grupo.id, { capaDark: dataUrl })
+      } else {
+        setCapa(dataUrl)
+        if (grupo) atualizarGrupo(grupo.id, { capa: dataUrl })
+      }
     } catch {
       // imagem inválida: ignora silenciosamente
     }
   }
 
-  function removerCapa() {
-    setCapa(undefined)
-    if (grupo) atualizarGrupo(grupo.id, { capa: undefined })
+  function removerCapa(tema: 'light' | 'dark') {
+    if (tema === 'dark') {
+      setCapaDark(undefined)
+      if (grupo) atualizarGrupo(grupo.id, { capaDark: undefined })
+    } else {
+      setCapa(undefined)
+      if (grupo) atualizarGrupo(grupo.id, { capa: undefined })
+    }
   }
 
   async function aoCriar() {
     const id = await criarGrupo(nome)
-    if (id && capa) await atualizarGrupo(id, { capa })
+    if (id && (capa || capaDark)) await atualizarGrupo(id, { capa, capaDark })
     if (id) onFechar()
   }
 
@@ -78,42 +91,81 @@ export function GrupoEditorSheet({ aberto, grupo, onFechar, onExcluido }: Props)
 
         <div className="flex flex-col gap-1.5">
           <span className="text-[13px] font-medium text-muted">
-            Capa (retrato 4:5)
+            Capas (retrato 4:5)
           </span>
-          <div className="flex items-end gap-3">
-            <button
-              onClick={() => inputArquivo.current?.click()}
-              aria-label={capa ? 'Trocar capa' : 'Adicionar capa'}
-              className="w-32 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-line transition-colors hover:border-muted/60"
-            >
-              {capa ? (
-                <img src={capa} alt="" className="aspect-[4/5] w-full object-cover" />
-              ) : (
-                <span className="flex aspect-[4/5] w-full flex-col items-center justify-center gap-1 text-muted">
-                  <IconMais />
-                  <span className="text-[12px]">Adicionar</span>
-                </span>
-              )}
-            </button>
-            {capa && (
-              <Button onClick={removerCapa} className="text-muted">
-                Remover capa
-              </Button>
-            )}
+          <div className="flex flex-wrap gap-4">
+            {/* Capa modo claro */}
+            <div className="flex flex-col gap-1.5">
+              <button
+                onClick={() => inputClara.current?.click()}
+                aria-label={capa ? 'Trocar capa clara' : 'Adicionar capa clara'}
+                className="w-28 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-line bg-white transition-colors hover:border-muted/60"
+              >
+                {capa ? (
+                  <img src={capa} alt="" className="aspect-[4/5] w-full object-contain" />
+                ) : (
+                  <span className="flex aspect-[4/5] w-full flex-col items-center justify-center gap-1 text-neutral-400">
+                    <IconMais />
+                    <span className="text-[11px]">Modo claro</span>
+                  </span>
+                )}
+              </button>
+              <div className="flex items-center justify-between px-0.5">
+                <span className="text-[11px] font-medium text-muted">☀️ Claro</span>
+                {capa && (
+                  <button onClick={() => removerCapa('light')} className="text-[11px] text-muted hover:text-danger">Remover</button>
+                )}
+              </div>
+            </div>
+
+            {/* Capa modo escuro */}
+            <div className="flex flex-col gap-1.5">
+              <button
+                onClick={() => inputEscura.current?.click()}
+                aria-label={capaDark ? 'Trocar capa escura' : 'Adicionar capa escura'}
+                className="w-28 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-line bg-neutral-900 transition-colors hover:border-muted/60"
+              >
+                {capaDark ? (
+                  <img src={capaDark} alt="" className="aspect-[4/5] w-full object-contain" />
+                ) : (
+                  <span className="flex aspect-[4/5] w-full flex-col items-center justify-center gap-1 text-neutral-500">
+                    <IconMais />
+                    <span className="text-[11px]">Modo escuro</span>
+                  </span>
+                )}
+              </button>
+              <div className="flex items-center justify-between px-0.5">
+                <span className="text-[11px] font-medium text-muted">🌙 Escuro</span>
+                {capaDark && (
+                  <button onClick={() => removerCapa('dark')} className="text-[11px] text-muted hover:text-danger">Remover</button>
+                )}
+              </div>
+            </div>
           </div>
           <input
-            ref={inputArquivo}
+            ref={inputClara}
             type="file"
             accept="image/*"
             className="hidden"
             onChange={(e) => {
               const arquivo = e.target.files?.[0]
-              if (arquivo) aoEscolherCapa(arquivo)
+              if (arquivo) aoEscolherCapa(arquivo, 'light')
+              e.target.value = ''
+            }}
+          />
+          <input
+            ref={inputEscura}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const arquivo = e.target.files?.[0]
+              if (arquivo) aoEscolherCapa(arquivo, 'dark')
               e.target.value = ''
             }}
           />
           <p className="text-[12px] text-muted/70">
-            A imagem é recortada ao centro automaticamente.
+            A capa escura é opcional — sem ela, a clara vale para os dois temas. Ótimo para PNGs com fundo transparente.
           </p>
         </div>
 

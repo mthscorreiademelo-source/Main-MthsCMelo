@@ -2,15 +2,18 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { EmptyState } from '../../core/components/EmptyState'
 import { IconCaneta, IconDocumento, IconMais, IconPasta } from '../../core/components/Icons'
+import { useTheme } from '../../core/theme/useTheme'
 import { GrupoEditorSheet } from './components/GrupoEditorSheet'
 import { ListaPaginas } from './components/ListaPaginas'
 import { criarPagina, ordenarGrupos } from './db'
 import { useGrupos, usePaginas } from './hooks'
+import { capaDoGrupo } from './types'
 
 export function NotasPage() {
   const paginas = usePaginas()
   const grupos = useGrupos()
   const navigate = useNavigate()
+  const { tema } = useTheme()
   const [criandoGrupo, setCriandoGrupo] = useState(false)
 
   const listaGrupos = useMemo(() => ordenarGrupos(grupos ?? []), [grupos])
@@ -39,16 +42,17 @@ export function NotasPage() {
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           {listaGrupos.map((g) => {
             const qtd = contagem.get(g.id) ?? 0
+            const capa = capaDoGrupo(g, tema)
             return (
               <button
                 key={g.id}
                 onClick={() => navigate(`/notas/grupo/${g.id}`)}
                 className="group cursor-pointer text-left"
               >
-                <span className="block overflow-hidden rounded-xl border border-line transition-transform duration-150 group-hover:scale-[1.02]">
-                  {g.capa ? (
+                <span className="block overflow-hidden rounded-xl border border-line bg-bg transition-transform duration-150 group-hover:scale-[1.02]">
+                  {capa ? (
                     <img
-                      src={g.capa}
+                      src={capa}
                       alt=""
                       className="aspect-[4/5] w-full object-cover"
                     />

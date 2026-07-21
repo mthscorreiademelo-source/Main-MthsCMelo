@@ -111,8 +111,15 @@ export interface Pagina {
 export interface Grupo {
   id: string
   nome: string
-  /** Capa em dataURL JPEG, já recortada ao centro em 4:5 (~480×600) */
+  /** Capa exibida no modo claro (e padrão). dataURL 4:5 (~480×600). */
   capa?: string
+  /** Capa alternativa exibida no modo escuro (opcional). */
+  capaDark?: string
   criadoEm: number
   ordem: number
+}
+
+/** Escolhe a capa conforme o tema: no escuro usa capaDark se houver. */
+export function capaDoGrupo(grupo: Pick<Grupo, 'capa' | 'capaDark'>, tema: 'light' | 'dark'): string | undefined {
+  return tema === 'dark' ? (grupo.capaDark ?? grupo.capa) : grupo.capa
 }

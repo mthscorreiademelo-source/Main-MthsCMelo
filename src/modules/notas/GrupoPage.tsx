@@ -10,16 +10,19 @@ import {
   IconPasta,
   IconSetaEsquerda,
 } from '../../core/components/Icons'
+import { useTheme } from '../../core/theme/useTheme'
 import { GrupoEditorSheet } from './components/GrupoEditorSheet'
 import { ListaPaginas } from './components/ListaPaginas'
 import { criarPagina } from './db'
 import { useGrupos, usePaginas } from './hooks'
+import { capaDoGrupo } from './types'
 
 export function GrupoPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const grupos = useGrupos()
   const paginas = usePaginas()
+  const { tema } = useTheme()
   const [editando, setEditando] = useState(false)
 
   const grupo = grupos?.find((g) => g.id === id) ?? null
@@ -43,11 +46,11 @@ export function GrupoPage() {
         <IconButton onClick={() => navigate('/notas')} aria-label="Voltar para Notas">
           <IconSetaEsquerda />
         </IconButton>
-        {grupo.capa && (
+        {capaDoGrupo(grupo, tema) && (
           <img
-            src={grupo.capa}
+            src={capaDoGrupo(grupo, tema)}
             alt=""
-            className="h-12 w-[38px] shrink-0 rounded-md border border-line object-cover"
+            className="h-12 w-[38px] shrink-0 rounded-md border border-line bg-bg object-cover"
           />
         )}
         <h1 className="min-w-0 flex-1 truncate text-2xl font-bold tracking-tight">
