@@ -45,11 +45,17 @@ function EventoCard({
   ini,
   hpx,
   onAbrir,
+  left = 4,
+  right = 4,
+  zIndex,
 }: {
   it: ItemPlano
   ini: number
   hpx: number
   onAbrir: () => void
+  left?: number
+  right?: number
+  zIndex?: number
 }) {
   const top = ((it.inicioMin - ini) / 60) * hpx
   // Altura proporcional EXATA à duração — sem mínimo. Quem controla a
@@ -64,20 +70,21 @@ function EventoCard({
     <button
       onClick={onAbrir}
       title={`${it.titulo} · ${paraHHMM(it.inicioMin)}–${paraHHMM(it.fimMin)}`}
-      className={`group/ev absolute overflow-hidden rounded-lg text-left shadow-sm transition-all hover:z-20 hover:shadow-md ${
-        minusculo ? 'px-1.5 py-0' : 'rounded-xl px-2.5 py-1.5'
+      className={`group/ev absolute flex flex-col justify-start overflow-hidden rounded-lg text-left shadow-sm transition-all hover:z-30 hover:shadow-md ${
+        minusculo ? 'px-1.5 py-0' : 'rounded-xl px-2.5 pt-1 pb-1.5'
       } ${it.concluida ? 'opacity-60' : ''} ${tarefa ? 'border border-dashed' : 'border-l-4'}`}
       style={{
         top,
         height: altura,
-        left: 4,
-        right: 4,
+        left,
+        right,
+        zIndex,
         borderColor: it.cor,
         backgroundColor: tarefa ? 'var(--vida-surface)' : `color-mix(in srgb, ${it.cor} 12%, var(--vida-surface))`,
         touchAction: 'manipulation',
       }}
     >
-      <div className={`flex items-center gap-1.5 ${minusculo ? '' : 'items-start'}`}>
+      <div className={`flex items-start gap-1.5`}>
         <span className={`shrink-0 leading-none ${minusculo ? 'text-[10px]' : 'text-[13px]'}`} aria-hidden style={tarefa ? { color: it.cor } : undefined}>
           {it.icone}
         </span>
@@ -119,20 +126,22 @@ function EventoCard({
   )
 }
 
-/** Um grupo de sobreposição: 1 item = cartão simples; vários = pilha de cartas. */
+/**
+ * Um grupo de sobreposição. Em vez de empilhar cartas ou dividir em colunas,
+ * os eventos ficam em camadas: os mais LONGOS ao fundo (largura cheia) e os
+ * mais CURTOS por cima, levemente recuados à esquerda — assim a borda do
+ * evento longo continua visível/clicável e o curto salta à frente. É a leitura
+ * mais intuitiva quando um compromisso curto cai dentro de um bloco maior.
+ */
 function GrupoBloco({
   grupo,
   ini,
   hpx,
-  expandido,
-  onExpandir,
   onAbrirItem,
 }: {
   grupo: GrupoSobreposto
   ini: number
   hpx: number
-  expandido: boolean
-  onExpandir: () => void
   onAbrirItem: (it: ItemPlano) => void
 }) {
   if (grupo.itens.length === 1) {
@@ -140,62 +149,26 @@ function GrupoBloco({
     return <EventoCard it={it} ini={ini} hpx={hpx} onAbrir={() => onAbrirItem(it)} />
   }
 
-  const top = ((grupo.inicioMin - ini) / 60) * hpx
-  const altura = Math.max(30, ((grupo.fimMin - grupo.inicioMin) / 60) * hpx - 1)
-
-  if (!expandido) {
-    const frente = grupo.itens[0]
-    return (
-      <div className="absolute" style={{ top, height: altura, left: 4, right: 4 }}>
-        {/* camadas de trás (cartas empilhadas) */}
-        <div className="absolute inset-x-1.5 top-1.5 h-full rounded-xl border border-line bg-surface/70" style={{ transform: 'translateY(6px)' }} />
-        <div className="absolute inset-x-0.5 top-0.5 h-full rounded-xl border border-line bg-surface/85" style={{ transform: 'translateY(3px)' }} />
-        <button
-          onClick={onExpandir}
-          className="absolute inset-0 overflow-hidden rounded-xl border-l-4 px-2.5 py-1.5 text-left shadow-sm transition-transform hover:scale-[1.01]"
-          style={{ borderColor: frente.cor, backgroundColor: `color-mix(in srgb, ${frente.cor} 12%, var(--vida-surface))` }}
-          title={`${grupo.itens.length} eventos sobrepostos`}
-        >
-          <div className="flex items-start gap-1.5">
-            <span className="shrink-0 text-[13px] leading-none" aria-hidden>{frente.icone}</span>
-            <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold leading-tight">{frente.titulo}</span>
-          </div>
-          <div className="mt-0.5 pl-[18px] text-[11px] text-muted">
-            {paraHHMM(frente.inicioMin)} · +{grupo.itens.length - 1} sobreposto{grupo.itens.length - 1 > 1 ? 's' : ''}
-          </div>
-        </button>
-      </div>
-    )
-  }
-
-  // Expandido: divide a largura em subcolunas lado a lado.
-  const n = grupo.itens.length
+  // Mais longos primeiro (ao fundo); empate desempata pelo horário de início.
+  const ordenados = [...grupo.itens].sort((a, b) => {
+    const dur = (b.fimMin - b.inicioMin) - (a.fimMin - a.inicioMin)
+    return dur !== 0 ? dur : a.inicioMin - b.inicioMin
+  })
+  const PASSO = 10 // recuo por camada
   return (
     <>
-      {grupo.itens.map((it, idx) => {
-        const t = ((it.inicioMin - ini) / 60) * hpx
-        const h = Math.max(3, ((it.fimMin - it.inicioMin) / 60) * hpx - 1)
-        const larg = 100 / n
-        return (
-          <button
-            key={it.id}
-            onClick={() => onAbrirItem(it)}
-            title={it.titulo}
-            className="absolute overflow-hidden rounded-lg border-l-4 px-1.5 py-1 text-left shadow-sm"
-            style={{
-              top: t,
-              height: h,
-              left: `calc(${idx * larg}% + 3px)`,
-              width: `calc(${larg}% - 5px)`,
-              borderColor: it.cor,
-              backgroundColor: `color-mix(in srgb, ${it.cor} 14%, var(--vida-surface))`,
-            }}
-          >
-            <div className="truncate text-[11px] font-semibold leading-tight">{it.titulo}</div>
-            <div className="truncate text-[9.5px] text-muted">{paraHHMM(it.inicioMin)}</div>
-          </button>
-        )
-      })}
+      {ordenados.map((it, idx) => (
+        <EventoCard
+          key={it.id}
+          it={it}
+          ini={ini}
+          hpx={hpx}
+          onAbrir={() => onAbrirItem(it)}
+          left={4 + idx * PASSO}
+          right={4}
+          zIndex={10 + idx}
+        />
+      ))}
     </>
   )
 }
@@ -207,8 +180,6 @@ function Coluna({
   hpx,
   agoraMin,
   ehHoje,
-  expandidoId,
-  setExpandidoId,
   onAbrirEvento,
   onAbrirTarefa,
   onCriar,
@@ -220,8 +191,6 @@ function Coluna({
   hpx: number
   agoraMin: number
   ehHoje: boolean
-  expandidoId: string | null
-  setExpandidoId: (id: string | null) => void
   onAbrirEvento: (e: Evento) => void
   onAbrirTarefa: (t: Task) => void
   onCriar: (data: string, iniMin: number, fimMin: number) => void
@@ -290,9 +259,9 @@ function Coluna({
   }
 
   return (
-    <section className="lume-entrada flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-line bg-surface/40">
-      {/* Cabeçalho do dia */}
-      <header className={`sticky top-0 z-30 flex items-center gap-2 border-b border-line px-3 py-2.5 backdrop-blur ${ehHoje ? 'bg-accent/10' : 'bg-surface/80'}`}>
+    <section className="lume-entrada flex min-w-0 flex-1 flex-col rounded-2xl border border-line bg-surface/40">
+      {/* Cabeçalho do dia — congelado ao rolar (sticky) */}
+      <header className={`sticky top-0 z-30 flex items-center gap-2 rounded-t-2xl border-b px-3 py-2.5 backdrop-blur-md ${ehHoje ? 'border-accent/40 bg-accent/15' : 'border-line bg-surface/90'}`}>
         <span className={`text-[22px] font-bold leading-none ${ehHoje ? 'text-accent' : ''}`}>{format(dt, 'd')}</span>
         <div className="flex min-w-0 flex-col leading-none">
           <span className="truncate text-[12px] font-semibold capitalize">{nomeDiaCurto(plano.dia)}</span>
@@ -374,15 +343,7 @@ function Coluna({
 
         {/* Eventos / tarefas */}
         {plano.grupos.map((g) => (
-          <GrupoBloco
-            key={g.id}
-            grupo={g}
-            ini={ini}
-            hpx={hpx}
-            expandido={expandidoId === g.id}
-            onExpandir={() => setExpandidoId(expandidoId === g.id ? null : g.id)}
-            onAbrirItem={abrirItem}
-          />
+          <GrupoBloco key={g.id} grupo={g} ini={ini} hpx={hpx} onAbrirItem={abrirItem} />
         ))}
 
         {/* Prévia do novo evento — confirma ao tocar, arrasta para ajustar */}
@@ -633,7 +594,6 @@ export function PlannerTresDias({
   const agora = useAgora()
   const agoraMin = minutosDoDia(agora)
   const contextos = useContextos()
-  const [expandidoId, setExpandidoId] = useState<string | null>(null)
   const [painelMin, setPainelMin] = useState(false)
   const [horaPx, setHoraPx] = useState<number>(() => {
     const salvo = typeof localStorage !== 'undefined' ? Number(localStorage.getItem(CHAVE_ZOOM)) : NaN
@@ -689,8 +649,6 @@ export function PlannerTresDias({
                     hpx={horaPx}
                     agoraMin={agoraMin}
                     ehHoje={p.dia === hoje}
-                    expandidoId={expandidoId}
-                    setExpandidoId={setExpandidoId}
                     onAbrirEvento={onAbrirEvento}
                     onAbrirTarefa={onAbrirTarefa}
                     onCriar={onCriar}
