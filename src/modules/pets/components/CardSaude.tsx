@@ -101,7 +101,7 @@ export function CardSaude({ pet, controle }: { pet: Pet; controle: ControleCarta
           {(condicoes ?? []).map((c) => (
             <span key={c.id} className="group flex items-center gap-1 rounded-full bg-hover px-2.5 py-1 text-[12px]">
               {c.tipo === 'alergia' ? '⚠️' : c.tipo === 'cronica' ? '🔁' : '🩹'} {c.nome}
-              <button onClick={() => removerCondicao(c.id)} className="text-muted opacity-0 hover:text-danger group-hover:opacity-100">×</button>
+              <button onClick={() => removerCondicao(c.id)} className="text-muted hover:text-danger">×</button>
             </span>
           ))}
         </div>
@@ -120,7 +120,7 @@ export function CardSaude({ pet, controle }: { pet: Pet; controle: ControleCarta
             <li key={m.id} className="group flex items-center gap-2 py-1.5 text-[13px]">
               <span aria-hidden>💊</span>
               <span className="flex-1">{m.nome}{m.dose ? ` · ${m.dose}` : ''}</span>
-              <button onClick={() => removerMedicamentoPet(m.id)} className="text-[15px] leading-none text-muted opacity-0 hover:text-danger group-hover:opacity-100">×</button>
+              <button onClick={() => removerMedicamentoPet(m.id)} className="text-[15px] leading-none text-muted hover:text-danger">×</button>
             </li>
           ))}
         </ul>
@@ -135,7 +135,7 @@ export function CardSaude({ pet, controle }: { pet: Pet; controle: ControleCarta
               <li key={p.id} className="group flex items-center gap-2 py-1.5 text-[13px]">
                 <span className="w-20 tabular-nums text-muted">{format(parseISO(p.data), 'dd/MM/yy')}</span>
                 <span className="flex-1 font-medium">{p.kg} kg</span>
-                <button onClick={() => removerPeso(p.id)} className="text-[15px] leading-none text-muted opacity-0 hover:text-danger group-hover:opacity-100">×</button>
+                <button onClick={() => removerPeso(p.id)} className="text-[15px] leading-none text-muted hover:text-danger">×</button>
               </li>
             ))}
           </ul>

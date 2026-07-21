@@ -78,7 +78,7 @@ export function CardGastos({ pet, controle }: { pet: Pet; controle: ControleCart
                 <span className="w-16 tabular-nums text-muted">{format(parseISO(g.data), 'dd/MM')}</span>
                 <span className="flex-1 truncate">{g.descricao}</span>
                 <span className="font-medium tabular-nums">{formatarBRL(g.valorCentavos)}</span>
-                <button onClick={() => excluirMovimento(g.id)} className="text-[14px] leading-none text-muted opacity-0 hover:text-danger group-hover:opacity-100">×</button>
+                <button onClick={() => excluirMovimento(g.id)} className="text-[14px] leading-none text-muted hover:text-danger">×</button>
               </li>
             ))}
           </ul>

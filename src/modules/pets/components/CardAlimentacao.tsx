@@ -119,7 +119,7 @@ export function CardAlimentacao({ pet, controle }: { pet: Pet; controle: Control
                     {it.quantidadeFechados ?? 0} {it.unidade}{dias != null ? ` · ~${dias}d` : ''}
                   </div>
                 </Link>
-                <button onClick={() => excluirDespensa(it.id)} className="text-[14px] leading-none text-muted opacity-0 hover:text-danger group-hover:opacity-100">×</button>
+                <button onClick={() => excluirDespensa(it.id)} className="text-[14px] leading-none text-muted hover:text-danger">×</button>
               </li>
             )
           })}

@@ -5,7 +5,7 @@ import { formatarBRL } from '../../financas/db'
 import { CartaoSecao, Vazio, type ControleSecao } from './CartaoSecao'
 import { MarcarComprado } from './MarcarComprado'
 import { ModoMercado } from './ModoMercado'
-import { adiarItem, atualizarItem, catInfo, criarItemCompra, criarLista, excluirItem, moverItem, transformarEmAquisicao } from '../db'
+import { adiarItem, atualizarItem, catInfo, criarItemCompra, criarLista, excluirItem, excluirLista, moverItem, transformarEmAquisicao } from '../db'
 import { useItensDaLista, useListas } from '../hooks'
 import type { ItemCompra } from '../types'
 
@@ -67,6 +67,15 @@ export function SecaoListas({ controle }: { controle: ControleSecao }) {
         <button onClick={() => setNovaLista(true)} className="flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[12.5px] font-medium text-muted hover:text-ink">
           <IconMais width={13} height={13} /> Lista
         </button>
+        {listaAtiva && (
+          <button
+            onClick={() => { if (confirm(`Excluir a lista “${listaAtiva.nome}” e seus itens?`)) { excluirLista(listaAtiva.id); setAtiva(null) } }}
+            className="rounded-full border border-line px-2.5 py-1 text-[12.5px] font-medium text-muted hover:text-danger"
+            title="Excluir lista"
+          >
+            🗑 Excluir lista
+          </button>
+        )}
       </div>
 
       {/* Itens */}

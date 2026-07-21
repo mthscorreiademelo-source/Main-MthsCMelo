@@ -66,7 +66,7 @@ export function CardDocumentos({ pet, controle }: { pet: Pet; controle: Controle
                   {CATEGORIAS_DOC.find((c) => c.valor === d.categoria)?.nome ?? 'Documento'} · {tamanhoLegivel(d.tamanho)} · {format(d.criadoEm, 'dd/MM/yy')}
                 </div>
               </button>
-              <button onClick={() => removerDocumento(d.id)} className="text-[16px] leading-none text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100" title="Remover">×</button>
+              <button onClick={() => removerDocumento(d.id)} className="text-[16px] leading-none text-muted hover:text-danger" title="Remover">×</button>
             </li>
           ))}
         </ul>

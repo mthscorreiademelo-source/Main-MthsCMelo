@@ -3,12 +3,14 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { IconButton } from '../components/Button'
 import {
   IconDownload,
+  IconLixeira,
   IconLua,
   IconMenu,
   IconSol,
   IconUpload,
 } from '../components/Icons'
 import { exportarBackup, importarBackup } from '../db/db'
+import { limparDadosExemplo } from '../db/exemplos'
 import { MODULOS } from '../modules'
 import { useSessao } from '../nuvem/auth'
 import { ContaSidebar } from '../nuvem/ContaSidebar'
@@ -117,6 +119,12 @@ function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
     avisar('Backup exportado')
   }
 
+  async function limparExemplos() {
+    if (!confirm('Apagar os dados de exemplo (Oli, itens de exemplo da despensa, "Ovos" e "Notebook novo")?\n\nNão apaga nada que você já tenha criado ou editado.')) return
+    const n = await limparDadosExemplo()
+    avisar(n > 0 ? `${n} registro(s) de exemplo apagado(s)` : 'Nenhum dado de exemplo encontrado')
+  }
+
   async function importar(arquivo: File) {
     try {
       const json = JSON.parse(await arquivo.text())
@@ -186,6 +194,13 @@ function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
             e.target.value = ''
           }}
         />
+        <button
+          onClick={limparExemplos}
+          className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm font-medium text-muted transition-colors hover:bg-hover/70 hover:text-danger"
+        >
+          <IconLixeira width={17} height={17} />
+          Apagar dados de exemplo
+        </button>
         {status && <p className="px-3 pt-1 text-xs text-muted">{status}</p>}
       </footer>
     </aside>

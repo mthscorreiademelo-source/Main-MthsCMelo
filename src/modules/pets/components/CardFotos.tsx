@@ -12,7 +12,7 @@ function Thumb({ fotoId, onRemover }: { fotoId: string; onRemover: () => void })
       {url && <img src={url} alt="" className="size-full object-cover" />}
       <button
         onClick={onRemover}
-        className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-black/45 text-[13px] text-white opacity-0 transition-opacity group-hover:opacity-100"
+        className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-black/45 text-[13px] text-white"
         title="Remover"
       >
         ×

@@ -71,7 +71,7 @@ export function CardHistorico({ pet, controle }: { pet: Pet; controle: ControleC
               <div className="min-w-0 flex-1 pb-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-[13.5px] font-medium">{c.titulo}</span>
-                  <button onClick={() => removerConsulta(c.id)} className="text-[16px] leading-none text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100" title="Remover">×</button>
+                  <button onClick={() => removerConsulta(c.id)} className="text-[16px] leading-none text-muted hover:text-danger" title="Remover">×</button>
                 </div>
                 <div className="text-[11.5px] text-muted">
                   {format(parseISO(c.data), "d 'de' MMM 'de' yyyy", { locale: ptBR })}

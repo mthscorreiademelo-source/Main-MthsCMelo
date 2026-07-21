@@ -208,6 +208,11 @@ export async function excluirPet(id: string): Promise<void> {
   const docs = await db.petDocumentos.where('petId').equals(id).toArray()
   const eventos = await db.eventos.filter((e) => e.petId === id).toArray()
   const movimentos = await db.movimentos.filter((m) => m.petId === id).toArray()
+  // Estoque do pet unificado na Despensa (item com petId).
+  const despensaPet = await db.despensa.filter((d) => d.petId === id).toArray()
+  const histDespensa = despensaPet.length
+    ? await db.despensaHistorico.where('despensaId').anyOf(despensaPet.map((d) => d.id)).primaryKeys()
+    : []
   await db.transaction(
     'rw',
     [
@@ -226,6 +231,8 @@ export async function excluirPet(id: string): Promise<void> {
       db.petArquivos,
       db.eventos,
       db.movimentos,
+      db.despensa,
+      db.despensaHistorico,
     ],
     async () => {
       for (const tabela of [
@@ -247,6 +254,8 @@ export async function excluirPet(id: string): Promise<void> {
       await db.petArquivos.bulkDelete([...fotos, ...docs].map((x) => x.id))
       await db.eventos.bulkDelete(eventos.map((e) => e.id))
       await db.movimentos.bulkDelete(movimentos.map((m) => m.id))
+      await db.despensaHistorico.bulkDelete(histDespensa as string[])
+      await db.despensa.bulkDelete(despensaPet.map((d) => d.id))
       await db.pets.delete(id)
     },
   )

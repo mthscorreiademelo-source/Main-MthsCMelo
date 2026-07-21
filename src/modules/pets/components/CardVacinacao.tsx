@@ -87,7 +87,7 @@ export function CardVacinacao({ pet, controle }: { pet: Pet; controle: ControleC
                   {v.proximaDose ? ` · próxima ${format(parseISO(v.proximaDose), "d 'de' MMM", { locale: ptBR })}` : ''}
                 </div>
               </div>
-              <button onClick={() => apagar(v)} className="text-[16px] leading-none text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100" title="Remover">×</button>
+              <button onClick={() => apagar(v)} className="text-[16px] leading-none text-muted hover:text-danger" title="Remover">×</button>
             </li>
           ))}
         </ul>

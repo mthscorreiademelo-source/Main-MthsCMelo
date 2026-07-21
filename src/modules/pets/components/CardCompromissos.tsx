@@ -79,7 +79,7 @@ export function CardCompromissos({ pet, controle }: { pet: Pet; controle: Contro
                   <div className="truncate text-[13.5px] font-medium">{e.titulo}</div>
                   <div className="text-[11.5px] text-muted">{e.diaInteiro ? 'Dia inteiro' : e.inicio}{e.local ? ` · ${e.local}` : ''}</div>
                 </div>
-                <button onClick={() => excluirEvento(e.id)} className="text-[16px] leading-none text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100" title="Remover">×</button>
+                <button onClick={() => excluirEvento(e.id)} className="text-[16px] leading-none text-muted hover:text-danger" title="Remover">×</button>
               </li>
             )
           })}

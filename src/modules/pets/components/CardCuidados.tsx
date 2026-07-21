@@ -67,7 +67,7 @@ export function CardCuidados({ pet, controle }: { pet: Pet; controle: ControleCa
                 {c.horario && <span className="text-[11px] tabular-nums text-muted">{c.horario}</span>}
                 <button
                   onClick={() => removerCuidado(c.id)}
-                  className="text-[16px] leading-none text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                  className="text-[16px] leading-none text-muted hover:text-danger"
                   title="Remover"
                 >
                   ×
