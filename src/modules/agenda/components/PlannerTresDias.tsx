@@ -20,8 +20,8 @@ import {
   type PlanoDia,
 } from '../planner'
 
-const ZOOM_MIN = 28
-const ZOOM_MAX = 170
+const ZOOM_MIN = 20
+const ZOOM_MAX = 300
 const ZOOM_PADRAO = 48
 const CHAVE_ZOOM = 'lume-agenda-zoom'
 
@@ -52,8 +52,9 @@ function EventoCard({
   onAbrir: () => void
 }) {
   const top = ((it.inicioMin - ini) / 60) * hpx
-  // Altura proporcional exata à duração (mínimo pequeno só para o toque).
-  const altura = Math.max(13, ((it.fimMin - it.inicioMin) / 60) * hpx - 1)
+  // Altura proporcional EXATA à duração — sem mínimo. Quem controla a
+  // legibilidade é o zoom (o título aparece quando cabe e some quando não).
+  const altura = Math.max(3, ((it.fimMin - it.inicioMin) / 60) * hpx - 1)
   const tarefa = it.tipo === 'tarefa'
   const pendente = it.tipo === 'evento' && it.presenca !== 'confirmado'
   const recusado = it.presenca === 'recusado'
@@ -173,7 +174,7 @@ function GrupoBloco({
     <>
       {grupo.itens.map((it, idx) => {
         const t = ((it.inicioMin - ini) / 60) * hpx
-        const h = Math.max(13, ((it.fimMin - it.inicioMin) / 60) * hpx - 1)
+        const h = Math.max(3, ((it.fimMin - it.inicioMin) / 60) * hpx - 1)
         const larg = 100 / n
         return (
           <button
@@ -640,9 +641,9 @@ export function PlannerTresDias({
   })
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  function ajustarZoom(delta: number) {
+  function ajustarZoom(fator: number) {
     setHoraPx((z) => {
-      const novo = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z + delta))
+      const novo = Math.round(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z * fator)))
       try { localStorage.setItem(CHAVE_ZOOM, String(novo)) } catch { /* ignore */ }
       return novo
     })
@@ -672,8 +673,8 @@ export function PlannerTresDias({
       {/* Controle de zoom (proporção dos blocos), estilo Google Agenda */}
       <div className="flex items-center justify-end gap-1">
         <span className="mr-1 text-[11px] text-muted">Zoom</span>
-        <button onClick={() => ajustarZoom(-14)} disabled={horaPx <= ZOOM_MIN} aria-label="Diminuir zoom" className="flex size-7 items-center justify-center rounded-full border border-line text-[15px] font-medium text-muted hover:text-ink disabled:opacity-40">−</button>
-        <button onClick={() => ajustarZoom(14)} disabled={horaPx >= ZOOM_MAX} aria-label="Aumentar zoom" className="flex size-7 items-center justify-center rounded-full border border-line text-[15px] font-medium text-muted hover:text-ink disabled:opacity-40">+</button>
+        <button onClick={() => ajustarZoom(1 / 1.3)} disabled={horaPx <= ZOOM_MIN} aria-label="Diminuir zoom" className="flex size-7 items-center justify-center rounded-full border border-line text-[15px] font-medium text-muted hover:text-ink disabled:opacity-40">−</button>
+        <button onClick={() => ajustarZoom(1.3)} disabled={horaPx >= ZOOM_MAX} aria-label="Aumentar zoom" className="flex size-7 items-center justify-center rounded-full border border-line text-[15px] font-medium text-muted hover:text-ink disabled:opacity-40">+</button>
       </div>
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">

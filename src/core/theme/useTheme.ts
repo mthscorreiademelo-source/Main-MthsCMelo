@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { aplicarPapel } from './papel'
 
 type Tema = 'light' | 'dark'
 const CHAVE = 'vida:tema'
@@ -17,6 +18,7 @@ export function useTheme() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', tema === 'dark')
     localStorage.setItem(CHAVE, tema)
+    aplicarPapel(tema)
   }, [tema])
 
   const alternar = useCallback(() => {

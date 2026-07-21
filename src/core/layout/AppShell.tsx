@@ -16,6 +16,7 @@ import { useSessao } from '../nuvem/auth'
 import { ContaSidebar } from '../nuvem/ContaSidebar'
 import { useSincronizacao } from '../nuvem/sync'
 import { useTheme } from '../theme/useTheme'
+import { AparenciaSheet } from '../theme/AparenciaSheet'
 
 const CHAVE_SIDEBAR = 'vida:sidebar'
 
@@ -98,6 +99,7 @@ export function AppShell() {
 function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
   const { tema, alternar } = useTheme()
   const [status, setStatus] = useState('')
+  const [aparencia, setAparencia] = useState(false)
   const inputArquivo = useRef<HTMLInputElement>(null)
 
   function avisar(msg: string) {
@@ -141,7 +143,7 @@ function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
         <span className="text-lg font-bold tracking-tight">Lume</span>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-0.5 px-2" aria-label="Módulos">
+      <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2" aria-label="Módulos">
         {MODULOS.map((m) => (
           <NavLink
             key={m.id}
@@ -169,6 +171,14 @@ function Sidebar({ aoNavegar }: { aoNavegar?: () => void }) {
           {tema === 'dark' ? <IconSol width={17} height={17} /> : <IconLua width={17} height={17} />}
           {tema === 'dark' ? 'Modo claro' : 'Modo escuro'}
         </button>
+        <button
+          onClick={() => setAparencia(true)}
+          className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm font-medium text-muted transition-colors hover:bg-hover/70"
+        >
+          <span className="text-[16px] leading-none">🎨</span>
+          Aparência
+        </button>
+        {aparencia && <AparenciaSheet tema={tema} alternar={alternar} onFechar={() => setAparencia(false)} />}
         <button
           onClick={exportar}
           className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm font-medium text-muted transition-colors hover:bg-hover/70"
