@@ -20,7 +20,10 @@ import {
   type PlanoDia,
 } from '../planner'
 
-const HORA_PX = 46
+const ZOOM_MIN = 28
+const ZOOM_MAX = 170
+const ZOOM_PADRAO = 48
+const CHAVE_ZOOM = 'lume-agenda-zoom'
 
 function nomeDiaCurto(iso: string): string {
   const d = parseISO(iso)
@@ -40,27 +43,29 @@ function durLegivel(min: number): string {
 function EventoCard({
   it,
   ini,
+  hpx,
   onAbrir,
-  compacto,
 }: {
   it: ItemPlano
   ini: number
+  hpx: number
   onAbrir: () => void
-  compacto?: boolean
 }) {
-  const top = ((it.inicioMin - ini) / 60) * HORA_PX
-  const altura = Math.max(compacto ? 30 : 40, ((it.fimMin - it.inicioMin) / 60) * HORA_PX - 3)
+  const top = ((it.inicioMin - ini) / 60) * hpx
+  // Altura proporcional exata à duração (mínimo pequeno só para o toque).
+  const altura = Math.max(13, ((it.fimMin - it.inicioMin) / 60) * hpx - 1)
   const tarefa = it.tipo === 'tarefa'
   const pendente = it.tipo === 'evento' && it.presenca !== 'confirmado'
   const recusado = it.presenca === 'recusado'
-  const baixo = altura < 52
+  const baixo = altura < 42
+  const minusculo = altura < 26
   return (
     <button
       onClick={onAbrir}
-      title={it.titulo}
-      className={`group/ev absolute overflow-hidden rounded-xl px-2.5 py-1.5 text-left shadow-sm transition-all hover:z-20 hover:shadow-md ${
-        it.concluida ? 'opacity-60' : ''
-      } ${tarefa ? 'border border-dashed' : 'border-l-4'}`}
+      title={`${it.titulo} · ${paraHHMM(it.inicioMin)}–${paraHHMM(it.fimMin)}`}
+      className={`group/ev absolute overflow-hidden rounded-lg text-left shadow-sm transition-all hover:z-20 hover:shadow-md ${
+        minusculo ? 'px-1.5 py-0' : 'rounded-xl px-2.5 py-1.5'
+      } ${it.concluida ? 'opacity-60' : ''} ${tarefa ? 'border border-dashed' : 'border-l-4'}`}
       style={{
         top,
         height: altura,
@@ -71,12 +76,12 @@ function EventoCard({
         touchAction: 'manipulation',
       }}
     >
-      <div className="flex items-start gap-1.5">
-        <span className="shrink-0 text-[13px] leading-none" aria-hidden style={tarefa ? { color: it.cor } : undefined}>
+      <div className={`flex items-center gap-1.5 ${minusculo ? '' : 'items-start'}`}>
+        <span className={`shrink-0 leading-none ${minusculo ? 'text-[10px]' : 'text-[13px]'}`} aria-hidden style={tarefa ? { color: it.cor } : undefined}>
           {it.icone}
         </span>
         <span
-          className={`min-w-0 flex-1 truncate text-[12.5px] font-semibold leading-tight ${
+          className={`min-w-0 flex-1 truncate font-semibold leading-tight ${minusculo ? 'text-[10.5px]' : 'text-[12.5px]'} ${
             recusado || it.concluida ? 'line-through opacity-70' : ''
           }`}
         >
@@ -117,23 +122,25 @@ function EventoCard({
 function GrupoBloco({
   grupo,
   ini,
+  hpx,
   expandido,
   onExpandir,
   onAbrirItem,
 }: {
   grupo: GrupoSobreposto
   ini: number
+  hpx: number
   expandido: boolean
   onExpandir: () => void
   onAbrirItem: (it: ItemPlano) => void
 }) {
   if (grupo.itens.length === 1) {
     const it = grupo.itens[0]
-    return <EventoCard it={it} ini={ini} onAbrir={() => onAbrirItem(it)} />
+    return <EventoCard it={it} ini={ini} hpx={hpx} onAbrir={() => onAbrirItem(it)} />
   }
 
-  const top = ((grupo.inicioMin - ini) / 60) * HORA_PX
-  const altura = Math.max(46, ((grupo.fimMin - grupo.inicioMin) / 60) * HORA_PX - 3)
+  const top = ((grupo.inicioMin - ini) / 60) * hpx
+  const altura = Math.max(30, ((grupo.fimMin - grupo.inicioMin) / 60) * hpx - 1)
 
   if (!expandido) {
     const frente = grupo.itens[0]
@@ -165,8 +172,8 @@ function GrupoBloco({
   return (
     <>
       {grupo.itens.map((it, idx) => {
-        const t = ((it.inicioMin - ini) / 60) * HORA_PX
-        const h = Math.max(30, ((it.fimMin - it.inicioMin) / 60) * HORA_PX - 3)
+        const t = ((it.inicioMin - ini) / 60) * hpx
+        const h = Math.max(13, ((it.fimMin - it.inicioMin) / 60) * hpx - 1)
         const larg = 100 / n
         return (
           <button
@@ -196,6 +203,7 @@ function Coluna({
   plano,
   ini,
   fim,
+  hpx,
   agoraMin,
   ehHoje,
   expandidoId,
@@ -208,6 +216,7 @@ function Coluna({
   plano: PlanoDia
   ini: number
   fim: number
+  hpx: number
   agoraMin: number
   ehHoje: boolean
   expandidoId: string | null
@@ -218,9 +227,9 @@ function Coluna({
   onAbrirContextos: () => void
 }) {
   const dt = parseISO(plano.dia)
-  const altura = ((fim - ini) / 60) * HORA_PX
+  const altura = ((fim - ini) / 60) * hpx
   const horas: number[] = []
-  for (let h = Math.ceil(ini / 60); h <= fim / 60; h += 2) horas.push(h)
+  for (let h = Math.ceil(ini / 60); h <= fim / 60; h += 1) horas.push(h)
 
   // Prévia do bloco de tempo: 1º toque cria a prévia (sem gravar nada);
   // arrastar ajusta o horário; tocar na prévia confirma e abre "novo evento".
@@ -234,7 +243,7 @@ function Coluna({
 
   function minutoEm(clientY: number, el: HTMLElement): number {
     const r = el.getBoundingClientRect()
-    const min = ini + ((clientY - r.top) / HORA_PX) * 60
+    const min = ini + ((clientY - r.top) / hpx) * 60
     return Math.min(fim, Math.max(ini, Math.round(min / 15) * 15))
   }
 
@@ -254,7 +263,7 @@ function Coluna({
   function moverArrasto(e: React.PointerEvent) {
     const a = arrasto.current
     if (!a || !previa) return
-    const delta = Math.round(((e.clientY - a.y0) / HORA_PX) * 60 / 15) * 15
+    const delta = Math.round(((e.clientY - a.y0) / hpx) * 60 / 15) * 15
     if (Math.abs(e.clientY - a.y0) > 3) a.moveu = true
     if (a.tipo === 'mover') {
       const dur = a.fim0 - a.ini0
@@ -317,7 +326,7 @@ function Coluna({
             <div
               key={c.id}
               className="pointer-events-none absolute inset-x-0"
-              style={{ top: ((a - ini) / 60) * HORA_PX, height: ((b - a) / 60) * HORA_PX, backgroundColor: `color-mix(in srgb, ${c.cor} ${Math.round(c.opacidade * 100)}%, transparent)` }}
+              style={{ top: ((a - ini) / 60) * hpx, height: ((b - a) / 60) * hpx, backgroundColor: `color-mix(in srgb, ${c.cor} ${Math.round(c.opacidade * 100)}%, transparent)` }}
             >
               <button
                 onClick={(e) => { e.stopPropagation(); onAbrirContextos() }}
@@ -330,10 +339,10 @@ function Coluna({
           )
         })}
 
-        {/* Linhas-guia de hora */}
+        {/* Linhas-guia de hora (de 1h em 1h) */}
         {horas.map((h) => (
-          <div key={h} className="pointer-events-none absolute inset-x-0 border-t border-line/50" style={{ top: ((h * 60 - ini) / 60) * HORA_PX }}>
-            <span className="absolute left-1 top-0.5 text-[9px] text-muted/60">{String(h).padStart(2, '0')}h</span>
+          <div key={h} className="pointer-events-none absolute inset-x-0 border-t border-line/50" style={{ top: ((h * 60 - ini) / 60) * hpx }}>
+            {(hpx >= 34 || h % 2 === 0) && <span className="absolute left-1 -top-[1px] bg-surface/40 px-0.5 text-[9px] text-muted/60">{String(h).padStart(2, '0')}h</span>}
           </div>
         ))}
 
@@ -344,7 +353,7 @@ function Coluna({
             onClick={(e) => { e.stopPropagation(); onAbrirTarefa(d.ref) }}
             title={`Prazo ${paraHHMM(d.horarioMin)} · ${d.titulo}`}
             className="absolute inset-x-0 z-[15] flex items-center gap-1 px-1"
-            style={{ top: ((d.horarioMin - ini) / 60) * HORA_PX - 6 }}
+            style={{ top: ((d.horarioMin - ini) / 60) * hpx - 6 }}
           >
             <span className="shrink-0 rounded px-1 text-[8.5px] font-bold text-white" style={{ backgroundColor: d.cor }}>
               ⚑ {paraHHMM(d.horarioMin)}
@@ -355,7 +364,7 @@ function Coluna({
 
         {/* Linha do agora */}
         {ehHoje && agoraMin >= ini && agoraMin <= fim && (
-          <div className="pointer-events-none absolute inset-x-0 z-20" style={{ top: ((agoraMin - ini) / 60) * HORA_PX }}>
+          <div className="pointer-events-none absolute inset-x-0 z-20" style={{ top: ((agoraMin - ini) / 60) * hpx }}>
             <div className="relative border-t-2 border-red-500">
               <span className="absolute -left-0.5 -top-[5px] size-2.5 rounded-full bg-red-500" />
             </div>
@@ -368,6 +377,7 @@ function Coluna({
             key={g.id}
             grupo={g}
             ini={ini}
+            hpx={hpx}
             expandido={expandidoId === g.id}
             onExpandir={() => setExpandidoId(expandidoId === g.id ? null : g.id)}
             onAbrirItem={abrirItem}
@@ -379,8 +389,8 @@ function Coluna({
           <div
             className="lume-pop absolute z-[25] rounded-xl border-2 border-dashed border-accent bg-accent/10 px-2 py-1 text-left"
             style={{
-              top: ((previa.ini - ini) / 60) * HORA_PX,
-              height: Math.max(30, ((previa.fim - previa.ini) / 60) * HORA_PX - 3),
+              top: ((previa.ini - ini) / 60) * hpx,
+              height: Math.max(26, ((previa.fim - previa.ini) / 60) * hpx - 1),
               left: 4,
               right: 4,
               touchAction: 'none',
@@ -624,13 +634,25 @@ export function PlannerTresDias({
   const contextos = useContextos()
   const [expandidoId, setExpandidoId] = useState<string | null>(null)
   const [painelMin, setPainelMin] = useState(false)
+  const [horaPx, setHoraPx] = useState<number>(() => {
+    const salvo = typeof localStorage !== 'undefined' ? Number(localStorage.getItem(CHAVE_ZOOM)) : NaN
+    return salvo >= ZOOM_MIN && salvo <= ZOOM_MAX ? salvo : ZOOM_PADRAO
+  })
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  function ajustarZoom(delta: number) {
+    setHoraPx((z) => {
+      const novo = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z + delta))
+      try { localStorage.setItem(CHAVE_ZOOM, String(novo)) } catch { /* ignore */ }
+      return novo
+    })
+  }
 
   // Dia inteiro é alto: ao abrir, rola até perto do horário atual (com folga).
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    const alvo = (Math.max(0, agoraMin - 90) / 60) * HORA_PX
+    const alvo = (Math.max(0, agoraMin - 90) / 60) * horaPx
     el.scrollTop = Math.min(alvo, el.scrollHeight)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dias[0]])
@@ -647,6 +669,12 @@ export function PlannerTresDias({
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Controle de zoom (proporção dos blocos), estilo Google Agenda */}
+      <div className="flex items-center justify-end gap-1">
+        <span className="mr-1 text-[11px] text-muted">Zoom</span>
+        <button onClick={() => ajustarZoom(-14)} disabled={horaPx <= ZOOM_MIN} aria-label="Diminuir zoom" className="flex size-7 items-center justify-center rounded-full border border-line text-[15px] font-medium text-muted hover:text-ink disabled:opacity-40">−</button>
+        <button onClick={() => ajustarZoom(14)} disabled={horaPx >= ZOOM_MAX} aria-label="Aumentar zoom" className="flex size-7 items-center justify-center rounded-full border border-line text-[15px] font-medium text-muted hover:text-ink disabled:opacity-40">+</button>
+      </div>
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div ref={scrollRef} className="overflow-y-auto overflow-x-hidden pb-1" style={{ maxHeight: 'calc(100vh - 210px)' }}>
@@ -657,6 +685,7 @@ export function PlannerTresDias({
                     plano={p}
                     ini={ini}
                     fim={fim}
+                    hpx={horaPx}
                     agoraMin={agoraMin}
                     ehHoje={p.dia === hoje}
                     expandidoId={expandidoId}
