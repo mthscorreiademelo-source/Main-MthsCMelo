@@ -2,11 +2,22 @@ import { useRef, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { IconLapis } from '../../../core/components/Icons'
+import { RecorteImagem } from '../../../core/components/RecorteImagem'
 import { Avatar } from './Avatar'
 import { EditorPet } from './EditorPet'
 import { atualizarPet, guardarPetArquivo, idadeLegivel, nomeEspecie, pesoAtual, proximaVacina, ultimaConsulta } from '../db'
 import { useBlobUrl, useConsultas, usePesos, useVacinas } from '../hooks'
 import type { Pet } from '../types'
+
+/** Converte um dataURL em Blob sem usar fetch (evita restrições de CSP). */
+function dataUrlParaBlob(dataUrl: string): Blob {
+  const [meta, b64] = dataUrl.split(',')
+  const mime = meta.match(/:(.*?);/)?.[1] ?? 'image/jpeg'
+  const bin = atob(b64)
+  const arr = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+  return new Blob([arr], { type: mime })
+}
 
 function Indicador({ emoji, rotulo, valor }: { emoji: string; rotulo: string; valor: string }) {
   return (
@@ -28,6 +39,7 @@ export function CabecalhoPet({ pet }: { pet: Pet }) {
   const [editando, setEditando] = useState(false)
   const fotoRef = useRef<HTMLInputElement>(null)
   const capaRef = useRef<HTMLInputElement>(null)
+  const [recorte, setRecorte] = useState<{ arquivo: File; campo: 'fotoId' | 'capaId' } | null>(null)
 
   const idade = idadeLegivel(pet.nascimento)
   const peso = pesos ? pesoAtual(pesos) : null
@@ -35,12 +47,18 @@ export function CabecalhoPet({ pet }: { pet: Pet }) {
   const uc = consultas ? ultimaConsulta(consultas) : null
   const sexoRotulo = pet.sexo === 'macho' ? 'Macho ♂' : pet.sexo === 'femea' ? 'Fêmea ♀' : null
 
-  async function subirFoto(e: React.ChangeEvent<HTMLInputElement>, campo: 'fotoId' | 'capaId') {
+  function escolher(e: React.ChangeEvent<HTMLInputElement>, campo: 'fotoId' | 'capaId') {
     const file = e.target.files?.[0]
-    if (!file) return
-    const id = await guardarPetArquivo(file, file.name, file.type)
-    await atualizarPet(pet.id, { [campo]: id })
+    if (file) setRecorte({ arquivo: file, campo })
     e.target.value = ''
+  }
+
+  async function salvarRecorte(dataUrl: string) {
+    if (!recorte) return
+    const blob = dataUrlParaBlob(dataUrl)
+    const id = await guardarPetArquivo(blob, `${recorte.campo}.jpg`, blob.type || 'image/jpeg')
+    await atualizarPet(pet.id, { [recorte.campo]: id })
+    setRecorte(null)
   }
 
   return (
@@ -56,7 +74,7 @@ export function CabecalhoPet({ pet }: { pet: Pet }) {
         >
           Capa
         </button>
-        <input ref={capaRef} type="file" accept="image/*" className="hidden" onChange={(e) => subirFoto(e, 'capaId')} />
+        <input ref={capaRef} type="file" accept="image/*" className="hidden" onChange={(e) => escolher(e, 'capaId')} />
       </div>
 
       <div className="px-4 pb-4">
@@ -67,7 +85,7 @@ export function CabecalhoPet({ pet }: { pet: Pet }) {
               <IconLapis width={11} height={11} />
             </span>
           </button>
-          <input ref={fotoRef} type="file" accept="image/*" className="hidden" onChange={(e) => subirFoto(e, 'fotoId')} />
+          <input ref={fotoRef} type="file" accept="image/*" className="hidden" onChange={(e) => escolher(e, 'fotoId')} />
           <div className="mb-1 flex min-w-0 flex-1 items-center justify-between gap-2">
             <div className="min-w-0">
               <h1 className="truncate text-[20px] font-bold leading-tight">{pet.nome}</h1>
@@ -100,6 +118,16 @@ export function CabecalhoPet({ pet }: { pet: Pet }) {
       </div>
 
       {editando && <EditorPet pet={pet} onFechar={() => setEditando(false)} />}
+      {recorte && (
+        <RecorteImagem
+          arquivo={recorte.arquivo}
+          aspecto={recorte.campo === 'fotoId' ? 1 : 40 / 13}
+          redondo={recorte.campo === 'fotoId'}
+          saidaLargura={recorte.campo === 'fotoId' ? 512 : 1200}
+          onConfirmar={salvarRecorte}
+          onCancelar={() => setRecorte(null)}
+        />
+      )}
     </section>
   )
 }
