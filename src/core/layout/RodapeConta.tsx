@@ -16,6 +16,8 @@ import { sair, useSessao } from '../nuvem/auth'
 import { nuvemAtiva } from '../nuvem/config'
 import { EntrarModal } from '../nuvem/EntrarModal'
 import { useStatusSync } from '../nuvem/sync/estado'
+import { usePerfil } from '../perfil/db'
+import { PerfilSheet } from '../perfil/PerfilSheet'
 import { AparenciaSheet } from '../theme/AparenciaSheet'
 import { useTheme } from '../theme/useTheme'
 
@@ -77,14 +79,24 @@ export function RodapeConta() {
   const { tema, alternar } = useTheme()
   const { pronta, sessao, email } = useSessao()
   const { estado, erro } = useStatusSync()
+  const perfil = usePerfil()
   const [painel, setPainel] = useState<null | 'perfil' | 'config'>(null)
   const [aparencia, setAparencia] = useState(false)
+  const [perfilAberto, setPerfilAberto] = useState(false)
   const [entrando, setEntrando] = useState(false)
   const [status, setStatus] = useState('')
   const inputArquivo = useRef<HTMLInputElement>(null)
 
   const nuvem = nuvemAtiva()
-  const { nome, foto, iniciais } = identidade(sessao, email)
+  const base = identidade(sessao, email)
+  // O perfil pessoal (editável) tem prioridade sobre os metadados da conta.
+  const nome = perfil?.nome || base.nome
+  const foto = perfil?.foto ?? base.foto
+  const iniciais = (perfil?.apelido || perfil?.nome || nome)
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? '')
+    .join('')
 
   function avisar(msg: string) {
     setStatus(msg)
@@ -166,15 +178,18 @@ export function RodapeConta() {
                   {estado === 'erro' && erro && <p className="line-clamp-2 text-[11px] text-muted">{erro}</p>}
                 </div>
               </div>
-              <p className="mt-3 text-[11.5px] leading-snug text-muted">
-                Em breve: contas na nuvem para guardar tudo com segurança e acessar de qualquer aparelho.
-              </p>
+              <button
+                onClick={() => { setPainel(null); setPerfilAberto(true) }}
+                className="mt-3 flex w-full min-h-10 items-center justify-center gap-2 rounded-xl bg-ink text-[13px] font-semibold text-bg"
+              >
+                Editar perfil
+              </button>
               <button
                 onClick={() => {
                   setPainel(null)
                   sair()
                 }}
-                className="mt-3 flex w-full min-h-10 items-center justify-center gap-2 rounded-xl border border-line text-[13px] font-medium text-muted transition-colors hover:text-danger"
+                className="mt-2 flex w-full min-h-10 items-center justify-center gap-2 rounded-xl border border-line text-[13px] font-medium text-muted transition-colors hover:text-danger"
               >
                 <IconSair width={15} height={15} />
                 Sair da conta
@@ -261,6 +276,7 @@ export function RodapeConta() {
 
       {aparencia && <AparenciaSheet tema={tema} alternar={alternar} onFechar={() => setAparencia(false)} />}
       {entrando && <EntrarModal onFechar={() => setEntrando(false)} />}
+      <PerfilSheet aberto={perfilAberto} email={email} onFechar={() => setPerfilAberto(false)} />
     </footer>
   )
 }

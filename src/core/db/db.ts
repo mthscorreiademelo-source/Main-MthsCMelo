@@ -13,6 +13,7 @@ import type {
 } from '../../modules/financas/types'
 import { deveIgnorarHooks } from '../nuvem/sync/bandeira'
 import { NOMES_SYNC } from '../nuvem/sync/colecoes'
+import type { Perfil } from '../perfil/types'
 import type {
   Categoria,
   Fator,
@@ -140,6 +141,7 @@ class VidaDB extends Dexie {
   aquisicaoPrecos!: Table<PrecoAquisicao, string>
   comprasConfig!: Table<ComprasConfig, string>
   lugares!: Table<Lugar, string>
+  perfil!: Table<Perfil, string>
   /** Espelho do último estado sincronizado (chave → atualizadoEm). */
   espelho!: Table<{ chave: string; atualizadoEm: number }, string>
 
@@ -333,6 +335,10 @@ class VidaDB extends Dexie {
       await tx.table('despensa').bulkAdd(migrados)
       await tx.table('petItens').clear()
     })
+    // v25: perfil pessoal do usuário (nome, nascimento, foto, bio).
+    this.version(25).stores({
+      perfil: 'id',
+    })
   }
 }
 
@@ -454,6 +460,7 @@ export async function exportarBackup() {
     aquisicaoPrecos: await db.aquisicaoPrecos.toArray(),
     comprasConfig: await db.comprasConfig.toArray(),
     lugares: await db.lugares.toArray(),
+    perfil: await db.perfil.toArray(),
   }
 }
 
@@ -529,6 +536,7 @@ export async function importarBackup(json: unknown) {
     aquisicaoPrecos?: PrecoAquisicao[]
     comprasConfig?: ComprasConfig[]
     lugares?: Lugar[]
+    perfil?: Perfil[]
   }
   const temTasks = Array.isArray(dados?.tasks)
   const temPaginas = Array.isArray(dados?.paginas)
@@ -620,6 +628,7 @@ export async function importarBackup(json: unknown) {
   if (Array.isArray(dados.aquisicaoPrecos)) await db.aquisicaoPrecos.bulkPut(dados.aquisicaoPrecos)
   if (Array.isArray(dados.comprasConfig)) await db.comprasConfig.bulkPut(dados.comprasConfig)
   if (Array.isArray(dados.lugares)) await db.lugares.bulkPut(dados.lugares)
+  if (Array.isArray(dados.perfil)) await db.perfil.bulkPut(dados.perfil)
   return {
     tasks: dados.tasks?.length ?? 0,
     paginas: dados.paginas?.length ?? 0,
