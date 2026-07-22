@@ -127,6 +127,24 @@ function somaEntradas(movs: Movimento[]): number {
   return movs.reduce((s, m) => (m.tipo === 'entrada' ? s + m.valorCentavos : s), 0)
 }
 
+/** Dia do mês (1–31) correspondente ao 5º dia útil (seg–sex; sem feriados). */
+export function quintoDiaUtil(ano: number, mes1a12: number): number {
+  const total = diasNoMes(ano, mes1a12)
+  let uteis = 0
+  for (let d = 1; d <= total; d++) {
+    const dow = new Date(ano, mes1a12 - 1, d).getDay() // 0=dom, 6=sáb
+    if (dow !== 0 && dow !== 6) uteis++
+    if (uteis === 5) return d
+  }
+  return total
+}
+
+/** Dia em que o recorrente vence no mês: 5º dia útil OU o dia fixo (limitado ao mês). */
+export function diaEfetivoRecorrente(r: Recorrente, ano: number, mes1a12: number): number {
+  if (r.quintoUtil) return quintoDiaUtil(ano, mes1a12)
+  return Math.min(Math.max(1, r.diaMes), diasNoMes(ano, mes1a12))
+}
+
 /**
  * Coração do módulo: "quanto posso gastar hoje sem comprometer meus objetivos?".
  * Reserva, antes de dividir pelos dias restantes: despesas recorrentes ainda não
@@ -157,9 +175,10 @@ export function orcamentoInteligente(args: {
   const entradasMes = somaEntradas(movMes)
   const gastoHoje = somaSaidas(movMes.filter((m) => m.data === hoje))
 
-  // Recorrentes (despesas) ainda não debitadas: dia do débito >= hoje.
+  // Recorrentes (despesas) ainda não debitadas: não confirmadas neste mês e com
+  // vencimento a partir de hoje (usa o dia efetivo — 5º dia útil, se marcado).
   const recorrentesReservados = recorrentes
-    .filter((r) => r.ativo !== false && r.tipo === 'saida' && r.diaMes >= diaHoje)
+    .filter((r) => r.ativo !== false && r.tipo === 'saida' && r.ultimaConfirmacao !== mes && diaEfetivoRecorrente(r, ano, mesNum) >= diaHoje)
     .reduce((s, r) => s + r.valorCentavos, 0)
 
   // Custos de eventos futuros dentro do mês (a partir de hoje).
@@ -213,7 +232,15 @@ export function orcamentoInteligente(args: {
 export interface DistribuicaoLinha {
   linha: OrcamentoLinha
   gastoCentavos: number
+  /** Limite valendo no mês (exceção do mês, se houver; senão o padrão). */
+  limiteEfetivo: number
   pct: number
+}
+
+/** Limite de uma linha valendo no mês: exceção do mês, ou o padrão. */
+export function limiteEfetivoLinha(linha: OrcamentoLinha, mes: string): number {
+  const esp = linha.limitesEspecificos?.[mes]
+  return esp != null ? esp : linha.limiteCentavos
 }
 
 /** Gasto de cada linha do orçamento no mês (pela categoria dos movimentos). */
@@ -226,8 +253,9 @@ export function distribuicao(linhas: OrcamentoLinha[], movimentos: Movimento[], 
       const gastoCentavos = movMes
         .filter((m) => (m.categoria ? set.has(m.categoria) : linha.categorias.length === 0))
         .reduce((s, m) => s + m.valorCentavos, 0)
-      const pct = linha.limiteCentavos > 0 ? gastoCentavos / linha.limiteCentavos : 0
-      return { linha, gastoCentavos, pct }
+      const limiteEfetivo = limiteEfetivoLinha(linha, mes)
+      const pct = limiteEfetivo > 0 ? gastoCentavos / limiteEfetivo : 0
+      return { linha, gastoCentavos, limiteEfetivo, pct }
     })
 }
 

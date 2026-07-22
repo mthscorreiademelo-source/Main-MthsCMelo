@@ -189,6 +189,16 @@ export function AjustesFinancas({ onFechar }: { onFechar: () => void }) {
                     </select>
                   </label>
                 </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <label className="flex items-center gap-2 text-[12px] text-muted">
+                    <input type="checkbox" defaultChecked={r.quintoUtil ?? false} onChange={(e) => atualizarRecorrente(r.id, { quintoUtil: e.target.checked })} />
+                    Vence no 5º dia útil (ex.: salário)
+                  </label>
+                  <label className="flex items-center gap-2 text-[12px] text-muted">
+                    <input type="checkbox" defaultChecked={r.tipo === 'entrada'} onChange={(e) => atualizarRecorrente(r.id, { tipo: e.target.checked ? 'entrada' : 'saida' })} />
+                    É uma receita (entrada)
+                  </label>
+                </div>
               </div>
             ))}
             <button onClick={() => criarRecorrente({ nome: 'Nova recorrente', icone: '🔁' })} className="flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-line py-2.5 text-[13px] font-medium text-muted hover:text-ink">

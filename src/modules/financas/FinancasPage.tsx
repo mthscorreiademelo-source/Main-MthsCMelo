@@ -13,7 +13,7 @@ import { AjustesFinancas } from './components/AjustesFinancas'
 import { CardObjetivo } from './components/CardObjetivo'
 import { GraficoBarras, GraficoEvolucao, Sparkline } from './components/Graficos'
 import { MovimentoEditorSheet } from './components/MovimentoEditorSheet'
-import { agruparPorDia, filtrarMes, formatarBRL, registrarSnapshot, semearFinancasSePreciso } from './db'
+import { agruparPorDia, atualizarOrcamentoLinha, confirmarRecorrente, definirLimiteMes, filtrarMes, formatarBRL, limparLimiteMes, parsearValor, registrarSnapshot, semearFinancasSePreciso } from './db'
 import {
   useContas,
   useFinancasConfig,
@@ -24,8 +24,10 @@ import {
   useSnapshots,
 } from './hooks'
 import {
+  diaEfetivoRecorrente,
   distribuicao,
   gerarInsights,
+  mediaLinha,
   mesDe,
   orcamentoInteligente,
   patrimonioLiquido,
@@ -86,9 +88,13 @@ export function FinancasPage() {
   const [busca, setBusca] = useState('')
   const [filtroTipo, setFiltroTipo] = useState<'todos' | 'entrada' | 'saida'>('todos')
   const [catFiltro, setCatFiltro] = useState<{ rotulo: string; cats: string[] } | null>(null)
+  const [limitesSoMes, setLimitesSoMes] = useState(false)
 
   const hoje = hojeISO()
   const mesHoje = mesDe(hoje)
+  const anoHoje = Number(hoje.slice(0, 4))
+  const mesNumHoje = Number(hoje.slice(5, 7))
+  const diaHojeNum = Number(hoje.slice(8, 10))
 
   // Semeia o exemplo na primeira visita (desligado por padrão).
   useEffect(() => {
@@ -588,22 +594,42 @@ export function FinancasPage() {
             <button onClick={() => setSheet('ajustes')} className="text-[12px] font-medium text-muted hover:text-ink">Gerenciar</button>
           </div>
           {recorrentesOrd.length === 0 ? (
-            <p className="text-[13px] text-muted">Cadastre gastos e receitas recorrentes (aluguel, assinaturas, salário) nos ajustes para vê-los aqui e no seu orçamento.</p>
+            <p className="text-[13px] text-muted">Cadastre gastos e receitas recorrentes (aluguel, assinaturas, salário) nos ajustes. Aqui você confirma cada um quando ele cai, virando um lançamento de verdade.</p>
           ) : (
             <>
               <ul className="flex flex-col divide-y divide-line">
-                {recorrentesOrd.map((r) => (
-                  <li key={r.id} className="flex items-center gap-3 py-2.5">
-                    <span className="flex size-9 items-center justify-center rounded-full bg-hover text-[15px]">{r.icone ?? (r.tipo === 'entrada' ? '💰' : '🔁')}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[14px] font-medium">{r.nome}</span>
-                      <span className="block text-[11px] text-muted">{r.categoria ?? 'Outros'} · todo dia {r.diaMes}</span>
-                    </span>
-                    <span className={`shrink-0 text-[14px] font-semibold tabular-nums ${r.tipo === 'entrada' ? 'text-accent' : ''}`}>
-                      {r.tipo === 'entrada' ? '+ ' : '− '}{formatarBRL(r.valorCentavos)}
-                    </span>
-                  </li>
-                ))}
+                {recorrentesOrd.map((r) => {
+                  const dia = diaEfetivoRecorrente(r, anoHoje, mesNumHoje)
+                  const confirmado = r.ultimaConfirmacao === mesHoje
+                  const diasAte = dia - diaHojeNum
+                  const contaPadrao = contasOrdenadas.find((c) => c.tipo === 'corrente' || c.tipo === 'carteira' || c.tipo === 'poupanca')?.id
+                  return (
+                    <li key={r.id} className="flex items-center gap-3 py-2.5">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-hover text-[15px]">{r.icone ?? (r.tipo === 'entrada' ? '💰' : '🔁')}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[14px] font-medium">{r.nome}</span>
+                        <span className="block text-[11px] text-muted">
+                          {r.categoria ?? 'Outros'} · {r.quintoUtil ? `5º dia útil (dia ${dia})` : `todo dia ${dia}`}
+                        </span>
+                      </span>
+                      <div className="flex shrink-0 flex-col items-end gap-0.5">
+                        <span className={`text-[14px] font-semibold tabular-nums ${r.tipo === 'entrada' ? 'text-accent' : ''}`}>
+                          {r.tipo === 'entrada' ? '+ ' : '− '}{formatarBRL(r.valorCentavos)}
+                        </span>
+                        {confirmado ? (
+                          <span className="text-[10.5px] font-medium text-accent">✓ {r.tipo === 'entrada' ? 'recebido' : 'pago'} este mês</span>
+                        ) : (
+                          <button
+                            onClick={() => confirmarRecorrente(r, mesHoje, contaPadrao)}
+                            className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-colors ${diasAte <= 0 ? 'bg-ink text-surface' : 'bg-hover text-muted hover:text-ink'}`}
+                          >
+                            {diasAte < 0 ? 'Confirmar (atrasado)' : diasAte === 0 ? 'Confirmar (hoje)' : `Confirmar · em ${diasAte}d`}
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  )
+                })}
               </ul>
               <div className="mt-3 flex items-center justify-between border-t border-line pt-3 text-[13px]">
                 <span className="font-semibold">Custo recorrente / mês</span>
@@ -611,6 +637,7 @@ export function FinancasPage() {
                   − {formatarBRL(recorrentesOrd.filter((r) => r.tipo === 'saida').reduce((s, r) => s + r.valorCentavos, 0))}
                 </span>
               </div>
+              <p className="mt-2 text-[11px] text-muted">Confirmar cria o lançamento no Extrato{contasOrdenadas.length > 0 ? ' e ajusta a conta' : ''}. O valor deixa de ser “reservado” no disponível.</p>
             </>
           )}
         </div>
@@ -620,7 +647,7 @@ export function FinancasPage() {
       {aba === 'orcamento' && (
         <>
           {(() => {
-            const estouradas = dist.filter((d) => d.linha.limiteCentavos > 0 && d.pct > 1)
+            const estouradas = dist.filter((d) => d.limiteEfetivo > 0 && d.pct > 1)
             if (estouradas.length === 0) return null
             return (
               <div className="rounded-2xl border border-danger/30 bg-danger/[0.06] p-4">
@@ -631,12 +658,12 @@ export function FinancasPage() {
                   </span>
                 </div>
                 <ul className="mt-2 flex flex-col gap-1.5">
-                  {estouradas.map(({ linha, gastoCentavos }) => (
+                  {estouradas.map(({ linha, gastoCentavos, limiteEfetivo }) => (
                     <li key={linha.id} className="flex items-center gap-2 text-[12.5px]">
                       <span>{linha.icone}</span>
                       <span className="flex-1 truncate font-medium">{linha.nome}</span>
-                      <span className="tabular-nums text-danger">{formatarBRL(gastoCentavos)} / {formatarBRL(linha.limiteCentavos)}</span>
-                      <span className="tabular-nums font-semibold text-danger">+{formatarBRL(gastoCentavos - linha.limiteCentavos)}</span>
+                      <span className="tabular-nums text-danger">{formatarBRL(gastoCentavos)} / {formatarBRL(limiteEfetivo)}</span>
+                      <span className="tabular-nums font-semibold text-danger">+{formatarBRL(gastoCentavos - limiteEfetivo)}</span>
                     </li>
                   ))}
                 </ul>
@@ -651,7 +678,7 @@ export function FinancasPage() {
             </div>
             <div className="flex flex-col gap-3">
               {dist.length === 0 && <p className="text-[13px] text-muted">Configure suas categorias e limites nos ajustes.</p>}
-              {dist.map(({ linha, gastoCentavos, pct }) => (
+              {dist.map(({ linha, gastoCentavos, limiteEfetivo, pct }) => (
                 <button
                   key={linha.id}
                   onClick={() => drillCategoria(linha.nome, linha.categorias)}
@@ -661,16 +688,63 @@ export function FinancasPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-[13px]">{linha.icone}</span>
                     <span className="flex-1 truncate text-[13px] font-medium">{linha.nome}</span>
+                    {linha.limitesEspecificos?.[mes] != null && <span className="rounded-full bg-hover px-1.5 text-[9px] font-semibold uppercase text-muted">exceção</span>}
                     <span className="text-[12px] font-semibold text-muted">{Math.round(pct * 100)}%</span>
                   </div>
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-hover">
                     <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, pct * 100)}%`, backgroundColor: pct > 1 ? 'var(--vida-danger)' : linha.cor }} />
                   </div>
-                  <div className="mt-0.5 text-[10.5px] text-muted">{formatarBRL(gastoCentavos)} / {formatarBRL(linha.limiteCentavos)}</div>
+                  <div className="mt-0.5 text-[10.5px] text-muted">{formatarBRL(gastoCentavos)} / {formatarBRL(limiteEfetivo)}</div>
                 </button>
               ))}
             </div>
           </div>
+
+          {/* Limites por categoria (editar + usar média + exceção do mês) */}
+          {dist.length > 0 && (
+            <div className={CARTAO}>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <span className={ROTULO}>Limites por categoria</span>
+                <label className="flex items-center gap-1.5 text-[11.5px] text-muted">
+                  <input type="checkbox" checked={limitesSoMes} onChange={(e) => setLimitesSoMes(e.target.checked)} />
+                  editar só neste mês
+                </label>
+              </div>
+              <div className="flex flex-col gap-2.5">
+                {dist.map(({ linha, gastoCentavos, limiteEfetivo }) => {
+                  const media = mediaLinha(linha.categorias, movimentos ?? [], mes)
+                  const temExcecao = linha.limitesEspecificos?.[mes] != null
+                  const salvar = (c: number) => {
+                    if (limitesSoMes) definirLimiteMes(linha.id, mes, c)
+                    else atualizarOrcamentoLinha(linha.id, { limiteCentavos: c })
+                  }
+                  return (
+                    <div key={linha.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="text-[14px]">{linha.icone}</span>
+                      <span className="min-w-20 flex-1 truncate text-[13px] font-medium">{linha.nome}</span>
+                      <span className="text-[11px] tabular-nums text-muted">gasto {formatarBRL(gastoCentavos)}</span>
+                      <InputLimite centavos={limiteEfetivo} onCommit={salvar} />
+                      {media > 0 && (
+                        <button onClick={() => salvar(media)} title={`Média 3m: ${formatarBRL(media)}`} className="rounded-full bg-hover px-2 py-1 text-[11px] font-medium text-muted hover:text-ink">
+                          usar média
+                        </button>
+                      )}
+                      {temExcecao && (
+                        <button onClick={() => limparLimiteMes(linha.id, mes)} title="Voltar ao limite padrão" className="text-[11px] font-medium text-accent hover:underline">
+                          ↺ padrão
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              <p className="mt-2.5 text-[11px] text-muted">
+                {limitesSoMes
+                  ? `As mudanças valem só para ${rotuloMes} (exceção). Desmarque para editar o limite padrão.`
+                  : 'Editar aqui muda o limite padrão (todo mês). Marque “editar só neste mês” para uma exceção pontual.'}
+              </p>
+            </div>
+          )}
 
           {/* Últimas transações (atalho para o extrato) */}
           <div className={CARTAO}>
@@ -707,6 +781,24 @@ export function FinancasPage() {
 }
 
 /* --------------------------------- helpers UI ----------------------------- */
+
+/** Campo de limite em R$ (edita ao sair do foco). */
+function InputLimite({ centavos, onCommit }: { centavos: number; onCommit: (c: number) => void }) {
+  const inicial = centavos > 0 ? formatarBRL(centavos).replace('R$', '').trim() : ''
+  const [txt, setTxt] = useState(inicial)
+  useEffect(() => { setTxt(centavos > 0 ? formatarBRL(centavos).replace('R$', '').trim() : '') }, [centavos])
+  return (
+    <input
+      value={txt}
+      onChange={(e) => setTxt(e.target.value)}
+      onBlur={() => { const v = parsearValor(txt); if (v != null) onCommit(v) }}
+      inputMode="decimal"
+      placeholder="0,00"
+      aria-label="Limite"
+      className="w-24 rounded-lg border border-line bg-surface px-2 py-1 text-right text-[13px] tabular-nums outline-none focus:border-muted/50"
+    />
+  )
+}
 
 function LinhaSaude({ label, valor, neg }: { label: string; valor: string; neg?: boolean }) {
   return (

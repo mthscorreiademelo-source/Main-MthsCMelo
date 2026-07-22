@@ -87,6 +87,10 @@ export interface Recorrente {
   categoria?: string
   /** Dia do mês do débito (1–31). */
   diaMes: number
+  /** Se true, vence no 5º dia útil do mês (ex.: salário) em vez do dia fixo. */
+  quintoUtil?: boolean
+  /** Mês (YYYY-MM) da última confirmação — evita cobrar duas vezes no mês. */
+  ultimaConfirmacao?: string
   ativo?: boolean
   cor?: string
   icone?: string
@@ -104,6 +108,8 @@ export interface OrcamentoLinha {
   cor: string
   icone?: string
   limiteCentavos: number
+  /** Exceções de limite por mês (YYYY-MM → centavos), sobrepõem o padrão. */
+  limitesEspecificos?: Record<string, number>
   /** Categorias de Movimento que contam nesta linha. */
   categorias: string[]
   ordem: number

@@ -2,6 +2,7 @@ import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
 import { SEMEAR_EXEMPLOS } from '../../core/db/exemplos'
 import { hojeISO } from '../../core/dates'
+import { diaEfetivoRecorrente } from './orcamento'
 import type {
   Conta,
   FinancasConfig,
@@ -248,6 +249,27 @@ export async function criarRecorrente(dados: Partial<Recorrente> & { nome: strin
 export const atualizarRecorrente = (id: string, m: Partial<Recorrente>) => db.recorrentes.update(id, m)
 export const excluirRecorrente = (id: string) => db.recorrentes.delete(id)
 
+/**
+ * Confirma o pagamento/recebimento de um recorrente no mês: cria o movimento
+ * real (opcionalmente debitando/creditando uma conta) e carimba a última
+ * confirmação para não cobrar duas vezes. `mes` no formato 'YYYY-MM'.
+ */
+export async function confirmarRecorrente(r: Recorrente, mes: string, contaId?: string): Promise<void> {
+  const ano = Number(mes.slice(0, 4))
+  const mesNum = Number(mes.slice(5, 7))
+  const dia = diaEfetivoRecorrente(r, ano, mesNum)
+  const data = `${mes}-${String(dia).padStart(2, '0')}`
+  await criarMovimento({
+    tipo: r.tipo,
+    valorCentavos: r.valorCentavos,
+    descricao: r.nome,
+    data,
+    categoria: r.categoria,
+    contaId,
+  })
+  await atualizarRecorrente(r.id, { ultimaConfirmacao: mes })
+}
+
 /* --------------------------- Linhas do orçamento -------------------------- */
 
 export async function criarOrcamentoLinha(dados: Partial<OrcamentoLinha> & { nome: string }): Promise<string> {
@@ -266,6 +288,21 @@ export async function criarOrcamentoLinha(dados: Partial<OrcamentoLinha> & { nom
 }
 export const atualizarOrcamentoLinha = (id: string, m: Partial<OrcamentoLinha>) => db.orcamentoLinhas.update(id, m)
 export const excluirOrcamentoLinha = (id: string) => db.orcamentoLinhas.delete(id)
+
+/** Define uma exceção de limite só para um mês (YYYY-MM), sem mexer no padrão. */
+export async function definirLimiteMes(linhaId: string, mes: string, centavos: number): Promise<void> {
+  const l = await db.orcamentoLinhas.get(linhaId)
+  if (!l) return
+  await db.orcamentoLinhas.update(linhaId, { limitesEspecificos: { ...(l.limitesEspecificos ?? {}), [mes]: Math.max(0, Math.round(centavos)) } })
+}
+
+/** Remove a exceção de um mês, voltando o limite ao padrão. */
+export async function limparLimiteMes(linhaId: string, mes: string): Promise<void> {
+  const l = await db.orcamentoLinhas.get(linhaId)
+  if (!l?.limitesEspecificos) return
+  const { [mes]: _remover, ...resto } = l.limitesEspecificos
+  await db.orcamentoLinhas.update(linhaId, { limitesEspecificos: resto })
+}
 
 /* -------------------------------- Config ---------------------------------- */
 
