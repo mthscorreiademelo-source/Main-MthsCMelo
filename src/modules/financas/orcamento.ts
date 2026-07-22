@@ -2,6 +2,7 @@ import type { Evento } from '../agenda/types'
 import type {
   Conta,
   FinancasConfig,
+  MovObjetivo,
   Movimento,
   Objetivo,
   OrcamentoLinha,
@@ -65,6 +66,30 @@ export function serieMensal(
     out.push({ mes: m, entradas: somaEntradas(doMes), saidas: somaSaidas(doMes) })
   }
   return out
+}
+
+/**
+ * Série cumulativa do quanto o objetivo tinha guardado ao longo do tempo,
+ * reconstruída a partir do histórico de movimentações (para o mini-gráfico).
+ * Começa em 0 e cada ponto soma o próximo delta.
+ */
+export function evolucaoObjetivo(historico?: MovObjetivo[]): number[] {
+  if (!historico || historico.length === 0) return []
+  const out = [0]
+  let acc = 0
+  for (const m of historico) {
+    acc = Math.max(0, acc + m.delta)
+    out.push(acc)
+  }
+  return out
+}
+
+/** Quanto foi GUARDADO (aportes) num objetivo dentro de um mês. */
+export function guardadoNoMes(historico: MovObjetivo[] | undefined, mes: string): number {
+  if (!historico) return 0
+  return historico
+    .filter((m) => m.tipo === 'guardar' && m.data.startsWith(mes))
+    .reduce((s, m) => s + m.delta, 0)
 }
 
 /* -------------------------- orçamento inteligente ------------------------- */

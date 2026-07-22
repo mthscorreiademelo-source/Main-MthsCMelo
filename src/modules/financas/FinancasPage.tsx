@@ -10,6 +10,7 @@ import { AnelProgresso } from '../habitos/components/AnelProgresso'
 import { useEventos } from '../agenda/hooks'
 import { AddMovimento } from './components/AddMovimento'
 import { AjustesFinancas } from './components/AjustesFinancas'
+import { CardObjetivo } from './components/CardObjetivo'
 import { GraficoBarras, GraficoEvolucao, Sparkline } from './components/Graficos'
 import { MovimentoEditorSheet } from './components/MovimentoEditorSheet'
 import { agruparPorDia, filtrarMes, formatarBRL, registrarSnapshot, semearFinancasSePreciso } from './db'
@@ -193,7 +194,6 @@ export function FinancasPage() {
     setBusca('')
     setAba('extrato')
   }
-  const objetivosVis = (objetivos ?? []).slice(0, 3)
   const contasOrdenadas = useMemo(
     () => [...(contas ?? [])].sort((a, b) => a.ordem - b.ordem),
     [contas],
@@ -446,36 +446,19 @@ export function FinancasPage() {
             </div>
           </div>
 
-          {/* Objetivos */}
+          {/* Objetivos / caixinhas */}
           <div className={CARTAO}>
             <div className="mb-3 flex items-center justify-between">
-              <span className={ROTULO}>Objetivos financeiros</span>
-              <button onClick={() => setSheet('ajustes')} className="text-[12px] font-medium text-muted hover:text-ink">Ver todos</button>
+              <span className={ROTULO}>Objetivos e caixinhas</span>
+              <button onClick={() => setSheet('ajustes')} className="text-[12px] font-medium text-muted hover:text-ink">Gerenciar</button>
             </div>
-            {objetivosVis.length === 0 ? (
-              <p className="text-[13px] text-muted">Crie objetivos (reserva, metas) nos ajustes para acompanhar aqui.</p>
+            {(objetivos ?? []).length === 0 ? (
+              <p className="text-[13px] text-muted">Crie objetivos (reserva, metas) nos ajustes. Guardar dinheiro aqui não conta como gasto — é uma transferência da conta pra caixinha.</p>
             ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {objetivosVis.map((o) => {
-                  const frac = o.alvoCentavos > 0 ? o.atualCentavos / o.alvoCentavos : 0
-                  return (
-                    <button key={o.id} onClick={() => setMovimentar(o)} className="cursor-pointer rounded-xl border border-line p-3 text-left transition-colors hover:border-muted/40">
-                      <div className="flex items-center gap-2">
-                        <span className="flex size-8 items-center justify-center rounded-full text-[15px]" style={{ backgroundColor: `color-mix(in srgb, ${o.cor ?? '#7c9885'} 16%, transparent)` }}>{o.icone ?? '🎯'}</span>
-                        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{o.nome}</span>
-                        <span className="text-[11px] text-muted">＋</span>
-                      </div>
-                      <div className="mt-2 flex items-baseline gap-1">
-                        <span className="text-[22px] font-bold leading-none">{Math.round(frac * 100)}</span>
-                        <span className="text-[13px] font-semibold text-muted">%</span>
-                      </div>
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-hover">
-                        <div className="h-full rounded-full" style={{ width: `${Math.min(100, frac * 100)}%`, backgroundColor: o.cor ?? '#7c9885' }} />
-                      </div>
-                      <div className="mt-1.5 text-[11px] text-muted">{formatarBRL(o.atualCentavos)} de {formatarBRL(o.alvoCentavos)}</div>
-                    </button>
-                  )
-                })}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {(objetivos ?? []).map((o) => (
+                  <CardObjetivo key={o.id} objetivo={o} mes={mesHoje} onClick={() => setMovimentar(o)} />
+                ))}
               </div>
             )}
           </div>

@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
 import { SEMEAR_EXEMPLOS } from '../../core/db/exemplos'
+import { hojeISO } from '../../core/dates'
 import type {
   Conta,
   FinancasConfig,
@@ -193,7 +194,10 @@ export async function guardarNoObjetivo(objetivoId: string, contaId: string | un
   if (centavos <= 0) return
   await db.transaction('rw', db.objetivos, db.contas, async () => {
     if (contaId) await db.contas.where('id').equals(contaId).modify((c) => { c.saldoCentavos -= centavos })
-    await db.objetivos.where('id').equals(objetivoId).modify((o) => { o.atualCentavos += centavos })
+    await db.objetivos.where('id').equals(objetivoId).modify((o) => {
+      o.atualCentavos += centavos
+      o.historico = [...(o.historico ?? []), { data: hojeISO(), delta: centavos, tipo: 'guardar' }]
+    })
   })
 }
 
@@ -201,17 +205,25 @@ export async function guardarNoObjetivo(objetivoId: string, contaId: string | un
 export async function retirarDoObjetivo(objetivoId: string, contaId: string | undefined, centavos: number) {
   if (centavos <= 0) return
   await db.transaction('rw', db.objetivos, db.contas, async () => {
-    await db.objetivos.where('id').equals(objetivoId).modify((o) => {
-      o.atualCentavos = Math.max(0, o.atualCentavos - centavos)
+    const o = await db.objetivos.get(objetivoId)
+    if (!o) return
+    const real = Math.min(o.atualCentavos, centavos) // não retira mais do que há guardado
+    if (real <= 0) return
+    await db.objetivos.update(objetivoId, {
+      atualCentavos: o.atualCentavos - real,
+      historico: [...(o.historico ?? []), { data: hojeISO(), delta: -real, tipo: 'retirar' }],
     })
-    if (contaId) await db.contas.where('id').equals(contaId).modify((c) => { c.saldoCentavos += centavos })
+    if (contaId) await db.contas.where('id').equals(contaId).modify((c) => { c.saldoCentavos += real })
   })
 }
 
 /** Rendimento: o objetivo cresce sozinho (juros/valorização), sem mexer em conta. */
 export async function renderNoObjetivo(objetivoId: string, centavos: number) {
   if (centavos <= 0) return
-  await db.objetivos.where('id').equals(objetivoId).modify((o) => { o.atualCentavos += centavos })
+  await db.objetivos.where('id').equals(objetivoId).modify((o) => {
+    o.atualCentavos += centavos
+    o.historico = [...(o.historico ?? []), { data: hojeISO(), delta: centavos, tipo: 'rendimento' }]
+  })
 }
 
 /* ------------------------------ Recorrentes ------------------------------- */

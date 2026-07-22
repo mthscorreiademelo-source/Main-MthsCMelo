@@ -49,6 +49,15 @@ export interface PatrimonioSnapshot {
 
 export type TipoObjetivo = 'reserva' | 'meta'
 
+export type TipoMovObjetivo = 'guardar' | 'retirar' | 'rendimento'
+
+/** Uma movimentação no objetivo (para reconstruir a evolução ao longo do tempo). */
+export interface MovObjetivo {
+  data: string // ISO yyyy-MM-dd
+  delta: number // variação no `atual` em centavos (guardar/rendimento +, retirar −)
+  tipo: TipoMovObjetivo
+}
+
 export interface Objetivo {
   id: string
   nome: string
@@ -60,6 +69,8 @@ export interface Objetivo {
   aporteMensalCentavos?: number
   /** 'reserva' = reserva de emergência (o objetivo-âncora); 'meta' = demais. */
   tipo?: TipoObjetivo
+  /** Histórico de guardar/retirar/rendimento (para o mini-gráfico de evolução). */
+  historico?: MovObjetivo[]
   ordem: number
   criadoEm: number
   atualizadoEm?: number
