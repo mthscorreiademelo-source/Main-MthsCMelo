@@ -92,6 +92,74 @@ export function guardadoNoMes(historico: MovObjetivo[] | undefined, mes: string)
     .reduce((s, m) => s + m.delta, 0)
 }
 
+export interface MesCompleto {
+  mes: string
+  receitas: number
+  despesas: number
+  aportes: number
+  /** Valores planejados (recorrentes/eventos/aportes não realizados) — só mês atual em diante. */
+  receitaProg: number
+  despesaProg: number
+  aporteProg: number
+}
+
+/**
+ * Série mensal COMPLETA para o gráfico de análise: receitas, despesas e aportes
+ * REAIS por mês, mais o PROGRAMADO (planejado) do mês atual em diante — recorrentes
+ * ainda não confirmados, custos de eventos futuros e o restante do aporte mensal.
+ */
+export function serieMensalCompleta(args: {
+  movimentos: Movimento[]
+  objetivos: Objetivo[]
+  recorrentes: Recorrente[]
+  eventos: Evento[]
+  mesAtual: string
+  meses?: number
+}): MesCompleto[] {
+  const { movimentos, objetivos, recorrentes, eventos, mesAtual, meses = 6 } = args
+  const out: MesCompleto[] = []
+  for (let i = meses - 1; i >= 0; i--) {
+    const mes = mesDeslocado(mesAtual, -i)
+    const doMes = movimentos.filter((m) => m.data.startsWith(mes))
+    const receitas = somaEntradas(doMes)
+    const despesas = somaSaidas(doMes)
+    const aportes = objetivos.reduce((s, o) => s + guardadoNoMes(o.historico, mes), 0)
+    let receitaProg = 0
+    let despesaProg = 0
+    let aporteProg = 0
+    if (mes >= mesAtual) {
+      for (const r of recorrentes) {
+        if (r.ativo === false || r.ultimaConfirmacao === mes) continue
+        if (r.tipo === 'entrada') receitaProg += r.valorCentavos
+        else despesaProg += r.valorCentavos
+      }
+      despesaProg += eventos
+        .filter((e) => !!e.custoCentavos && e.data.startsWith(mes))
+        .reduce((s, e) => s + (e.custoCentavos ?? 0), 0)
+      aporteProg = objetivos.reduce(
+        (s, o) => s + Math.max(0, (o.aporteMensalCentavos ?? 0) - guardadoNoMes(o.historico, mes)),
+        0,
+      )
+    }
+    out.push({ mes, receitas, despesas, aportes, receitaProg, despesaProg, aporteProg })
+  }
+  return out
+}
+
+/** Gasto por categoria num mês (saídas), ordenado do maior para o menor, com %. */
+export function gastosPorCategoria(movimentos: Movimento[], mes: string): { categoria: string; total: number; pct: number }[] {
+  const saidas = movimentos.filter((m) => m.tipo === 'saida' && m.data.startsWith(mes))
+  const totalGeral = saidas.reduce((s, m) => s + m.valorCentavos, 0)
+  const mapa = new Map<string, number>()
+  for (const m of saidas) {
+    const cat = m.categoria ?? 'Outros'
+    mapa.set(cat, (mapa.get(cat) ?? 0) + m.valorCentavos)
+  }
+  return [...mapa.entries()]
+    .map(([categoria, total]) => ({ categoria, total, pct: totalGeral > 0 ? total / totalGeral : 0 }))
+    .sort((a, b) => b.total - a.total)
+}
+
 /* -------------------------- orçamento inteligente ------------------------- */
 
 export interface OrcamentoInteligente {

@@ -82,6 +82,102 @@ export function GraficoBarras({
   )
 }
 
+/** Cores das três séries da análise (identidade Lume: verde/vermelho/azul). */
+export const CORES_ANALISE = {
+  receitas: '#2f9e6f',
+  despesas: 'var(--vida-danger)',
+  aportes: 'var(--vida-accent)',
+} as const
+
+/**
+ * Colunas mensais de Receitas × Despesas × Aportes, com o REAL (sólido) e o
+ * PROGRAMADO (planejado, tracejado) empilhado por cima. Cada mês tem 3 barras.
+ * Clicar num mês chama `onMes` (drill-down para o extrato daquele mês).
+ */
+export function GraficoBarrasCompleto({
+  serie,
+  formatarCurto,
+  onMes,
+  mesAtivo,
+}: {
+  serie: {
+    mes: string
+    receitas: number
+    despesas: number
+    aportes: number
+    receitaProg: number
+    despesaProg: number
+    aporteProg: number
+  }[]
+  formatarCurto: (c: number) => string
+  onMes?: (mes: string) => void
+  mesAtivo?: string
+}) {
+  const L = 560
+  const A = 168
+  const padY = 16
+  const padL = 46
+  const cols: { cor: string; real: (s: (typeof serie)[number]) => number; prog: (s: (typeof serie)[number]) => number }[] = [
+    { cor: CORES_ANALISE.receitas, real: (s) => s.receitas, prog: (s) => s.receitaProg },
+    { cor: CORES_ANALISE.despesas, real: (s) => s.despesas, prog: (s) => s.despesaProg },
+    { cor: CORES_ANALISE.aportes, real: (s) => s.aportes, prog: (s) => s.aporteProg },
+  ]
+  const max = Math.max(1, ...serie.flatMap((s) => cols.map((c) => c.real(s) + c.prog(s))))
+  const n = Math.max(1, serie.length)
+  const slot = (L - padL - 8) / n
+  const barW = Math.min(14, (slot * 0.72) / cols.length)
+  const gap = 2
+  const grupo = cols.length * barW + (cols.length - 1) * gap
+  const y0 = A - padY
+  const h = (v: number) => (v / max) * (A - padY * 2)
+  const linhasY = [max, max / 2, 0]
+  return (
+    <svg viewBox={`0 0 ${L} ${A + 18}`} className="w-full">
+      <defs>
+        {cols.map((c, ci) => (
+          <pattern key={ci} id={`prog-${ci}`} width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width="5" height="5" fill={c.cor} opacity="0.16" />
+            <line x1="0" y1="0" x2="0" y2="5" stroke={c.cor} strokeWidth="2" opacity="0.7" />
+          </pattern>
+        ))}
+      </defs>
+      {linhasY.map((v, i) => (
+        <g key={i}>
+          <line x1={padL} y1={y0 - h(v)} x2={L - 8} y2={y0 - h(v)} stroke="var(--vida-line)" strokeWidth="1" strokeDasharray="2 4" />
+          <text x={0} y={y0 - h(v) + 3} className="fill-[var(--vida-muted)]" style={{ fontSize: 9 }}>{formatarCurto(v)}</text>
+        </g>
+      ))}
+      {serie.map((s, i) => {
+        const cx = padL + slot * i + slot / 2
+        const x0 = cx - grupo / 2
+        const ativo = mesAtivo === s.mes
+        return (
+          <g key={s.mes} onClick={onMes ? () => onMes(s.mes) : undefined} style={{ cursor: onMes ? 'pointer' : 'default' }}>
+            {onMes && <rect x={padL + slot * i} y={padY - 6} width={slot} height={A - padY} fill={ativo ? 'var(--vida-hover)' : 'transparent'} rx={6} />}
+            {cols.map((c, ci) => {
+              const bx = x0 + ci * (barW + gap)
+              const real = c.real(s)
+              const prog = c.prog(s)
+              const hReal = h(real)
+              const hProg = h(prog)
+              const topReal = y0 - hReal
+              return (
+                <g key={ci}>
+                  {prog > 0 && (
+                    <rect x={bx} y={topReal - hProg} width={barW} height={hProg} rx={3} fill={`url(#prog-${ci})`} stroke={c.cor} strokeWidth="0.75" strokeOpacity="0.55" />
+                  )}
+                  {real > 0 && <rect x={bx} y={topReal} width={barW} height={hReal} rx={3} fill={c.cor} opacity={ativo ? 1 : 0.9} />}
+                </g>
+              )
+            })}
+            <text x={cx} y={A + 12} textAnchor="middle" className="fill-[var(--vida-muted)]" style={{ fontSize: 9, fontWeight: ativo ? 700 : 400 }}>{NOMES_MES[Number(s.mes.slice(5, 7)) - 1]}</text>
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
 /** Gráfico de linha da evolução patrimonial, com área, pontos e rótulos de mês. */
 export function GraficoEvolucao({
   serie,

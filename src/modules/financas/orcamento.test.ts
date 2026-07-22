@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { diaEfetivoRecorrente, evolucaoObjetivo, guardadoNoMes, limiteEfetivoLinha, quintoDiaUtil, serieMensal } from './orcamento'
-import type { MovObjetivo, Movimento, OrcamentoLinha, Recorrente } from './types'
+import {
+  diaEfetivoRecorrente,
+  evolucaoObjetivo,
+  gastosPorCategoria,
+  guardadoNoMes,
+  limiteEfetivoLinha,
+  quintoDiaUtil,
+  serieMensal,
+  serieMensalCompleta,
+} from './orcamento'
+import type { Evento } from '../agenda/types'
+import type { MovObjetivo, Movimento, Objetivo, OrcamentoLinha, Recorrente } from './types'
 
 function mov(data: string, tipo: 'entrada' | 'saida', valorCentavos: number): Movimento {
   return { id: `${data}-${tipo}-${valorCentavos}`, data, tipo, valorCentavos, criadoEm: 0 } as unknown as Movimento
@@ -102,5 +112,89 @@ describe('orçamento: limite efetivo por mês', () => {
 
   it('exceção de 0 (não gastar) é respeitada', () => {
     expect(limiteEfetivoLinha(linha({ limitesEspecificos: { '2026-07': 0 } }), '2026-07')).toBe(0)
+  })
+})
+
+function movC(data: string, tipo: 'entrada' | 'saida', valorCentavos: number, categoria?: string): Movimento {
+  return { id: `${data}-${tipo}-${valorCentavos}-${categoria ?? ''}`, data, tipo, valorCentavos, categoria, criadoEm: 0 } as unknown as Movimento
+}
+
+describe('serieMensalCompleta', () => {
+  const objetivos: Objetivo[] = [
+    {
+      id: 'o1',
+      nome: 'Meta',
+      alvoCentavos: 100000,
+      atualCentavos: 30000,
+      aporteMensalCentavos: 20000,
+      historico: [
+        { data: '2026-06-10', delta: 20000, tipo: 'guardar' },
+        { data: '2026-07-05', delta: 5000, tipo: 'guardar' },
+      ],
+      ordem: 0,
+      criadoEm: 0,
+    } as Objetivo,
+  ]
+  const recorrentes: Recorrente[] = [
+    { id: 'r1', nome: 'Aluguel', tipo: 'saida', valorCentavos: 150000, diaMes: 10, ordem: 0, criadoEm: 0 } as Recorrente,
+    { id: 'r2', nome: 'Salário', tipo: 'entrada', valorCentavos: 500000, diaMes: 5, ordem: 1, criadoEm: 0 } as Recorrente,
+  ]
+  const eventos: Evento[] = [
+    { id: 'e1', titulo: 'Viagem', data: '2026-07-20', custoCentavos: 30000 } as unknown as Evento,
+  ]
+  const movs = [movC('2026-06-05', 'entrada', 500000), movC('2026-06-12', 'saida', 80000), movC('2026-07-03', 'saida', 25000)]
+
+  it('devolve N meses terminando no mês atual, com reais por mês', () => {
+    const s = serieMensalCompleta({ movimentos: movs, objetivos, recorrentes, eventos, mesAtual: '2026-07', meses: 2 })
+    expect(s.map((x) => x.mes)).toEqual(['2026-06', '2026-07'])
+    expect(s[0].receitas).toBe(500000)
+    expect(s[0].despesas).toBe(80000)
+    expect(s[0].aportes).toBe(20000)
+    expect(s[1].receitas).toBe(0)
+    expect(s[1].despesas).toBe(25000)
+    expect(s[1].aportes).toBe(5000)
+  })
+
+  it('só projeta programado do mês atual em diante', () => {
+    const s = serieMensalCompleta({ movimentos: movs, objetivos, recorrentes, eventos, mesAtual: '2026-07', meses: 2 })
+    // junho (passado): sem programado
+    expect(s[0].receitaProg).toBe(0)
+    expect(s[0].despesaProg).toBe(0)
+    expect(s[0].aporteProg).toBe(0)
+    // julho (atual): salário + aluguel + evento; aporte restante = 20000 - 5000 já guardado
+    expect(s[1].receitaProg).toBe(500000)
+    expect(s[1].despesaProg).toBe(150000 + 30000)
+    expect(s[1].aporteProg).toBe(15000)
+  })
+
+  it('ignora recorrente já confirmado no mês', () => {
+    const recConf = recorrentes.map((r) => (r.id === 'r1' ? { ...r, ultimaConfirmacao: '2026-07' } : r))
+    const s = serieMensalCompleta({ movimentos: movs, objetivos, recorrentes: recConf, eventos, mesAtual: '2026-07', meses: 1 })
+    expect(s[0].despesaProg).toBe(30000) // só o evento, aluguel já confirmado
+  })
+})
+
+describe('gastosPorCategoria', () => {
+  const movs = [
+    movC('2026-07-01', 'saida', 6000, 'Alimentação'),
+    movC('2026-07-05', 'saida', 4000, 'Alimentação'),
+    movC('2026-07-10', 'saida', 20000, 'Transporte'),
+    movC('2026-07-12', 'entrada', 99999, 'Salário'), // entrada não conta
+    movC('2026-07-15', 'saida', 10000, undefined), // sem categoria → Outros
+    movC('2026-06-30', 'saida', 7000, 'Lazer'), // outro mês
+  ]
+
+  it('agrupa saídas do mês por categoria, ordenado por total desc, com %', () => {
+    const g = gastosPorCategoria(movs, '2026-07')
+    expect(g.map((x) => x.categoria)).toEqual(['Transporte', 'Alimentação', 'Outros'])
+    expect(g[0]).toMatchObject({ categoria: 'Transporte', total: 20000 })
+    expect(g[1]).toMatchObject({ categoria: 'Alimentação', total: 10000 })
+    // total geral = 40000 → transporte 50%, alimentação 25%, outros 25%
+    expect(Math.round(g[0].pct * 100)).toBe(50)
+    expect(Math.round(g[2].pct * 100)).toBe(25)
+  })
+
+  it('devolve vazio quando não há saídas no mês', () => {
+    expect(gastosPorCategoria(movs, '2026-05')).toEqual([])
   })
 })

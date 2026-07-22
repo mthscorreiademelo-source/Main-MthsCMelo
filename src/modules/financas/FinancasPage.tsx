@@ -11,7 +11,7 @@ import { useEventos } from '../agenda/hooks'
 import { AddMovimento } from './components/AddMovimento'
 import { AjustesFinancas } from './components/AjustesFinancas'
 import { CardObjetivo } from './components/CardObjetivo'
-import { GraficoBarras, GraficoEvolucao, Sparkline } from './components/Graficos'
+import { CORES_ANALISE, GraficoBarras, GraficoBarrasCompleto, GraficoEvolucao, Sparkline } from './components/Graficos'
 import { MovimentoEditorSheet } from './components/MovimentoEditorSheet'
 import { agruparPorDia, atualizarOrcamentoLinha, confirmarRecorrente, definirLimiteMes, filtrarMes, formatarBRL, limparLimiteMes, parsearValor, registrarSnapshot, semearFinancasSePreciso } from './db'
 import {
@@ -26,6 +26,7 @@ import {
 import {
   diaEfetivoRecorrente,
   distribuicao,
+  gastosPorCategoria,
   gerarInsights,
   mediaLinha,
   mesDe,
@@ -34,6 +35,7 @@ import {
   reservaDeEmergencia,
   serieEvolucao,
   serieMensal,
+  serieMensalCompleta,
 } from './orcamento'
 import { MovimentarObjetivo } from './components/MovimentarObjetivo'
 import type { Movimento, Objetivo } from './types'
@@ -58,9 +60,10 @@ const ROTULO = 'text-[11px] font-semibold uppercase tracking-wide text-muted'
 const CARTAO = 'rounded-2xl border border-line bg-surface/50 p-4'
 const COR_ALERTA = '#e0a800' // âmbar (aviso), tom da identidade do Lume
 
-type AbaFinancas = 'visao' | 'extrato' | 'assinaturas' | 'orcamento'
+type AbaFinancas = 'visao' | 'analise' | 'extrato' | 'assinaturas' | 'orcamento'
 const ABAS: { id: AbaFinancas; rotulo: string }[] = [
   { id: 'visao', rotulo: 'Visão geral' },
+  { id: 'analise', rotulo: 'Análise' },
   { id: 'extrato', rotulo: 'Extrato' },
   { id: 'assinaturas', rotulo: 'Assinaturas' },
   { id: 'orcamento', rotulo: 'Orçamento' },
@@ -189,6 +192,30 @@ export function FinancasPage() {
   }, [extratoFiltrado])
   const serieBarras = useMemo(() => serieMensal(movimentos ?? [], mesHoje, 6), [movimentos, mesHoje])
   const temMovimentoBarras = serieBarras.some((s) => s.entradas > 0 || s.saidas > 0)
+
+  // Análise: colunas mensais (real + programado) e gasto por categoria do mês.
+  const serieCompleta = useMemo(
+    () =>
+      serieMensalCompleta({
+        movimentos: movimentos ?? [],
+        objetivos: objetivos ?? [],
+        recorrentes: recorrentes ?? [],
+        eventos: eventos ?? [],
+        mesAtual: mesHoje,
+        meses: 6,
+      }),
+    [movimentos, objetivos, recorrentes, eventos, mesHoje],
+  )
+  const temSerieCompleta = serieCompleta.some(
+    (s) => s.receitas + s.despesas + s.aportes + s.receitaProg + s.despesaProg + s.aporteProg > 0,
+  )
+  const gastosCat = useMemo(() => gastosPorCategoria(movimentos ?? [], mes), [movimentos, mes])
+  const totalGastosCat = useMemo(() => gastosCat.reduce((s, g) => s + g.total, 0), [gastosCat])
+  const balancoMes = useMemo(() => {
+    const rec = movsMes.filter((m) => m.tipo === 'entrada').reduce((s, m) => s + m.valorCentavos, 0)
+    const des = movsMes.filter((m) => m.tipo === 'saida').reduce((s, m) => s + m.valorCentavos, 0)
+    return { rec, des, saldo: rec - des }
+  }, [movsMes])
 
   function drillMes(m: string) {
     setMes(m)
@@ -501,6 +528,90 @@ export function FinancasPage() {
                 </ul>
               )}
             </div>
+          </div>
+        </>
+      )}
+
+      {/* ============================== ANÁLISE ============================= */}
+      {aba === 'analise' && (
+        <>
+          {/* Colunas: receitas × despesas × aportes (real + programado) */}
+          <div className={CARTAO}>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <span className={ROTULO}>Receitas · despesas · aportes</span>
+              <span className="text-[11px] text-muted">Últimos 6 meses</span>
+            </div>
+            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+              <span className="flex items-center gap-1"><span className="size-2 rounded-full" style={{ backgroundColor: CORES_ANALISE.receitas }} />Receitas</span>
+              <span className="flex items-center gap-1"><span className="size-2 rounded-full" style={{ backgroundColor: CORES_ANALISE.despesas }} />Despesas</span>
+              <span className="flex items-center gap-1"><span className="size-2 rounded-full" style={{ backgroundColor: CORES_ANALISE.aportes }} />Aportes</span>
+              <span className="flex items-center gap-1">
+                <span className="size-2.5 rounded-sm border border-muted/60" style={{ backgroundImage: 'repeating-linear-gradient(45deg, var(--vida-muted) 0 1.5px, transparent 1.5px 3px)' }} />
+                Programado
+              </span>
+            </div>
+            {temSerieCompleta ? (
+              <>
+                <GraficoBarrasCompleto serie={serieCompleta} formatarCurto={brlCurto} mesAtivo={mes} onMes={drillMes} />
+                <p className="mt-1 text-center text-[11px] text-muted">Barra cheia = realizado · hachura = ainda programado. Toque num mês para o extrato.</p>
+              </>
+            ) : (
+              <p className="text-[13px] text-muted">Registre entradas, saídas e aportes para ver a evolução mês a mês.</p>
+            )}
+          </div>
+
+          {/* Balanço do mês */}
+          <div className={CARTAO}>
+            <span className={ROTULO}>Balanço · {rotuloMes}</span>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="rounded-xl border border-line p-3">
+                <div className="text-[11px] text-muted">Receitas</div>
+                <div className="mt-0.5 text-[17px] font-bold leading-none tabular-nums" style={{ color: CORES_ANALISE.receitas }}>{formatarBRL(balancoMes.rec)}</div>
+              </div>
+              <div className="rounded-xl border border-line p-3">
+                <div className="text-[11px] text-muted">Despesas</div>
+                <div className="mt-0.5 text-[17px] font-bold leading-none tabular-nums text-danger">{formatarBRL(balancoMes.des)}</div>
+              </div>
+              <div className="rounded-xl border border-line p-3">
+                <div className="text-[11px] text-muted">Saldo</div>
+                <div className={`mt-0.5 text-[17px] font-bold leading-none tabular-nums ${balancoMes.saldo >= 0 ? 'text-accent' : 'text-danger'}`}>
+                  {balancoMes.saldo < 0 ? '− ' : ''}{formatarBRL(Math.abs(balancoMes.saldo))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Gastos por categoria */}
+          <div className={CARTAO}>
+            <div className="mb-3 flex items-center justify-between">
+              <span className={ROTULO}>Gastos por categoria · {rotuloMes}</span>
+              {totalGastosCat > 0 && <span className="text-[12px] font-semibold tabular-nums text-muted">{formatarBRL(totalGastosCat)}</span>}
+            </div>
+            {gastosCat.length === 0 ? (
+              <p className="text-[13px] text-muted">Nenhuma saída registrada neste mês.</p>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {gastosCat.map((g, i) => (
+                  <button
+                    key={g.categoria}
+                    onClick={() => drillCategoria(g.categoria, [g.categoria])}
+                    className="-mx-1 rounded-lg px-1 py-0.5 text-left transition-colors hover:bg-hover/50"
+                    title="Ver lançamentos desta categoria"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-[14px]">{iconeCategoria(g.categoria)}</span>
+                      <span className="flex-1 truncate text-[13px] font-medium">{g.categoria}</span>
+                      <span className="text-[12px] font-semibold tabular-nums">{formatarBRL(g.total)}</span>
+                      <span className="w-9 text-right text-[11px] text-muted tabular-nums">{Math.round(g.pct * 100)}%</span>
+                    </div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-hover">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(2, g.pct * 100)}%`, backgroundColor: corCategoria(i) }} />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="mt-3 text-[11px] text-muted">Toque numa categoria para ver os lançamentos no extrato.</p>
           </div>
         </>
       )}
@@ -818,6 +929,11 @@ function rotuloTipoConta(tipo: string): string {
     case 'divida': return 'Dívida'
     default: return 'Conta'
   }
+}
+// Paleta ordenada para as barras de categoria (ordem fixa, nunca cíclica de matiz).
+const PALETA_CAT = ['#2383e2', '#2f9e6f', '#d99b2b', '#c2554e', '#8b5cf6', '#0d9488', '#db6d9e', '#64748b']
+function corCategoria(i: number): string {
+  return PALETA_CAT[i % PALETA_CAT.length]
 }
 function iconeCategoria(cat?: string): string {
   switch (cat) {
