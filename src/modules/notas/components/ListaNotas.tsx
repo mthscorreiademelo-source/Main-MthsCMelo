@@ -25,7 +25,9 @@ export function ListaNotas({ paginas }: { paginas: Pagina[] }) {
           <li key={p.id} className="group relative flex items-center gap-1">
             <button onClick={() => navigate(`/notas/${p.id}`)} className="flex min-h-14 flex-1 items-center gap-3 rounded-lg px-2 text-left transition-colors hover:bg-hover">
               {ehDesenho && p.miniatura ? (
-                <img src={p.miniatura} alt="" className="h-12 w-9 shrink-0 rounded-md border border-line object-cover" />
+                <span className="isolate h-12 w-9 shrink-0 overflow-hidden rounded-md border border-line bg-bg">
+                  <img src={p.miniatura} alt="" className="size-full object-cover mix-blend-multiply dark:mix-blend-normal" />
+                </span>
               ) : ehDesenho ? (
                 <IconCaneta className="shrink-0 text-muted" width={18} height={18} />
               ) : ehArquivos ? (

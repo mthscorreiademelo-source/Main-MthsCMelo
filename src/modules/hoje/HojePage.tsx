@@ -328,11 +328,11 @@ export function HojePage() {
               <Link
                 key={p.id}
                 to={`/notas/${p.id}`}
-                className="flex aspect-[3/4] flex-col overflow-hidden rounded-lg border border-line bg-bg"
+                className="flex aspect-[3/4] flex-col isolate overflow-hidden rounded-lg border border-line bg-bg"
                 title={p.titulo || 'Sem título'}
               >
                 {p.miniatura ? (
-                  <img src={p.miniatura} alt="" className="h-full w-full object-cover" />
+                  <img src={p.miniatura} alt="" className="h-full w-full object-cover mix-blend-multiply dark:mix-blend-normal" />
                 ) : (
                   <span className="line-clamp-4 p-1.5 text-[10px] leading-tight text-muted">
                     {p.titulo || 'Sem título'}

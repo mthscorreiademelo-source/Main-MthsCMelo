@@ -37,7 +37,9 @@ export function SecaoHoje() {
             className={`flex items-center gap-3 p-3 transition-colors hover:bg-hover ${i > 0 ? 'border-t border-line' : ''}`}
           >
             {p.miniatura ? (
-              <img src={p.miniatura} alt="" className="size-9 shrink-0 rounded-md border border-line object-cover" />
+              <span className="isolate size-9 shrink-0 overflow-hidden rounded-md border border-line bg-bg">
+                <img src={p.miniatura} alt="" className="size-full object-cover mix-blend-multiply dark:mix-blend-normal" />
+              </span>
             ) : (
               <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-hover text-muted">
                 <IconeTipo pagina={p} />

@@ -194,8 +194,8 @@ function Inicio({ ativas, favoritos, desenhos, entrada, grupos, contagem, tema, 
         <Secao titulo="Desenhos" verTudo="Ver todos" onVer={() => onAba('desenhos')}>
           <div className="grid grid-cols-4 gap-2">
             {desenhos.slice(0, 4).map((p) => (
-              <button key={p.id} onClick={() => navigate(`/notas/${p.id}`)} className="aspect-[3/4] overflow-hidden rounded-lg border border-line bg-bg">
-                {p.miniatura ? <img src={p.miniatura} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full items-center justify-center text-muted"><IconCaneta /></span>}
+              <button key={p.id} onClick={() => navigate(`/notas/${p.id}`)} className="aspect-[3/4] isolate overflow-hidden rounded-lg border border-line bg-bg">
+                {p.miniatura ? <img src={p.miniatura} alt="" className="h-full w-full object-cover mix-blend-multiply dark:mix-blend-normal" /> : <span className="flex h-full items-center justify-center text-muted"><IconCaneta /></span>}
               </button>
             ))}
           </div>
@@ -263,8 +263,8 @@ function GradeDesenhos({ desenhos, onAbrir, onNovo }: { desenhos: Pagina[]; onAb
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
       {desenhos.map((p) => (
         <button key={p.id} onClick={() => onAbrir(p.id)} className="group text-left">
-          <span className="block aspect-[3/4] overflow-hidden rounded-xl border border-line bg-bg transition-transform group-hover:scale-[1.02]">
-            {p.miniatura ? <img src={p.miniatura} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full items-center justify-center text-muted"><IconCaneta /></span>}
+          <span className="block aspect-[3/4] isolate overflow-hidden rounded-xl border border-line bg-bg transition-transform group-hover:scale-[1.02]">
+            {p.miniatura ? <img src={p.miniatura} alt="" className="h-full w-full object-cover mix-blend-multiply dark:mix-blend-normal" /> : <span className="flex h-full items-center justify-center text-muted"><IconCaneta /></span>}
           </span>
           <span className="mt-1 block truncate px-0.5 text-[13px] font-medium">{p.titulo || 'Sem título'}</span>
         </button>
