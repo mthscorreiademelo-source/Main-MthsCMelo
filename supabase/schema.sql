@@ -46,15 +46,31 @@ create trigger documentos_updated_at
   before update on public.documentos
   for each row execute procedure extensions.moddatetime (updated_at);
 
--- Storage: bucket privado para os arquivos (PDFs, imagens, vídeos, desenhos).
--- Usado numa etapa futura; criar já não custa nada.
+-- Storage: bucket privado para os BINÁRIOS de anexos (PDFs, imagens, vídeos,
+-- desenhos, capas e arquivos de livros). O código sincroniza em
+-- `anexos/{userId}/{tabela}/{id}` (ver src/core/nuvem/sync/anexos.ts), então o
+-- nome do bucket PRECISA ser `anexos` — caso contrário a sync de binários
+-- falha em silêncio (o gate `bucketPronto` só devolve false e segue).
 insert into storage.buckets (id, name, public)
-values ('arquivos', 'arquivos', false)
+values ('anexos', 'anexos', false)
 on conflict (id) do nothing;
 
 -- Cada usuário só acessa arquivos dentro de uma pasta com o próprio id.
-drop policy if exists "arquivos do dono" on storage.objects;
-create policy "arquivos do dono" on storage.objects
-  for all
-  using (bucket_id = 'arquivos' and (storage.foldername(name))[1] = auth.uid()::text)
-  with check (bucket_id = 'arquivos' and (storage.foldername(name))[1] = auth.uid()::text);
+-- Uma política por operação (o Storage não aceita cláusula de nome no INSERT).
+drop policy if exists "anexos do dono" on storage.objects;
+
+drop policy if exists "anexos: dono lê" on storage.objects;
+create policy "anexos: dono lê" on storage.objects
+  for select using (bucket_id = 'anexos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "anexos: dono envia" on storage.objects;
+create policy "anexos: dono envia" on storage.objects
+  for insert with check (bucket_id = 'anexos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "anexos: dono atualiza" on storage.objects;
+create policy "anexos: dono atualiza" on storage.objects
+  for update using (bucket_id = 'anexos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "anexos: dono apaga" on storage.objects;
+create policy "anexos: dono apaga" on storage.objects
+  for delete using (bucket_id = 'anexos' and (storage.foldername(name))[1] = auth.uid()::text);
