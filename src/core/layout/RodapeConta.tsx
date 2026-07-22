@@ -3,7 +3,6 @@ import type { Session } from '@supabase/supabase-js'
 import {
   IconDownload,
   IconEngrenagem,
-  IconLixeira,
   IconLua,
   IconNuvem,
   IconSair,
@@ -11,7 +10,6 @@ import {
   IconUpload,
 } from '../components/Icons'
 import { exportarBackup, importarBackup } from '../db/db'
-import { recomecarDoZero } from '../db/exemplos'
 import { sair, useSessao } from '../nuvem/auth'
 import { nuvemAtiva } from '../nuvem/config'
 import { EntrarModal } from '../nuvem/EntrarModal'
@@ -122,27 +120,6 @@ export function RodapeConta() {
       avisar(`Restaurado: ${tasks} tarefa(s), ${paginas} página(s)`)
     } catch {
       avisar('Arquivo de backup inválido')
-    }
-  }
-
-  const [recomecando, setRecomecando] = useState(false)
-  async function recomecar() {
-    if (
-      !confirm(
-        'Recomeçar do zero?\n\nIsto APAGA todos os seus dados — aqui e na nuvem (Finanças, Saúde, Humor, Hábitos, Agenda, Pets, Compras, Biblioteca, Projetos, etc.).\n\nSEUS TAREFAS E NOTAS/CADERNOS SÃO PRESERVADOS.\n\nAção irreversível. Continuar?',
-      )
-    )
-      return
-    if (!confirm('Tem certeza? Não dá para desfazer.')) return
-    setRecomecando(true)
-    avisar('Apagando…')
-    try {
-      await recomecarDoZero()
-      avisar('Pronto! Recarregando…')
-      setTimeout(() => window.location.reload(), 900)
-    } catch (e) {
-      setRecomecando(false)
-      avisar(`Falha ao recomeçar: ${String(e).slice(0, 80)}`)
     }
   }
 
@@ -261,17 +238,6 @@ export function RodapeConta() {
             >
               <IconUpload width={16} height={16} />
               Importar backup
-            </button>
-            <button
-              onClick={() => {
-                setPainel(null)
-                recomecar()
-              }}
-              disabled={recomecando}
-              className="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-[13.5px] font-medium text-muted transition-colors hover:bg-hover/70 hover:text-danger disabled:opacity-50"
-            >
-              <IconLixeira width={16} height={16} />
-              Recomeçar do zero
             </button>
           </div>
         )}
