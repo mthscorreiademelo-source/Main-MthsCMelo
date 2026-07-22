@@ -3,13 +3,17 @@ import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.tsx'
+import { sinalizarAtualizacao } from './core/pwa/atualizacao'
 
-// Auto-atualização do PWA: registra o service worker e checa por versões novas
-// ao carregar, ao focar a aba e a cada 30 min. Com registerType 'autoUpdate',
-// o app recarrega sozinho assim que a nova versão é ativada — sem precisar
-// limpar cache na mão.
-registerSW({
+// Atualização do PWA em modo 'prompt': registra o service worker e checa por
+// versões novas ao focar a aba e a cada 30 min. Quando há uma versão nova
+// aguardando, avisamos o usuário (AvisoAtualizacao) em vez de recarregar
+// sozinho — assim uma edição em andamento nunca é interrompida sem aviso.
+const atualizarSW = registerSW({
   immediate: true,
+  onNeedRefresh() {
+    sinalizarAtualizacao(() => void atualizarSW(true))
+  },
   onRegisteredSW(_url, registration) {
     if (!registration) return
     const checar = () => void registration.update().catch(() => {})

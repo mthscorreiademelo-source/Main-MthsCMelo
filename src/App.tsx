@@ -1,6 +1,7 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './core/layout/AppShell'
 import { ErrorBoundary } from './core/components/ErrorBoundary'
+import { AvisoAtualizacao } from './core/pwa/AvisoAtualizacao'
 import { MODULOS } from './core/modules'
 import { nuvemAtiva } from './core/nuvem/config'
 import { useSessao } from './core/nuvem/auth'
@@ -55,6 +56,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <Portao />
+      <AvisoAtualizacao />
     </ErrorBoundary>
   )
 }

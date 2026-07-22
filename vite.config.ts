@@ -10,7 +10,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt': a nova versão fica em espera e o app avisa o usuário, em vez
+      // de recarregar sozinho (que podia interromper uma edição em andamento).
+      registerType: 'prompt',
       includeAssets: ['favicon-32.png', 'favicon-96.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'Lume',
