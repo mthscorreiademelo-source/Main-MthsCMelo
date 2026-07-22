@@ -122,7 +122,12 @@ gratuito) e devolve uma interpretação melhor — que você ainda confirma. Fic
 na heurística (zero regressão).
 
 **1. Pegue uma chave grátis do Gemini** em https://aistudio.google.com/apikey
-(botão *Create API key*). O tier gratuito cobre uso pessoal com folga.
+(botão *Create API key* → **Create API key in a new project**, para o projeto ser
+elegível ao tier gratuito). O tier gratuito cobre uso pessoal com folga.
+
+> Modelo: a função usa `gemini-flash-latest` por padrão — um apelido que sempre
+> aponta pro flash atual, então não quebra quando o Google descontinua uma
+> versão. Se quiser fixar outro, crie o segredo `GEMINI_MODEL`.
 
 **2. Publique a função** (precisa do [Supabase CLI](https://supabase.com/docs/guides/cli)):
 

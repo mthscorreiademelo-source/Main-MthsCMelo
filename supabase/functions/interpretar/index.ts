@@ -5,7 +5,8 @@
 // confirma antes de gravar — a IA é um palpite melhor, não uma ação automática.
 //
 // Segredo necessário: GEMINI_API_KEY (chave grátis do Google AI Studio).
-// Modelo padrão: gemini-2.0-flash (tier gratuito). Ajustável por GEMINI_MODEL.
+// Modelo padrão: gemini-flash-latest (apelido que aponta sempre pro flash
+// atual — não quebra por descontinuação). Ajustável por GEMINI_MODEL.
 
 const CORS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -51,7 +52,7 @@ Deno.serve(async (req: Request) => {
 
     const chave = Deno.env.get('GEMINI_API_KEY')
     if (!chave) return json({ erro: 'GEMINI_API_KEY não configurada' }, 500)
-    const modelo = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.0-flash'
+    const modelo = Deno.env.get('GEMINI_MODEL') ?? 'gemini-flash-latest'
     const hojeISO = typeof hoje === 'string' ? hoje : new Date().toISOString().slice(0, 10)
 
     const resp = await fetch(
