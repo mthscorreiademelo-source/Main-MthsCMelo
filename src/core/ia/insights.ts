@@ -25,6 +25,8 @@ export interface ResultadoInsight {
   texto: string | null
   fonte: FonteInsight
   regenerar: () => void
+  /** Diagnóstico do último motivo de não usar a IA (temporário, para depurar). */
+  erro: string | null
 }
 
 interface Cache {
@@ -74,9 +76,11 @@ export function useInsightIA({
 }): ResultadoInsight {
   const [texto, setTexto] = useState<string | null>(heuristico)
   const [fonte, setFonte] = useState<FonteInsight>('heuristica')
+  const [erro, setErro] = useState<string | null>(null)
 
   const gerar = useCallback(
     async (forcar: boolean) => {
+      setErro(null)
       if (!IA_INSIGHTS_ATIVA || !habilitado) {
         setTexto(heuristico)
         setFonte('heuristica')
@@ -91,21 +95,33 @@ export function useInsightIA({
       setFonte('carregando')
       try {
         const cliente = await obterCliente()
-        if (!cliente) throw new Error('sem cliente')
+        if (!cliente) { setErro('sem cliente (login/nuvem)'); setTexto(heuristico); setFonte('heuristica'); return }
         const { data, error } = await cliente.functions.invoke('insights', {
           body: { contexto, dados, hoje: hojeISO() },
         })
-        const t = !error && data && typeof data.texto === 'string' ? data.texto.trim() : ''
+        if (error) {
+          let extra = ''
+          try {
+            const ctx = (error as { context?: Response }).context
+            if (ctx) extra = ` [${ctx.status} ${(await ctx.text()).slice(0, 200)}]`
+          } catch { /* ignora */ }
+          setErro(`${(error as Error).message ?? 'erro'}${extra}`)
+          setTexto(heuristico)
+          setFonte('heuristica')
+          return
+        }
+        const t = data && typeof data.texto === 'string' ? data.texto.trim() : ''
         if (t) {
           gravarCache(chave, { texto: t, assinatura, geradoEm: Date.now() })
           setTexto(t)
           setFonte('ia')
         } else {
-          // IA achou que não há nada digno de nota, ou falhou → heurística.
+          setErro(`resposta vazia: ${JSON.stringify(data).slice(0, 180)}`)
           setTexto(heuristico)
           setFonte('heuristica')
         }
-      } catch {
+      } catch (e) {
+        setErro(`exceção: ${String(e).slice(0, 180)}`)
         setTexto(heuristico)
         setFonte('heuristica')
       }
@@ -118,5 +134,5 @@ export function useInsightIA({
     void gerar(false)
   }, [gerar])
 
-  return { texto, fonte, regenerar: () => void gerar(true) }
+  return { texto, fonte, regenerar: () => void gerar(true), erro }
 }

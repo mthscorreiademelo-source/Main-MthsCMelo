@@ -555,7 +555,7 @@ export function HojePage() {
     assinatura: assinaturaInsight,
     heuristico: insightHeur?.texto ?? null,
   })
-  if (insightIA.texto || insightIA.fonte === 'carregando') {
+  if (insightIA.texto || insightIA.fonte === 'carregando' || insightIA.erro) {
     const emoji = insightIA.fonte === 'ia' ? '✨' : (insightHeur?.emoji ?? '💡')
     blocos.push({
       id: 'insight',
@@ -566,8 +566,11 @@ export function HojePage() {
           <span className="text-[12px] font-semibold uppercase tracking-wide text-muted">Observação {emoji}</span>
           {insightIA.fonte === 'carregando' && !insightIA.texto ? (
             <p className="mt-1 text-[13px] text-muted">Pensando…</p>
-          ) : (
+          ) : insightIA.texto ? (
             <p className="mt-1 text-[14px] font-medium">{insightIA.texto}</p>
+          ) : null}
+          {insightIA.erro && (
+            <p className="mt-1 select-all text-[10.5px] leading-snug text-danger">IA: {insightIA.erro}</p>
           )}
         </CartaoHoje>
       ),
