@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, useEffect } from 'react'
 import { hojeISO, rotuloData } from '../dates'
 import { formatarBRL } from '../../modules/financas/db'
 import { interpretar } from './interpretar'
-import { interpretarIA } from './ia'
+import { interpretarIA, ultimoErroIA } from './ia'
 import { aplicarInterpretacao, desfazer } from './fluxos'
 import { criarCaptura } from './db'
 import { mostrarToast } from './store'
@@ -41,6 +41,7 @@ export function CapturaUniversal({ textoInicial, autoFocus, aoFechar }: {
   const [cands, setCands] = useState<Interpretacao[]>([])
   const [analisando, setAnalisando] = useState(false)
   const [fonteIA, setFonteIA] = useState(false)
+  const [erroIA, setErroIA] = useState<string | null>(null)
   const [caret, setCaret] = useState(0)
   const ref = useRef<HTMLTextAreaElement>(null)
   const fontes = useFontesTokens()
@@ -105,6 +106,7 @@ export function CapturaUniversal({ textoInicial, autoFocus, aoFechar }: {
     const lista = ia ?? interpretar(base)
     setCands(mesclar(lista, extra))
     setFonteIA(!!ia)
+    setErroIA(ia ? null : ultimoErroIA)
     setAnalisando(false)
   }
 
@@ -196,6 +198,11 @@ export function CapturaUniversal({ textoInicial, autoFocus, aoFechar }: {
             <span className="text-[12px] font-semibold uppercase tracking-wide text-muted">Como guardar?</span>
             <span className="text-[10.5px] text-muted/70">{fonteIA ? '✨ IA · Gemini' : 'heurística local'} — confirme antes</span>
           </div>
+          {erroIA && (
+            <p className="select-all rounded-lg bg-danger/10 px-2.5 py-1.5 text-[10.5px] leading-snug text-danger">
+              IA indisponível → {erroIA}
+            </p>
+          )}
           {cands.map((i, idx) => {
             const info = TIPO_INFO[i.tipo]
             const resumo = resumoCampos(i)
