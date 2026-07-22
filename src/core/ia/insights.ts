@@ -137,7 +137,9 @@ export function useInsightIA({
             const ctx = (error as { context?: Response }).context
             if (ctx) extra = ` [${ctx.status} ${(await ctx.text()).slice(0, 200)}]`
           } catch { /* ignora */ }
-          setErro(`${(error as Error).message ?? 'erro'}${extra}`)
+          const msg = `${(error as Error).message ?? 'erro'}${extra}`
+          console.warn(`[lume insight:${chave}]`, msg)
+          setErro(msg)
           setTexto(heuristico)
           setFonte('heuristica')
           return
@@ -148,12 +150,16 @@ export function useInsightIA({
           setTexto(t)
           setFonte('ia')
         } else {
-          setErro(`resposta vazia: ${JSON.stringify(data).slice(0, 180)}`)
+          const msg = `resposta vazia: ${JSON.stringify(data).slice(0, 180)}`
+          console.warn(`[lume insight:${chave}]`, msg)
+          setErro(msg)
           setTexto(heuristico)
           setFonte('heuristica')
         }
       } catch (e) {
-        setErro(`exceção: ${String(e).slice(0, 180)}`)
+        const msg = `exceção: ${String(e).slice(0, 180)}`
+        console.warn(`[lume insight:${chave}]`, msg)
+        setErro(msg)
         setTexto(heuristico)
         setFonte('heuristica')
       }

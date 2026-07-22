@@ -136,8 +136,12 @@ export function FinancasPage() {
       economiaProjetadaReais: Math.round(orc.economiaProjetada) / 100,
       observacoes: insights.map((i) => i.texto),
     },
-    assinatura: `${mesHoje}|${Math.round(varMes)}|${insights.map((i) => i.id).join(',')}`,
+    // Inclui os valores REAIS que vão no payload (disponível/economia) + os
+    // textos das observações — só os ids fixos deixavam o cache servir números
+    // velhos por até 24h enquanto o mês evoluía.
+    assinatura: `${mesHoje}|${Math.round(varMes)}|${Math.round(orc.disponivelHoje)}|${Math.round(orc.economiaProjetada)}|${insights.map((i) => i.texto).join('¦')}`,
     heuristico: insights[0]?.texto ?? null,
+    habilitado: insights.length > 0,
   })
 
   const gastosHoje = useMemo(

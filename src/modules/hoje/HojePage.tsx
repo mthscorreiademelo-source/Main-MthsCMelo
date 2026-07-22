@@ -547,7 +547,7 @@ export function HojePage() {
     sequenciaHabitosDias: streakGeralHoje,
     gastoHojeReais: Math.round(gastoHojeCent) / 100,
   }
-  const assinaturaInsight = `${hoje}|${cronologicos.length}|${tarefasHoje.length}|${atrasadas}|${resumoHabHoje?.feitos ?? -1}/${resumoHabHoje?.total ?? -1}|${streakGeralHoje}|${gastoHojeCent}`
+  const assinaturaInsight = `${hoje}|${faixa}|${cronologicos.length}|${tarefasHoje.length}|${atrasadas}|${resumoHabHoje?.feitos ?? -1}/${resumoHabHoje?.total ?? -1}|${streakGeralHoje}|${gastoHojeCent}`
   const insightIA = useInsightIA({
     chave: 'hoje',
     contexto: 'resumo e observação do dia de hoje de uma pessoa',
@@ -555,7 +555,10 @@ export function HojePage() {
     assinatura: assinaturaInsight,
     heuristico: insightHeur?.texto ?? null,
   })
-  if (insightIA.texto || insightIA.fonte === 'carregando' || insightIA.erro) {
+  // Só há bloco quando há texto de verdade (IA ou heurística) ou está pensando.
+  // Nunca mostramos o `erro` cru na home: se a IA falhar, cai na heurística em
+  // silêncio (o diagnóstico segue disponível via console no hook).
+  if (insightIA.texto || insightIA.fonte === 'carregando') {
     const emoji = insightIA.fonte === 'ia' ? '✨' : (insightHeur?.emoji ?? '💡')
     blocos.push({
       id: 'insight',
@@ -569,9 +572,6 @@ export function HojePage() {
           ) : insightIA.texto ? (
             <p className="mt-1 text-[14px] font-medium">{insightIA.texto}</p>
           ) : null}
-          {insightIA.erro && (
-            <p className="mt-1 select-all text-[10.5px] leading-snug text-danger">IA: {insightIA.erro}</p>
-          )}
         </CartaoHoje>
       ),
     })

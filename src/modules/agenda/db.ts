@@ -79,7 +79,10 @@ export function eventoVazio(e: Evento): boolean {
   return (
     (!e.titulo || e.titulo.trim() === '' || e.titulo === 'Novo evento') &&
     !e.local && !e.descricao && !(e.participantes?.length) &&
-    !e.custoCentavos && !e.diaInteiro && !e.recorrencia && !e.cronogramaId
+    !e.custoCentavos && !e.diaInteiro && !e.recorrencia && !e.cronogramaId &&
+    // Também conta como "conteúdo real" categorizar, vincular a pet/projeto ou
+    // pintar o evento — senão fechar sem título apagaria dados que o usuário pôs.
+    !e.categoria && !e.petId && !e.projetoId && !e.cor
   )
 }
 

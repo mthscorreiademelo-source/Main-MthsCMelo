@@ -49,10 +49,13 @@ export function EditorNotaPage() {
     }
   }, [])
 
-  // Salvamento automático com debounce (ignora o set inicial do carregamento)
+  // Salvamento automático com debounce (ignora o set inicial do carregamento).
+  // O guard `encerradaRef` evita que um autosave pendente ressuscite uma página
+  // que o usuário acabou de excluir (o delete é assíncrono; o timer podia
+  // disparar depois e regravar a linha).
   useEffect(() => {
     if (!pagina || Date.now() - carregouEm.current < 100) return
-    const t = setTimeout(() => salvarPagina(pagina), 300)
+    const t = setTimeout(() => { if (!encerradaRef.current) salvarPagina(pagina) }, 300)
     return () => clearTimeout(t)
   }, [pagina])
 

@@ -19,6 +19,7 @@ export function CardInsights({ pet, controle }: { pet: Pet; controle: ControleCa
     dados: { observacoes: insights.map((i) => i.texto) },
     assinatura: `${pet.id}|${insights.map((i) => i.texto).join('¦')}`,
     heuristico: insights[0]?.texto ?? null,
+    habilitado: !!pronto && insights.length > 0,
   })
 
   return (

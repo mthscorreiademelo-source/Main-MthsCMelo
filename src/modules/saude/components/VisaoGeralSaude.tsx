@@ -104,8 +104,11 @@ export function VisaoGeralSaude({ onIrAba, onEditarDia }: { onIrAba: (a: AbaSaud
     chave: 'saude',
     contexto: 'saúde recente de uma pessoa (sono, passos, FC, humor, exames)',
     dados: { observacoes: insights.map((i) => (i.meta ? `${i.texto} (${i.meta})` : i.texto)) },
-    assinatura: insights.map((i) => i.id).join(','),
+    // Assinatura precisa refletir os NÚMEROS, não só os ids fixos — senão o
+    // cache de 24h serve texto de IA desatualizado enquanto o padrão muda.
+    assinatura: insights.map((i) => `${i.id}:${i.texto}${i.meta ? `(${i.meta})` : ''}`).join('|'),
     heuristico: insights[0]?.texto ?? null,
+    habilitado: insights.length > 0,
   })
 
   const proximas = consultas
