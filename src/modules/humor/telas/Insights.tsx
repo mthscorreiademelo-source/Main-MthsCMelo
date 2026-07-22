@@ -3,6 +3,8 @@ import { EmptyState } from '../../../core/components/EmptyState'
 import { IconHumor } from '../../../core/components/Icons'
 import { IconeFator } from '../../../core/components/icones'
 import { correlacaoSeries, impactoDeFator } from '../../../core/insights/engine'
+import { useInsightIA } from '../../../core/ia/insights'
+import { ObservacaoIA } from '../../../core/ia/ObservacaoIA'
 import { useSinaisSaude } from '../../saude/sinais'
 import { extremosDiaSemana, impactoDosFatores, serieHumorDiaria, tendenciaHumor } from '../insights'
 import { diasComRegistro } from '../humor'
@@ -46,6 +48,25 @@ export function Insights({ registros, fatores }: { registros: Registro[]; fatore
     [fatoresSaude, humorSerie],
   )
   const temSaude = correlacoes.length > 0 || impactosSaude.length > 0
+
+  const insightHumor = useInsightIA({
+    chave: 'humor',
+    contexto: 'padrões de humor de uma pessoa ao longo do tempo',
+    dados: {
+      tendencia: inclin > 0.03 ? 'melhorando' : inclin < -0.03 ? 'caindo' : 'estável',
+      melhorDiaSemana: extremos.melhor ? DIAS_LONGO[extremos.melhor.dia] : null,
+      piorDiaSemana: extremos.pior && extremos.pior.dia !== extremos.melhor?.dia ? DIAS_LONGO[extremos.pior.dia] : null,
+      fatoresQueElevam: impactos.filter((i) => i.impacto.delta >= 0.15).slice(0, 5).map((i) => i.fator.nome),
+      fatoresQueDerrubam: impactos.filter((i) => i.impacto.delta <= -0.15).slice(-5).map((i) => i.fator.nome),
+      correlacoesSaude: correlacoes.map(({ s, c }) => `humor melhor com ${c!.r >= 0 ? 'mais' : 'menos'} ${s.rotulo.toLowerCase()}`),
+    },
+    assinatura: `${inclin.toFixed(2)}|${extremos.melhor?.dia ?? -1}|${correlacoes.length}|${impactos.length}`,
+    heuristico:
+      inclin > 0.03 ? 'Seu humor vem melhorando no período. Continue assim. ✦'
+        : inclin < -0.03 ? 'Seu humor vem caindo um pouco. Vale um olhar carinhoso para você. ✦'
+          : 'Seu humor está estável no período.',
+    habilitado: diasRegistrados >= 4,
+  })
 
   if (diasRegistrados < 4) {
     return (
@@ -128,7 +149,9 @@ export function Insights({ registros, fatores }: { registros: Registro[]; fatore
       )}
 
       <Cartao titulo="Tendência">
-        <p className="text-[14px]">{tendTexto}</p>
+        {insightHumor.fonte === 'ia' && insightHumor.texto
+          ? <ObservacaoIA resultado={insightHumor} />
+          : <p className="text-[14px]">{tendTexto}</p>}
       </Cartao>
 
       {!temSaude && (

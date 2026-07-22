@@ -5,6 +5,8 @@ import { FolhaInferior } from '../../core/components/FolhaInferior'
 import { ModalCentral } from '../../core/components/ModalCentral'
 import { IconEngrenagem, IconMais, IconSeta, IconSetaEsquerda } from '../../core/components/Icons'
 import { hojeISO, rotuloData } from '../../core/dates'
+import { useInsightIA } from '../../core/ia/insights'
+import { ObservacaoIA } from '../../core/ia/ObservacaoIA'
 import { AnelProgresso } from '../habitos/components/AnelProgresso'
 import { useEventos } from '../agenda/hooks'
 import { AddMovimento } from './components/AddMovimento'
@@ -125,6 +127,18 @@ export function FinancasPage() {
       }),
     [mesHoje, movimentos, linhas, snapshots, patrimonio, orc],
   )
+  const insightFin = useInsightIA({
+    chave: 'financas-mes',
+    contexto: 'finanças do mês (orçamento, patrimônio, gastos) de uma pessoa',
+    dados: {
+      variacaoPatrimonioMesPct: Math.round(varMes),
+      disponivelHojeReais: Math.round(orc.disponivelHoje) / 100,
+      economiaProjetadaReais: Math.round(orc.economiaProjetada) / 100,
+      observacoes: insights.map((i) => i.texto),
+    },
+    assinatura: `${mesHoje}|${Math.round(varMes)}|${insights.map((i) => i.id).join(',')}`,
+    heuristico: insights[0]?.texto ?? null,
+  })
 
   const gastosHoje = useMemo(
     () =>
@@ -432,15 +446,19 @@ export function FinancasPage() {
 
         <div className="rounded-2xl border border-line bg-accent/[0.06] p-4">
           <span className={ROTULO}>Insight do mês</span>
-          <ul className="mt-3 flex flex-col gap-3">
-            {insights.length === 0 && <li className="text-[13px] text-muted">Registre alguns gastos para o Lume gerar insights.</li>}
-            {insights.map((ins) => (
-              <li key={ins.id} className="flex items-start gap-2.5">
-                <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: tomBg(ins.tom) }}>{tomIcone(ins.tom)}</span>
-                <span className="text-[13.5px] leading-snug">{ins.texto}</span>
-              </li>
-            ))}
-          </ul>
+          {insightFin.fonte === 'ia' && insightFin.texto ? (
+            <div className="mt-3"><ObservacaoIA resultado={insightFin} /></div>
+          ) : (
+            <ul className="mt-3 flex flex-col gap-3">
+              {insights.length === 0 && <li className="text-[13px] text-muted">Registre alguns gastos para o Lume gerar insights.</li>}
+              {insights.map((ins) => (
+                <li key={ins.id} className="flex items-start gap-2.5">
+                  <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: tomBg(ins.tom) }}>{tomIcone(ins.tom)}</span>
+                  <span className="text-[13.5px] leading-snug">{ins.texto}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
 

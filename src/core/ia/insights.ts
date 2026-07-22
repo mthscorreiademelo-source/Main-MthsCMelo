@@ -62,19 +62,22 @@ export function useInsightIA({
   dados,
   assinatura,
   heuristico,
+  habilitado = true,
 }: {
   chave: string
   contexto: string
   dados: unknown
   assinatura: string
   heuristico: string | null
+  /** Quando false, nem chama a IA (ex.: dados insuficientes) — usa a heurística. */
+  habilitado?: boolean
 }): ResultadoInsight {
   const [texto, setTexto] = useState<string | null>(heuristico)
   const [fonte, setFonte] = useState<FonteInsight>('heuristica')
 
   const gerar = useCallback(
     async (forcar: boolean) => {
-      if (!IA_INSIGHTS_ATIVA) {
+      if (!IA_INSIGHTS_ATIVA || !habilitado) {
         setTexto(heuristico)
         setFonte('heuristica')
         return
@@ -108,7 +111,7 @@ export function useInsightIA({
       }
     },
     // `dados` é representado por `assinatura` de propósito (evita re-render infinito).
-    [chave, contexto, assinatura, heuristico], // eslint-disable-line react-hooks/exhaustive-deps
+    [chave, contexto, assinatura, heuristico, habilitado], // eslint-disable-line react-hooks/exhaustive-deps
   )
 
   useEffect(() => {

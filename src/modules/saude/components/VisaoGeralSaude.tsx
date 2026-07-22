@@ -2,6 +2,8 @@ import { useMemo } from 'react'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { hojeISO } from '../../../core/dates'
+import { useInsightIA } from '../../../core/ia/insights'
+import { ObservacaoIA } from '../../../core/ia/ObservacaoIA'
 import { useRegistros } from '../../humor/hooks'
 import { useHabitos, useRegistros as useRegistrosHabito } from '../../habitos/hooks'
 import { somaAguaHabitos } from '../../habitos/vinculos'
@@ -98,6 +100,13 @@ export function VisaoGeralSaude({ onIrAba, onEditarDia }: { onIrAba: (a: AbaSaud
     () => gerarInsightsSaude({ hoje, dias, registrosHumor, exames }),
     [hoje, dias, registrosHumor, exames],
   )
+  const insightSaude = useInsightIA({
+    chave: 'saude',
+    contexto: 'saúde recente de uma pessoa (sono, passos, FC, humor, exames)',
+    dados: { observacoes: insights.map((i) => (i.meta ? `${i.texto} (${i.meta})` : i.texto)) },
+    assinatura: insights.map((i) => i.id).join(','),
+    heuristico: insights[0]?.texto ?? null,
+  })
 
   const proximas = consultas
     .filter((c) => c.status === 'agendada' && c.data >= hoje)
@@ -291,18 +300,22 @@ export function VisaoGeralSaude({ onIrAba, onEditarDia }: { onIrAba: (a: AbaSaud
             <span className={ROTULO}>✦ Insights da saúde</span>
             <button onClick={() => onIrAba('linha')} className="text-[12px] font-medium text-muted hover:text-ink">Linha do tempo</button>
           </div>
-          <ul className="flex flex-col gap-3">
-            {insights.length === 0 && <li className="text-[13px] text-muted">Registre mais dias para o Lume observar padrões.</li>}
-            {insights.map((ins) => (
-              <li key={ins.id} className="flex items-start gap-2.5">
-                <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-surface text-[13px]">{ins.icone}</span>
-                <span>
-                  <span className="block text-[13px] leading-snug">{ins.texto}</span>
-                  {ins.meta && <span className="text-[10.5px] text-muted">{ins.meta}</span>}
-                </span>
-              </li>
-            ))}
-          </ul>
+          {insightSaude.fonte === 'ia' && insightSaude.texto ? (
+            <ObservacaoIA resultado={insightSaude} />
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {insights.length === 0 && <li className="text-[13px] text-muted">Registre mais dias para o Lume observar padrões.</li>}
+              {insights.map((ins) => (
+                <li key={ins.id} className="flex items-start gap-2.5">
+                  <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-surface text-[13px]">{ins.icone}</span>
+                  <span>
+                    <span className="block text-[13px] leading-snug">{ins.texto}</span>
+                    {ins.meta && <span className="text-[10.5px] text-muted">{ins.meta}</span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className={CARTAO}>

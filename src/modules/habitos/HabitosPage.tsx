@@ -4,6 +4,8 @@ import { EmptyState } from '../../core/components/EmptyState'
 import { IconChama, IconGrafico, IconMais, IconMenuPontos } from '../../core/components/Icons'
 import { getDay, parseISO } from 'date-fns'
 import { hojeISO } from '../../core/dates'
+import { useInsightIA } from '../../core/ia/insights'
+import { ObservacaoIA } from '../../core/ia/ObservacaoIA'
 import { CabecalhoProgresso } from './components/CabecalhoProgresso'
 import { CartaoHabito } from './components/CartaoHabito'
 import { CategoriaSecao } from './components/CategoriaSecao'
@@ -291,6 +293,22 @@ function AbaInsights({ ativos, registros, streak }: { ativos: Habito[]; registro
     { rot: 'Dias perfeitos', val: String(g.diasPerfeitos) },
     { rot: 'Sequência', val: `${streak} d` },
   ]
+  const leituraHeur = g.ativos === 0
+    ? null
+    : `Nos últimos 30 dias você concluiu ${Math.round(g.taxa * 100)}% do que estava previsto, com ${g.diasPerfeitos} dia${g.diasPerfeitos === 1 ? '' : 's'} completo${g.diasPerfeitos === 1 ? '' : 's'}.`
+  const insightHab = useInsightIA({
+    chave: 'habitos',
+    contexto: 'consistência de hábitos de uma pessoa nos últimos 30 dias',
+    dados: {
+      conclusao30dPct: Math.round(g.taxa * 100),
+      diasPerfeitos: g.diasPerfeitos,
+      sequenciaDias: streak,
+      habitosAtivos: g.ativos,
+      diaMaisConsistente: padraoDia,
+    },
+    assinatura: `${g.ativos}|${Math.round(g.taxa * 100)}|${g.diasPerfeitos}|${streak}|${padraoDia?.dia ?? ''}${padraoDia?.pct ?? ''}`,
+    heuristico: leituraHeur,
+  })
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -324,12 +342,18 @@ function AbaInsights({ ativos, registros, streak }: { ativos: Habito[]; registro
           <span className="text-[12px] font-semibold uppercase tracking-wide text-muted">Leitura</span>
           <span className="text-[10px] text-muted/70">observacional · correlação, não causa</span>
         </div>
-        <p className="mt-1.5 text-[13.5px] leading-snug">
-          {g.ativos === 0 ? 'Crie hábitos para o Lume acompanhar sua consistência ao longo do tempo.'
-            : `Nos últimos 30 dias você concluiu ${Math.round(g.taxa * 100)}% do que estava previsto, com ${g.diasPerfeitos} dia${g.diasPerfeitos === 1 ? '' : 's'} completo${g.diasPerfeitos === 1 ? '' : 's'}. A sequência não deve pesar: um dia de folga não apaga o seu progresso.`}
-        </p>
-        {padraoDia && (
-          <p className="mt-1.5 text-[13.5px] leading-snug">📅 Observando as últimas semanas, <b className="capitalize">{padraoDia.dia}</b> tende a ser o seu dia mais consistente ({padraoDia.pct}%).</p>
+        {insightHab.fonte === 'ia' && insightHab.texto ? (
+          <div className="mt-1.5"><ObservacaoIA resultado={insightHab} /></div>
+        ) : (
+          <>
+            <p className="mt-1.5 text-[13.5px] leading-snug">
+              {g.ativos === 0 ? 'Crie hábitos para o Lume acompanhar sua consistência ao longo do tempo.'
+                : `Nos últimos 30 dias você concluiu ${Math.round(g.taxa * 100)}% do que estava previsto, com ${g.diasPerfeitos} dia${g.diasPerfeitos === 1 ? '' : 's'} completo${g.diasPerfeitos === 1 ? '' : 's'}. A sequência não deve pesar: um dia de folga não apaga o seu progresso.`}
+            </p>
+            {padraoDia && (
+              <p className="mt-1.5 text-[13.5px] leading-snug">📅 Observando as últimas semanas, <b className="capitalize">{padraoDia.dia}</b> tende a ser o seu dia mais consistente ({padraoDia.pct}%).</p>
+            )}
+          </>
         )}
         <Link to="/habitos/estatisticas" className="mt-2 inline-block text-[12.5px] font-medium text-accent">Ver estatísticas completas →</Link>
       </div>

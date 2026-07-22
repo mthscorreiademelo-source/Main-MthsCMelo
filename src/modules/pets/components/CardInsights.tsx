@@ -1,4 +1,6 @@
 import { CartaoModulo, type ControleCartao } from './CartaoModulo'
+import { useInsightIA } from '../../../core/ia/insights'
+import { ObservacaoIA } from '../../../core/ia/ObservacaoIA'
 import { gerarInsights } from '../db'
 import { useAlimentos, useConsultas, usePesos, useVacinas } from '../hooks'
 import type { Pet } from '../types'
@@ -11,9 +13,19 @@ export function CardInsights({ pet, controle }: { pet: Pet; controle: ControleCa
 
   const pronto = pesos && vacinas && consultas && alimentos
   const insights = pronto ? gerarInsights(pet, { pesos, vacinas, consultas, alimentos }) : []
+  const insightPet = useInsightIA({
+    chave: `pet-${pet.id}`,
+    contexto: `situação do pet ${pet.nome} (ração, vacinas, consultas, peso)`,
+    dados: { observacoes: insights.map((i) => i.texto) },
+    assinatura: `${pet.id}|${insights.map((i) => i.texto).join('¦')}`,
+    heuristico: insights[0]?.texto ?? null,
+  })
 
   return (
     <CartaoModulo titulo="Insights" emoji="✨" {...controle}>
+      {insightPet.fonte === 'ia' && insightPet.texto ? (
+        <ObservacaoIA resultado={insightPet} />
+      ) : (
       <ul className="flex flex-col gap-2">
         {insights.map((i, idx) => (
           <li key={idx} className="flex gap-2.5">
@@ -26,6 +38,7 @@ export function CardInsights({ pet, controle }: { pet: Pet; controle: ControleCa
           </li>
         ))}
       </ul>
+      )}
       <p className="mt-3 border-t border-line pt-2 text-[11px] leading-snug text-muted">
         Leituras automáticas do que você registrou (datas, pesos, estoque). São observações — nunca um diagnóstico. Na dúvida, consulte o veterinário.
       </p>
