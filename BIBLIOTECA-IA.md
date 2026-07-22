@@ -15,10 +15,13 @@
 
 ## 1. Flashcards
 
-Modelo a acrescentar (schema): `flashcards { id, livroId, frente, verso, cfi?,
-proximaRevisao?, facilidade? }`. UI no Workspace: criar manualmente ou **gerar a
-partir de um destaque/nota**. Revisão espaçada (SM-2) roda **local**; a
-**geração automática** a partir do texto exige LLM (Edge Function).
+✅ **Implementado (local, offline):** aba **Flashcards** na Biblioteca com
+criação **manual** (frente/verso, opcionalmente ligados a um livro) e **revisão
+espaçada SM-2** (tabela `flashcards`, schema v30; sincroniza e entra no backup).
+Botões de recordação Errei/Bom/Fácil, agendamento automático da próxima revisão.
+
+Ainda futuro: **geração automática** de cartões a partir de um destaque/nota,
+que exige um LLM (Edge Function) — não roda no cliente e não foi simulada.
 
 ## 2. Resumo e perguntas por IA (LLM)
 

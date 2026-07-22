@@ -9,14 +9,16 @@ import { CartaoLivro } from './components/CartaoLivro'
 import { Estante } from './components/Estante'
 import { statusDerivadoSerie } from './db'
 import { useDestaques, useLivros, useNotas } from './hooks'
+import { PainelFlashcards } from './flashcards/PainelFlashcards'
 import type { Livro } from './types'
 
-type Aba = 'geral' | 'estante' | 'leituras' | 'notas' | 'autores' | 'colecoes'
+type Aba = 'geral' | 'estante' | 'leituras' | 'notas' | 'flashcards' | 'autores' | 'colecoes'
 const ABAS: { id: Aba; rotulo: string }[] = [
   { id: 'geral', rotulo: 'Visão geral' },
   { id: 'estante', rotulo: 'Estante' },
   { id: 'leituras', rotulo: 'Leituras' },
   { id: 'notas', rotulo: 'Notas' },
+  { id: 'flashcards', rotulo: 'Flashcards' },
   { id: 'autores', rotulo: 'Autores' },
   { id: 'colecoes', rotulo: 'Coleções' },
 ]
@@ -88,6 +90,7 @@ export function BibliotecaPage() {
         ))}
       </div>
 
+      {aba === 'flashcards' && <PainelFlashcards />}
       {aba === 'estante' && <Estante generoInicial={generoEstante} />}
 
       {aba === 'geral' && (

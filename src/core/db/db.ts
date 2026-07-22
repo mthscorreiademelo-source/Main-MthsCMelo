@@ -38,6 +38,7 @@ import type {
   Vacina,
 } from '../../modules/saude/types'
 import type { ArquivoLivro, Destaque, Livro, NotaLivro } from '../../modules/biblioteca/types'
+import type { Flashcard } from '../../modules/biblioteca/flashcards/tipos'
 import type { Contexto, Cronograma, Evento } from '../../modules/agenda/types'
 import type {
   Pet,
@@ -150,6 +151,8 @@ class VidaDB extends Dexie {
   /** Rotinas (sequências reutilizáveis) e seu histórico de execução. */
   rotinas!: Table<Rotina, string>
   rotinaExecucoes!: Table<ExecucaoRotina, string>
+  /** Flashcards (repetição espaçada, Biblioteca). */
+  flashcards!: Table<Flashcard, string>
   /** Espelho do último estado sincronizado (chave → atualizadoEm). */
   espelho!: Table<{ chave: string; atualizadoEm: number }, string>
 
@@ -366,6 +369,10 @@ class VidaDB extends Dexie {
       rotinas: 'id, ordem, criadoEm',
       rotinaExecucoes: 'id, rotinaId, data',
     })
+    // v30: Flashcards (Biblioteca) com repetição espaçada.
+    this.version(30).stores({
+      flashcards: 'id, livroId, proximaRevisao, criadoEm',
+    })
   }
 }
 
@@ -505,6 +512,7 @@ export async function exportarBackup() {
     capturas: await db.capturas.toArray(),
     rotinas: await db.rotinas.toArray(),
     rotinaExecucoes: await db.rotinaExecucoes.toArray(),
+    flashcards: await db.flashcards.toArray(),
   }
 }
 
@@ -596,6 +604,7 @@ export async function importarBackup(json: unknown) {
     capturas?: Captura[]
     rotinas?: Rotina[]
     rotinaExecucoes?: ExecucaoRotina[]
+    flashcards?: Flashcard[]
   }
   const temTasks = Array.isArray(dados?.tasks)
   const temPaginas = Array.isArray(dados?.paginas)
@@ -704,6 +713,7 @@ export async function importarBackup(json: unknown) {
   if (Array.isArray(dados.capturas)) await db.capturas.bulkPut(dados.capturas)
   if (Array.isArray(dados.rotinas)) await db.rotinas.bulkPut(dados.rotinas)
   if (Array.isArray(dados.rotinaExecucoes)) await db.rotinaExecucoes.bulkPut(dados.rotinaExecucoes)
+  if (Array.isArray(dados.flashcards)) await db.flashcards.bulkPut(dados.flashcards)
   return {
     tasks: dados.tasks?.length ?? 0,
     paginas: dados.paginas?.length ?? 0,

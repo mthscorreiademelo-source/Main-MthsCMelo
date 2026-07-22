@@ -32,19 +32,18 @@ visão (não roda offline no PWA).
   muda no schema. Campo `origem: 'ia'` e `confianca`.
 - **Privacidade:** a foto sai do aparelho só se o usuário ativar o recurso.
 
-## 2. OCR de exames (PDF/imagem → valores)
+## 2. OCR de exames (foto → valores)
 
-Hoje: exame com **PDF/imagem anexado** + valores digitados à mão; histórico e
-gráfico por marcador já funcionam.
+✅ **Implementado (no aparelho):** no "Novo exame", o botão **Escanear foto
+(OCR)** lê uma imagem do laudo com **Tesseract.js** (o mesmo motor do módulo
+Compras, rodando localmente) e **pré-preenche** nome/valor/unidade/faixa de
+referência por heurística. É best-effort e o usuário **revisa antes de salvar**
+(o formulário É a revisão); a própria foto fica anexada.
 
-Futuro: extrair automaticamente marcadores, valores, unidades e faixas de
-referência do PDF do laboratório.
-
-- **Arquitetura:** Edge Function `/saude/ocr-exame` (OCR + parsing por layout de
-  laboratório, ou um LLM com o texto extraído). Retorna uma lista de
-  `Exame` candidatos para o usuário revisar.
-- **Encaixe:** cria vários `exames` com `marcador` já preenchido → o gráfico de
-  evolução por marcador (que já existe) passa a se montar sozinho. `origem:'ocr'`.
+Ainda futuro (precisa de backend/IA): parsing por **layout de laboratório** ou
+um **LLM** para extrair vários marcadores de um PDF de uma vez com alta precisão
+(Edge Function `/saude/ocr-exame`), criando vários `Exame` candidatos com
+`origem:'ocr'`. O que existe hoje cobre bem foto de um marcador por vez.
 
 ## 3. Wearables e dispositivos
 

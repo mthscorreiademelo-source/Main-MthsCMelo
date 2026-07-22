@@ -8,6 +8,7 @@ import { criarEvento } from '../../agenda/db'
 import { CartaoMetrica } from './CartaoMetrica'
 import { BarraMeta, GraficoLinha } from './GraficosSaude'
 import { salvarAnexo, useAnexoUrl } from '../anexo'
+import { parseExame, reconhecerTexto } from '../ocrExame'
 import { nutricaoDoDia, ultimosDias } from '../analise'
 import {
   DEF_MEDIDA,
@@ -384,9 +385,28 @@ function EditorExame({ onFechar }: { onFechar: () => void }) {
   const [refMin, setRefMin] = useState('')
   const [refMax, setRefMax] = useState('')
   const [arquivoId, setArquivoId] = useState<string>()
+  const [escaneando, setEscaneando] = useState(false)
   async function anexar(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (f) setArquivoId(await salvarAnexo(f))
+  }
+  // Lê uma foto do laudo por OCR e PRÉ-PREENCHE os campos (você revisa antes).
+  async function escanear(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f) return
+    setEscaneando(true)
+    try {
+      const lido = parseExame(await reconhecerTexto(f))
+      if (lido.nome && !nome.trim()) setNome(lido.nome)
+      if (lido.valorNum != null && !valor.trim()) setValor(String(lido.valorNum))
+      if (lido.unidade && !unidade.trim()) setUnidade(lido.unidade)
+      if (lido.refMin != null && !refMin.trim()) setRefMin(String(lido.refMin))
+      if (lido.refMax != null && !refMax.trim()) setRefMax(String(lido.refMax))
+      setArquivoId(await salvarAnexo(f))
+    } finally {
+      setEscaneando(false)
+    }
   }
   async function salvar() {
     const v = num(valor)
@@ -405,12 +425,19 @@ function EditorExame({ onFechar }: { onFechar: () => void }) {
         <Campo rotulo="Ref. mín"><input inputMode="decimal" value={refMin} onChange={(e) => setRefMin(e.target.value)} className={CAMPO} /></Campo>
         <Campo rotulo="Ref. máx"><input inputMode="decimal" value={refMax} onChange={(e) => setRefMax(e.target.value)} className={CAMPO} /></Campo>
       </div>
-      <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-line p-3 text-[13px] text-muted">
-        <span className="text-[18px]">📎</span>
-        <span>{arquivoId ? 'Arquivo anexado ✓' : 'Anexar PDF / imagem do exame'}</span>
-        <input type="file" accept="application/pdf,image/*" onChange={anexar} className="hidden" />
-      </label>
-      <p className="text-[11px] leading-snug text-muted">Leitura automática do PDF (OCR) chega numa próxima versão — veja SAUDE-INTEGRACOES.md.</p>
+      <div className="flex gap-2">
+        <label className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-line p-3 text-[13px] ${escaneando ? 'pointer-events-none opacity-60' : 'text-muted'}`}>
+          <span className="text-[16px]">📷</span>
+          <span>{escaneando ? 'Lendo a foto…' : 'Escanear foto (OCR)'}</span>
+          <input type="file" accept="image/*" onChange={escanear} className="hidden" disabled={escaneando} />
+        </label>
+        <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-line p-3 text-[13px] text-muted">
+          <span className="text-[16px]">📎</span>
+          <span>{arquivoId ? 'Anexado ✓' : 'Anexar PDF/imagem'}</span>
+          <input type="file" accept="application/pdf,image/*" onChange={anexar} className="hidden" />
+        </label>
+      </div>
+      <p className="text-[11px] leading-snug text-muted">O OCR roda no seu aparelho e é um palpite — confira os campos antes de salvar. Laudos variam muito de formato.</p>
       <button onClick={salvar} className={BTNSALVAR}>Salvar</button>
     </FolhaInferior>
   )

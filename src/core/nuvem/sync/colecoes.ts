@@ -93,6 +93,7 @@ const COLECOES_BASE: ColecaoSync[] = [
   { colecao: 'capturas', chave: 'id' },
   { colecao: 'rotinas', chave: 'id' },
   { colecao: 'rotinaExecucoes', chave: 'id' },
+  { colecao: 'flashcards', chave: 'id' },
 ]
 
 // Metadados dos anexos só entram na sincronização quando o recurso está ligado.
