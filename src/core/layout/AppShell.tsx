@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { IconButton } from '../components/Button'
 import { IconMenu } from '../components/Icons'
+import { ErrorBoundary } from '../components/ErrorBoundary'
 import { MODULOS } from '../modules'
 import { useSessao } from '../nuvem/auth'
 import { useSincronizacao } from '../nuvem/sync'
@@ -76,11 +77,19 @@ export function AppShell() {
         </header>
         {moduloAtual.telaCheia ? (
           <div className="flex min-h-0 flex-1 flex-col">
-            <Outlet />
+            <ErrorBoundary resetKey={pathname}>
+              <Suspense fallback={<CarregandoTela />}>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto px-5 pb-24 md:px-10">
-            <Outlet />
+            <ErrorBoundary resetKey={pathname}>
+              <Suspense fallback={<CarregandoTela />}>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         )}
       </main>
@@ -89,6 +98,15 @@ export function AppShell() {
       <BotaoGlobal />
       <LauncherCaptura />
       <ToastCaptura />
+    </div>
+  )
+}
+
+/** Fallback discreto enquanto o chunk da rota carrega (code-splitting). */
+function CarregandoTela() {
+  return (
+    <div className="flex min-h-[40vh] w-full items-center justify-center">
+      <span className="size-6 animate-spin rounded-full border-2 border-line border-t-muted" aria-label="Carregando" />
     </div>
   )
 }

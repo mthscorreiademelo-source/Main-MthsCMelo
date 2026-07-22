@@ -5,7 +5,7 @@ interface Estado {
 }
 
 /** Rede de segurança: um erro de renderização mostra uma tela amigável em vez de branco. */
-export class ErrorBoundary extends Component<{ children: ReactNode }, Estado> {
+export class ErrorBoundary extends Component<{ children: ReactNode; resetKey?: unknown }, Estado> {
   state: Estado = { erro: null }
 
   static getDerivedStateFromError(erro: Error): Estado {
@@ -14,6 +14,14 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, Estado> {
 
   componentDidCatch(erro: Error) {
     console.error('[lume] erro de renderização:', erro)
+  }
+
+  // Ao mudar de rota (resetKey), limpa o erro — um módulo quebrado não deixa
+  // o usuário preso: navegar para outro lugar volta a funcionar.
+  componentDidUpdate(anterior: { resetKey?: unknown }) {
+    if (this.state.erro && anterior.resetKey !== this.props.resetKey) {
+      this.setState({ erro: null })
+    }
   }
 
   render() {

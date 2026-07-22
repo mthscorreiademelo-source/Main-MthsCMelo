@@ -1,4 +1,4 @@
-import type { ComponentType, SVGProps } from 'react'
+import { lazy, type ComponentType, type SVGProps } from 'react'
 import {
   IconCalendario,
   IconCarrinho,
@@ -14,29 +14,41 @@ import {
   IconSaude,
   IconSol,
 } from './components/Icons'
+// A Hoje é a tela inicial — fica no bundle principal para pintar na hora.
 import { HojePage } from '../modules/hoje/HojePage'
-import { TarefasPage } from '../modules/tarefas/TarefasPage'
-import { NotasPage } from '../modules/notas/NotasPage'
-import { EditorNotaPage } from '../modules/notas/EditorNotaPage'
-import { GrupoPage } from '../modules/notas/GrupoPage'
-import { AgendaPage } from '../modules/agenda/AgendaPage'
-import { HabitosPage } from '../modules/habitos/HabitosPage'
-import { HabitoDetalhePage } from '../modules/habitos/HabitoDetalhePage'
-import { HabitosEstatisticasPage } from '../modules/habitos/HabitosEstatisticasPage'
-import { HumorPage } from '../modules/humor/HumorPage'
-import { SaudePage } from '../modules/saude/SaudePage'
-import { FinancasPage } from '../modules/financas/FinancasPage'
-import { BibliotecaPage } from '../modules/biblioteca/BibliotecaPage'
-import { LivroPage } from '../modules/biblioteca/LivroPage'
-import { CompiladoPage } from '../modules/biblioteca/CompiladoPage'
-import { LeitorPage } from '../modules/biblioteca/leitor/LeitorPage'
-import { ProjetosPage } from '../modules/projetos/ProjetosPage'
-import { PetsPage } from '../modules/pets/PetsPage'
-import { PetWorkspacePage } from '../modules/pets/PetWorkspacePage'
-import { ComprasPage } from '../modules/compras/ComprasPage'
-import { ItemDespensaPage } from '../modules/compras/ItemDespensaPage'
-import { AquisicaoPage } from '../modules/compras/AquisicaoPage'
-import { LugaresPage } from '../modules/lugares/LugaresPage'
+
+/**
+ * Carrega uma página sob demanda (code-splitting por rota). As páginas usam
+ * export NOMEADO, então mapeamos para `default` que o React.lazy espera. Cada
+ * módulo vira um chunk separado — o download inicial passa a ser só Hoje + shell,
+ * e Finanças/Saúde/Biblioteca/etc. só chegam quando o usuário abre.
+ */
+function tela(loader: () => Promise<Record<string, unknown>>, nome: string): ComponentType {
+  return lazy(() => loader().then((m) => ({ default: m[nome] as ComponentType }))) as unknown as ComponentType
+}
+
+const TarefasPage = tela(() => import('../modules/tarefas/TarefasPage'), 'TarefasPage')
+const NotasPage = tela(() => import('../modules/notas/NotasPage'), 'NotasPage')
+const EditorNotaPage = tela(() => import('../modules/notas/EditorNotaPage'), 'EditorNotaPage')
+const GrupoPage = tela(() => import('../modules/notas/GrupoPage'), 'GrupoPage')
+const AgendaPage = tela(() => import('../modules/agenda/AgendaPage'), 'AgendaPage')
+const HabitosPage = tela(() => import('../modules/habitos/HabitosPage'), 'HabitosPage')
+const HabitoDetalhePage = tela(() => import('../modules/habitos/HabitoDetalhePage'), 'HabitoDetalhePage')
+const HabitosEstatisticasPage = tela(() => import('../modules/habitos/HabitosEstatisticasPage'), 'HabitosEstatisticasPage')
+const HumorPage = tela(() => import('../modules/humor/HumorPage'), 'HumorPage')
+const SaudePage = tela(() => import('../modules/saude/SaudePage'), 'SaudePage')
+const FinancasPage = tela(() => import('../modules/financas/FinancasPage'), 'FinancasPage')
+const BibliotecaPage = tela(() => import('../modules/biblioteca/BibliotecaPage'), 'BibliotecaPage')
+const LivroPage = tela(() => import('../modules/biblioteca/LivroPage'), 'LivroPage')
+const CompiladoPage = tela(() => import('../modules/biblioteca/CompiladoPage'), 'CompiladoPage')
+const LeitorPage = tela(() => import('../modules/biblioteca/leitor/LeitorPage'), 'LeitorPage')
+const ProjetosPage = tela(() => import('../modules/projetos/ProjetosPage'), 'ProjetosPage')
+const PetsPage = tela(() => import('../modules/pets/PetsPage'), 'PetsPage')
+const PetWorkspacePage = tela(() => import('../modules/pets/PetWorkspacePage'), 'PetWorkspacePage')
+const ComprasPage = tela(() => import('../modules/compras/ComprasPage'), 'ComprasPage')
+const ItemDespensaPage = tela(() => import('../modules/compras/ItemDespensaPage'), 'ItemDespensaPage')
+const AquisicaoPage = tela(() => import('../modules/compras/AquisicaoPage'), 'AquisicaoPage')
+const LugaresPage = tela(() => import('../modules/lugares/LugaresPage'), 'LugaresPage')
 
 export interface ModuloDef {
   id: string
