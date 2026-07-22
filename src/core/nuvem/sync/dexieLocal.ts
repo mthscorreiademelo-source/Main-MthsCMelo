@@ -2,6 +2,7 @@ import { db } from '../../db/db'
 import { comAplicacaoRemota } from './bandeira'
 import { chaveReal, COLECOES, ehTabelaBlob, idDoc, TABELAS_BLOB } from './colecoes'
 import { remotoVence, type Cursor, type LinhaDoc, type LocalStore, type Pendentes } from './engine'
+import { marcarSujo, precisaVarrer } from './sujos'
 
 type Registro = Record<string, unknown> & { atualizadoEm?: number }
 
@@ -51,6 +52,9 @@ export const localDexie: LocalStore = {
           // local é mais novo → registra no espelho o valor do servidor,
           // para o diff perceber que precisamos reenviar a nossa versão.
           await db.espelho.put({ chave: chaveEsp, atualizadoEm: l.atualizadoEm })
+          // Esse reenvio pendente não passa pelos hooks de escrita local, então
+          // marcamos sujo aqui para a próxima coleta varrer e empurrar.
+          marcarSujo()
         }
       }
     })
@@ -58,6 +62,10 @@ export const localDexie: LocalStore = {
   },
 
   async coletarPendentes(): Promise<Pendentes> {
+    // Nada mudou localmente desde a última coleta (e não é hora de reconciliar)
+    // → pula a varredura de ~65 tabelas e não há nada a empurrar.
+    if (!precisaVarrer()) return { upserts: [], remocoes: [] }
+
     const atualPorChave = new Map<string, { colecao: string; id: string; doc: Registro; at: number }>()
     for (const { colecao } of COLECOES) {
       if (!tabelaExiste(colecao)) continue

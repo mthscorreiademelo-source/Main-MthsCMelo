@@ -13,6 +13,7 @@ import type {
 } from '../../modules/financas/types'
 import { deveIgnorarHooks } from '../nuvem/sync/bandeira'
 import { NOMES_SYNC } from '../nuvem/sync/colecoes'
+import { marcarSujo } from '../nuvem/sync/sujos'
 import type { Perfil } from '../perfil/types'
 import type { Captura } from '../captura/types'
 import type { ExecucaoRotina, Rotina } from '../../modules/habitos/rotinas/types'
@@ -383,11 +384,17 @@ export const db = new VidaDB()
 for (const nome of NOMES_SYNC) {
   const tabela = (db as unknown as Record<string, Table>)[nome]
   tabela.hook('creating', (_pk, obj: Record<string, unknown>) => {
-    if (!deveIgnorarHooks() && obj.atualizadoEm == null) obj.atualizadoEm = Date.now()
+    if (deveIgnorarHooks()) return
+    if (obj.atualizadoEm == null) obj.atualizadoEm = Date.now()
+    marcarSujo() // há escrita local pendente → a sync varre no próximo ciclo
   })
   tabela.hook('updating', (_mods, _pk, _obj) => {
     if (deveIgnorarHooks()) return undefined
+    marcarSujo()
     return { atualizadoEm: Date.now() }
+  })
+  tabela.hook('deleting', () => {
+    if (!deveIgnorarHooks()) marcarSujo()
   })
 }
 
@@ -613,107 +620,101 @@ export async function importarBackup(json: unknown) {
   if (dados?.app !== 'vida' || (!temTasks && !temPaginas && !temHabitos && !temMovimentos)) {
     throw new Error('Arquivo de backup inválido')
   }
-  if (temTasks) await db.tasks.bulkPut(dados.tasks!)
-  if (Array.isArray(dados.projetos)) await db.projetos.bulkPut(dados.projetos)
-  if (Array.isArray(dados.eventos)) await db.eventos.bulkPut(dados.eventos)
-  if (Array.isArray(dados.cronogramas)) await db.cronogramas.bulkPut(dados.cronogramas)
-  if (Array.isArray(dados.contextos)) await db.contextos.bulkPut(dados.contextos)
-  if (temPaginas) await db.paginas.bulkPut(dados.paginas!)
-  if (Array.isArray(dados.grupos)) await db.grupos.bulkPut(dados.grupos)
-  if (temHabitos) await db.habitos.bulkPut(dados.habitos!)
-  if (Array.isArray(dados.habitoRegistros)) {
-    await db.habitoRegistros.bulkPut(dados.habitoRegistros)
-  }
-  if (temMovimentos) await db.movimentos.bulkPut(dados.movimentos!)
-  if (Array.isArray(dados.contas)) await db.contas.bulkPut(dados.contas)
-  if (Array.isArray(dados.objetivos)) await db.objetivos.bulkPut(dados.objetivos)
-  if (Array.isArray(dados.recorrentes)) await db.recorrentes.bulkPut(dados.recorrentes)
-  if (Array.isArray(dados.orcamentoLinhas)) await db.orcamentoLinhas.bulkPut(dados.orcamentoLinhas)
-  if (Array.isArray(dados.financasConfig)) await db.financasConfig.bulkPut(dados.financasConfig)
-  if (Array.isArray(dados.patrimonioSnapshots)) await db.patrimonioSnapshots.bulkPut(dados.patrimonioSnapshots)
-  if (Array.isArray(dados.arquivos)) {
-    await db.arquivos.bulkPut(
-      dados.arquivos.map((a) => ({
-        id: a.id,
-        nome: a.nome,
-        tipo: a.tipo,
-        tamanho: a.tamanho,
-        criadoEm: a.criadoEm,
-        blob: base64ParaBlob(a.dados, a.tipo),
-      })),
-    )
-  }
-  if (Array.isArray(dados.humores)) await db.humores.bulkPut(dados.humores)
-  if (Array.isArray(dados.registros)) await db.registros.bulkPut(dados.registros)
-  if (Array.isArray(dados.humorTipos)) await db.humorTipos.bulkPut(dados.humorTipos)
-  if (Array.isArray(dados.categorias)) await db.categorias.bulkPut(dados.categorias)
-  if (Array.isArray(dados.fatores)) await db.fatores.bulkPut(dados.fatores)
-  if (Array.isArray(dados.saude)) await db.saude.bulkPut(dados.saude)
-  if (Array.isArray(dados.saudeMedidas)) await db.saudeMedidas.bulkPut(dados.saudeMedidas)
-  if (Array.isArray(dados.atividades)) await db.atividades.bulkPut(dados.atividades)
-  if (Array.isArray(dados.refeicoes)) await db.refeicoes.bulkPut(dados.refeicoes)
-  if (Array.isArray(dados.profissionais)) await db.profissionais.bulkPut(dados.profissionais)
-  if (Array.isArray(dados.consultas)) await db.consultas.bulkPut(dados.consultas)
-  if (Array.isArray(dados.medicamentos)) await db.medicamentos.bulkPut(dados.medicamentos)
-  if (Array.isArray(dados.medicamentoTomadas)) await db.medicamentoTomadas.bulkPut(dados.medicamentoTomadas)
-  if (Array.isArray(dados.exames)) await db.exames.bulkPut(dados.exames)
-  if (Array.isArray(dados.vacinas)) await db.vacinas.bulkPut(dados.vacinas)
-  if (Array.isArray(dados.doacoesSangue)) await db.doacoesSangue.bulkPut(dados.doacoesSangue)
-  if (Array.isArray(dados.saudeConfig)) await db.saudeConfig.bulkPut(dados.saudeConfig)
-  if (Array.isArray(dados.livros)) await db.livros.bulkPut(dados.livros)
-  if (Array.isArray(dados.notasLivro)) await db.notasLivro.bulkPut(dados.notasLivro)
-  if (Array.isArray(dados.destaques)) await db.destaques.bulkPut(dados.destaques)
-  if (Array.isArray(dados.categoriasHabito)) await db.categoriasHabito.bulkPut(dados.categoriasHabito)
-  if (Array.isArray(dados.pets)) await db.pets.bulkPut(dados.pets)
-  if (Array.isArray(dados.petPesos)) await db.petPesos.bulkPut(dados.petPesos)
-  if (Array.isArray(dados.petVacinas)) await db.petVacinas.bulkPut(dados.petVacinas)
-  if (Array.isArray(dados.petConsultas)) await db.petConsultas.bulkPut(dados.petConsultas)
-  if (Array.isArray(dados.petCondicoes)) await db.petCondicoes.bulkPut(dados.petCondicoes)
-  if (Array.isArray(dados.petMedicamentos)) await db.petMedicamentos.bulkPut(dados.petMedicamentos)
-  if (Array.isArray(dados.petAlimentos)) await db.petAlimentos.bulkPut(dados.petAlimentos)
-  if (Array.isArray(dados.petItens)) await db.petItens.bulkPut(dados.petItens)
-  if (Array.isArray(dados.petCuidados)) await db.petCuidados.bulkPut(dados.petCuidados)
-  if (Array.isArray(dados.petCuidadoRegistros)) await db.petCuidadoRegistros.bulkPut(dados.petCuidadoRegistros)
-  if (Array.isArray(dados.petFotos)) await db.petFotos.bulkPut(dados.petFotos)
-  if (Array.isArray(dados.petDocumentos)) await db.petDocumentos.bulkPut(dados.petDocumentos)
-  if (Array.isArray(dados.petArquivos)) {
-    await db.petArquivos.bulkPut(
-      dados.petArquivos.map((a) => ({
-        id: a.id,
-        nome: a.nome,
-        tipo: a.tipo,
-        tamanho: a.tamanho,
-        criadoEm: a.criadoEm,
-        blob: base64ParaBlob(a.dados, a.tipo),
-      })),
-    )
-  }
-  if (Array.isArray(dados.arquivosLivros)) {
-    await db.arquivosLivros.bulkPut(
-      dados.arquivosLivros.map((a) => ({
-        id: a.id,
-        nome: a.nome,
-        formato: a.formato,
-        tamanho: a.tamanho,
-        criadoEm: a.criadoEm,
-        blob: base64ParaBlob(a.dados, a.mime || ''),
-      })),
-    )
-  }
-  if (Array.isArray(dados.comprasListas)) await db.comprasListas.bulkPut(dados.comprasListas)
-  if (Array.isArray(dados.comprasItens)) await db.comprasItens.bulkPut(dados.comprasItens)
-  if (Array.isArray(dados.despensa)) await db.despensa.bulkPut(dados.despensa)
-  if (Array.isArray(dados.despensaHistorico)) await db.despensaHistorico.bulkPut(dados.despensaHistorico)
-  if (Array.isArray(dados.aquisicoes)) await db.aquisicoes.bulkPut(dados.aquisicoes)
-  if (Array.isArray(dados.aquisicaoPrecos)) await db.aquisicaoPrecos.bulkPut(dados.aquisicaoPrecos)
-  if (Array.isArray(dados.comprasConfig)) await db.comprasConfig.bulkPut(dados.comprasConfig)
-  if (Array.isArray(dados.lugares)) await db.lugares.bulkPut(dados.lugares)
-  if (Array.isArray(dados.perfil)) await db.perfil.bulkPut(dados.perfil)
-  if (Array.isArray(dados.projetoItens)) await db.projetoItens.bulkPut(dados.projetoItens)
-  if (Array.isArray(dados.capturas)) await db.capturas.bulkPut(dados.capturas)
-  if (Array.isArray(dados.rotinas)) await db.rotinas.bulkPut(dados.rotinas)
-  if (Array.isArray(dados.rotinaExecucoes)) await db.rotinaExecucoes.bulkPut(dados.rotinaExecucoes)
-  if (Array.isArray(dados.flashcards)) await db.flashcards.bulkPut(dados.flashcards)
+
+  // Só grava registros que são objetos com a chave primária presente — um
+  // registro malformado no arquivo não corrompe a tabela nem aborta o import.
+  const ok = <T,>(arr: T[] | undefined, chave = 'id'): T[] =>
+    Array.isArray(arr)
+      ? arr.filter((r): r is T => !!r && typeof r === 'object' && (r as Record<string, unknown>)[chave] != null)
+      : []
+
+  // Anexos: reconstrói o Blob a partir do base64, tolerante a dado corrompido
+  // (um blob inválido é pulado, não derruba o restante da restauração).
+  const blobsArquivo = (arr: ArquivoSerial[] | undefined) =>
+    ok(arr).flatMap((a) => {
+      try {
+        return [{ id: a.id, nome: a.nome, tipo: a.tipo, tamanho: a.tamanho, criadoEm: a.criadoEm, blob: base64ParaBlob(a.dados, a.tipo) }]
+      } catch { return [] }
+    })
+  const blobsLivro = (arr: ArquivoLivroSerial[] | undefined) =>
+    ok(arr).flatMap((a) => {
+      try {
+        return [{ id: a.id, nome: a.nome, formato: a.formato, tamanho: a.tamanho, criadoEm: a.criadoEm, blob: base64ParaBlob(a.dados, a.mime || '') }]
+      } catch { return [] }
+    })
+
+  // Tudo numa transação só: ou o backup inteiro entra, ou nada muda (uma falha
+  // no meio não deixa o banco pela metade). `bulkPut([])` é no-op, então tabela
+  // ausente no arquivo fica intocada, como antes.
+  await db.transaction('rw', db.tables, async () => {
+    await db.tasks.bulkPut(ok(dados.tasks))
+    await db.projetos.bulkPut(ok(dados.projetos))
+    await db.eventos.bulkPut(ok(dados.eventos))
+    await db.cronogramas.bulkPut(ok(dados.cronogramas))
+    await db.contextos.bulkPut(ok(dados.contextos))
+    await db.paginas.bulkPut(ok(dados.paginas))
+    await db.grupos.bulkPut(ok(dados.grupos))
+    await db.habitos.bulkPut(ok(dados.habitos))
+    await db.habitoRegistros.bulkPut(ok(dados.habitoRegistros))
+    await db.movimentos.bulkPut(ok(dados.movimentos))
+    await db.contas.bulkPut(ok(dados.contas))
+    await db.objetivos.bulkPut(ok(dados.objetivos))
+    await db.recorrentes.bulkPut(ok(dados.recorrentes))
+    await db.orcamentoLinhas.bulkPut(ok(dados.orcamentoLinhas))
+    await db.financasConfig.bulkPut(ok(dados.financasConfig))
+    await db.patrimonioSnapshots.bulkPut(ok(dados.patrimonioSnapshots, 'mes'))
+    await db.arquivos.bulkPut(blobsArquivo(dados.arquivos))
+    await db.humores.bulkPut(ok(dados.humores))
+    await db.registros.bulkPut(ok(dados.registros))
+    await db.humorTipos.bulkPut(ok(dados.humorTipos, 'nivel'))
+    await db.categorias.bulkPut(ok(dados.categorias))
+    await db.fatores.bulkPut(ok(dados.fatores))
+    await db.saude.bulkPut(ok(dados.saude))
+    await db.saudeMedidas.bulkPut(ok(dados.saudeMedidas))
+    await db.atividades.bulkPut(ok(dados.atividades))
+    await db.refeicoes.bulkPut(ok(dados.refeicoes))
+    await db.profissionais.bulkPut(ok(dados.profissionais))
+    await db.consultas.bulkPut(ok(dados.consultas))
+    await db.medicamentos.bulkPut(ok(dados.medicamentos))
+    await db.medicamentoTomadas.bulkPut(ok(dados.medicamentoTomadas))
+    await db.exames.bulkPut(ok(dados.exames))
+    await db.vacinas.bulkPut(ok(dados.vacinas))
+    await db.doacoesSangue.bulkPut(ok(dados.doacoesSangue))
+    await db.saudeConfig.bulkPut(ok(dados.saudeConfig))
+    await db.livros.bulkPut(ok(dados.livros))
+    await db.notasLivro.bulkPut(ok(dados.notasLivro))
+    await db.destaques.bulkPut(ok(dados.destaques))
+    await db.categoriasHabito.bulkPut(ok(dados.categoriasHabito))
+    await db.pets.bulkPut(ok(dados.pets))
+    await db.petPesos.bulkPut(ok(dados.petPesos))
+    await db.petVacinas.bulkPut(ok(dados.petVacinas))
+    await db.petConsultas.bulkPut(ok(dados.petConsultas))
+    await db.petCondicoes.bulkPut(ok(dados.petCondicoes))
+    await db.petMedicamentos.bulkPut(ok(dados.petMedicamentos))
+    await db.petAlimentos.bulkPut(ok(dados.petAlimentos))
+    await db.petItens.bulkPut(ok(dados.petItens))
+    await db.petCuidados.bulkPut(ok(dados.petCuidados))
+    await db.petCuidadoRegistros.bulkPut(ok(dados.petCuidadoRegistros))
+    await db.petFotos.bulkPut(ok(dados.petFotos))
+    await db.petDocumentos.bulkPut(ok(dados.petDocumentos))
+    await db.petArquivos.bulkPut(blobsArquivo(dados.petArquivos))
+    await db.arquivosLivros.bulkPut(blobsLivro(dados.arquivosLivros))
+    await db.comprasListas.bulkPut(ok(dados.comprasListas))
+    await db.comprasItens.bulkPut(ok(dados.comprasItens))
+    await db.despensa.bulkPut(ok(dados.despensa))
+    await db.despensaHistorico.bulkPut(ok(dados.despensaHistorico))
+    await db.aquisicoes.bulkPut(ok(dados.aquisicoes))
+    await db.aquisicaoPrecos.bulkPut(ok(dados.aquisicaoPrecos))
+    await db.comprasConfig.bulkPut(ok(dados.comprasConfig))
+    await db.lugares.bulkPut(ok(dados.lugares))
+    await db.perfil.bulkPut(ok(dados.perfil))
+    await db.projetoItens.bulkPut(ok(dados.projetoItens))
+    await db.capturas.bulkPut(ok(dados.capturas))
+    await db.rotinas.bulkPut(ok(dados.rotinas))
+    await db.rotinaExecucoes.bulkPut(ok(dados.rotinaExecucoes))
+    await db.flashcards.bulkPut(ok(dados.flashcards))
+  })
+  marcarSujo() // garante que a restauração seja empurrada para a nuvem
   return {
     tasks: dados.tasks?.length ?? 0,
     paginas: dados.paginas?.length ?? 0,

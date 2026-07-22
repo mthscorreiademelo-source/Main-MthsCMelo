@@ -48,6 +48,17 @@ Sem segredos vazados; RLS correto; sem XSS. O que segue é refino, não resgate.
 - **Code-splitting por rota + ErrorBoundary por módulo.** Cada página agora é
   um chunk sob demanda (a Hoje segue no bundle inicial). Um módulo que quebra
   na renderização não derruba mais o app inteiro.
+- **Import de backup transacional + validação de forma.** Restaurar um backup
+  agora é tudo-ou-nada (uma falha no meio não deixa o banco pela metade) e só
+  grava registros bem-formados (objeto com chave presente); blob corrompido é
+  pulado em vez de derrubar a restauração.
+- **Sync não varre mais o banco inteiro a cada 12s quando nada mudou.** Um
+  sinal "sujo" (ligado pelos hooks de escrita do Dexie) faz a coleta pular a
+  varredura de ~65 tabelas quando não houve mudança local; quando há, cai na
+  varredura completa de sempre (semântica de sync intocada). Rede de segurança:
+  reconciliação completa periódica + sempre na 1ª coleta após carregar.
+  _Versão de baixo risco; um set por-registro (evita varrer tudo até durante
+  edição ativa) fica como refino futuro, junto dos testes de sync (item 1)._
 
 ---
 
@@ -63,18 +74,8 @@ Ordenado por valor/esforço. Nada aqui depende de você; é só dar o "vai".
    preservação de blob no pull. Plano: adicionar `fake-indexeddb` (dev dep) e
    testar: local-mais-novo-vence, tombstone-vence-cópia-velha, blob
    preservado quando o remoto chega sem ele, e um ciclo backup→apaga→restaura.
-   _É a maior lacuna de teste; fecha o maior risco de perda de dado._
-2. **Import de backup transacional + validação de forma (S/M).** O
-   `importarBackup` roda 60+ `bulkPut` sem transação (falha no meio = import
-   parcial) e não valida a forma dos registros. Envolver numa transação Dexie
-   e checar campos mínimos antes de gravar. Fecha a superfície de perda/
-   corrupção de dado ao restaurar.
-3. **Set "sujo" para a sync não varrer o banco inteiro a cada 12s (M).** Hoje
-   `coletarPendentes()` faz `.toArray()` em ~65 tabelas por ciclo. Fine hoje,
-   mas vira O(tudo) a cada 12s conforme os anos acumulam. Os hooks de escrita
-   do Dexie já existem; é só empurrarem `{coleção,id}` num set sujo e a sync
-   ler só o que mudou (mantendo a varredura completa como reconciliação
-   periódica). _Ganho de eficiência que compõe com o tempo._
+   _É a maior lacuna de teste; fecha o maior risco de perda de dado._ Fazer
+   junto do set por-registro (refino do item de sync já entregue)._
 
 ### Médio / baixo
 
