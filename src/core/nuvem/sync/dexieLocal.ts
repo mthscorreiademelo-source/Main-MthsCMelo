@@ -1,9 +1,17 @@
 import { db } from '../../db/db'
 import { comAplicacaoRemota } from './bandeira'
-import { chaveReal, COLECOES, idDoc } from './colecoes'
+import { chaveReal, COLECOES, ehTabelaBlob, idDoc, TABELAS_BLOB } from './colecoes'
 import { remotoVence, type Cursor, type LinhaDoc, type LocalStore, type Pendentes } from './engine'
 
 type Registro = Record<string, unknown> & { atualizadoEm?: number }
+
+/** Remove o Blob antes de enviar metadados de um anexo (o binário vai pelo Storage). */
+function semBlob(colecao: string, r: Registro): Registro {
+  if (!ehTabelaBlob(colecao)) return r
+  const campo = TABELAS_BLOB[colecao]
+  const { [campo]: _blob, ...resto } = r
+  return resto as Registro
+}
 
 /** A object store realmente existe no schema aberto do Dexie? */
 function tabelaExiste(nome: string): boolean {
@@ -28,6 +36,13 @@ export const localDexie: LocalStore = {
             await tabela.delete(chave)
             await db.espelho.delete(chaveEsp)
           } else {
+            // Anexo: preserva o binário local (o Storage repõe quando faltar).
+            if (ehTabelaBlob(l.colecao)) {
+              const campo = TABELAS_BLOB[l.colecao]
+              const doc = l.doc as Record<string, unknown>
+              const localBlob = (atual as Record<string, unknown> | undefined)?.[campo]
+              if (localBlob && doc[campo] == null) doc[campo] = localBlob
+            }
             await tabela.put(l.doc)
             await db.espelho.put({ chave: chaveEsp, atualizadoEm: l.atualizadoEm })
           }
@@ -50,7 +65,9 @@ export const localDexie: LocalStore = {
       const registros = (await tabela.toArray()) as Registro[]
       for (const r of registros) {
         const id = idDoc(colecao, r)
-        atualPorChave.set(`${colecao}:${id}`, { colecao, id, doc: r, at: r.atualizadoEm ?? 0 })
+        // Anexos empurram só os metadados; o binário vai pelo Storage.
+        const doc = semBlob(colecao, r)
+        atualPorChave.set(`${colecao}:${id}`, { colecao, id, doc, at: r.atualizadoEm ?? 0 })
       }
     }
     const espelho = new Map((await db.espelho.toArray()).map((e) => [e.chave, e.atualizadoEm]))

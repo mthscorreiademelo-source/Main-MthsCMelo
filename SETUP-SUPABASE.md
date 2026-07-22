@@ -66,3 +66,49 @@ VITE_SUPABASE_ANON_KEY=coloque-a-chave-anon-aqui
 
 Com isso configurado, aparece a seção **Conta** na barra lateral do Lume para
 entrar com o Google. A sincronização dos dados entra na sequência.
+
+## Anexos na nuvem (fotos, PDFs, desenhos, arquivos de livro)
+
+Por padrão, o Lume sincroniza **dados** (texto, números, metadados) entre os
+aparelhos, mas os **arquivos binários** (imagens de desenho, PDFs, anexos de
+nota, capas/arquivos de livro, fotos de pet) ficam **só no aparelho** — no outro
+aparelho a referência aparece sem o conteúdo. O código para sincronizá-los pelo
+**Supabase Storage** já está pronto, mas vem **desligado** até você criar o
+depósito (bucket) e validar. Passos:
+
+**1. Crie o bucket.** No painel do Supabase → **Storage** → **New bucket**:
+- Nome: `anexos`
+- **Private** (não marque "Public").
+
+**2. Aplique as policies** (Storage → Policies, ou SQL Editor). Elas garantem
+que cada usuário só acessa a própria pasta (`anexos/{seu-id}/…`):
+
+```sql
+-- Ler os próprios anexos
+create policy "anexos: ler os meus"
+on storage.objects for select to authenticated
+using ( bucket_id = 'anexos' and (storage.foldername(name))[1] = auth.uid()::text );
+
+-- Enviar/atualizar os próprios anexos
+create policy "anexos: enviar os meus"
+on storage.objects for insert to authenticated
+with check ( bucket_id = 'anexos' and (storage.foldername(name))[1] = auth.uid()::text );
+
+create policy "anexos: atualizar os meus"
+on storage.objects for update to authenticated
+using ( bucket_id = 'anexos' and (storage.foldername(name))[1] = auth.uid()::text );
+
+-- Apagar os próprios anexos
+create policy "anexos: apagar os meus"
+on storage.objects for delete to authenticated
+using ( bucket_id = 'anexos' and (storage.foldername(name))[1] = auth.uid()::text );
+```
+
+**3. Ligue o recurso.** Em `src/core/nuvem/sync/colecoes.ts`, troque
+`export const ANEXOS_ATIVO = false` para `true` e faça o deploy. (Me avise que
+eu troco e valido junto — vale testar em dois aparelhos: criar um desenho num,
+confirmar que a imagem aparece no outro.)
+
+Enquanto `ANEXOS_ATIVO` estiver `false`, **nada muda**: os blobs continuam
+locais e o backup JSON segue sendo a forma de levá-los para outro aparelho.
+Custo: o Storage do Supabase inclui **1 GB grátis**, suficiente para uso pessoal.

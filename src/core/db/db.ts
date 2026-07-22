@@ -424,9 +424,21 @@ export async function exportarBackup() {
       dados: await blobParaBase64(a.blob),
     })),
   )
+  const arquivosLivros = await db.arquivosLivros.toArray()
+  const arquivosLivrosSerial = await Promise.all(
+    arquivosLivros.map(async (a) => ({
+      id: a.id,
+      nome: a.nome,
+      formato: a.formato,
+      tamanho: a.tamanho,
+      criadoEm: a.criadoEm,
+      mime: a.blob.type || '',
+      dados: await blobParaBase64(a.blob),
+    })),
+  )
   return {
     app: 'vida',
-    versao: 9,
+    versao: 10,
     exportadoEm: new Date().toISOString(),
     tasks: await db.tasks.toArray(),
     projetos: await db.projetos.toArray(),
@@ -479,6 +491,7 @@ export async function exportarBackup() {
     petFotos: await db.petFotos.toArray(),
     petDocumentos: await db.petDocumentos.toArray(),
     petArquivos: petArquivosSerial,
+    arquivosLivros: arquivosLivrosSerial,
     comprasListas: await db.comprasListas.toArray(),
     comprasItens: await db.comprasItens.toArray(),
     despensa: await db.despensa.toArray(),
@@ -501,6 +514,16 @@ interface ArquivoSerial {
   tipo: string
   tamanho: number
   criadoEm: number
+  dados: string
+}
+
+interface ArquivoLivroSerial {
+  id: string
+  nome: string
+  formato: ArquivoLivro['formato']
+  tamanho: number
+  criadoEm: number
+  mime: string
   dados: string
 }
 
@@ -559,6 +582,7 @@ export async function importarBackup(json: unknown) {
     petFotos?: PetFoto[]
     petDocumentos?: PetDocumento[]
     petArquivos?: ArquivoSerial[]
+    arquivosLivros?: ArquivoLivroSerial[]
     comprasListas?: ListaCompra[]
     comprasItens?: ItemCompra[]
     despensa?: ItemDespensa[]
@@ -652,6 +676,18 @@ export async function importarBackup(json: unknown) {
         tamanho: a.tamanho,
         criadoEm: a.criadoEm,
         blob: base64ParaBlob(a.dados, a.tipo),
+      })),
+    )
+  }
+  if (Array.isArray(dados.arquivosLivros)) {
+    await db.arquivosLivros.bulkPut(
+      dados.arquivosLivros.map((a) => ({
+        id: a.id,
+        nome: a.nome,
+        formato: a.formato,
+        tamanho: a.tamanho,
+        criadoEm: a.criadoEm,
+        blob: base64ParaBlob(a.dados, a.mime || ''),
       })),
     )
   }

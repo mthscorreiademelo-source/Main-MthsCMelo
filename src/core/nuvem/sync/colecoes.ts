@@ -1,13 +1,37 @@
 /**
  * Tabelas que sincronizam e o campo que é a chave primária de cada uma.
- * `arquivos` (blobs) fica de fora — vai para o Storage numa etapa futura.
+ *
+ * Anexos (blobs) têm um caminho próprio: os METADADOS viajam por aqui (sem o
+ * blob), e o BINÁRIO vai pelo Supabase Storage (ver `anexos.ts`). Isso só entra
+ * em vigor quando `ANEXOS_ATIVO` é ligado — o que exige criar o bucket no
+ * Supabase (ver SETUP-SUPABASE.md). Enquanto desligado, nada muda: os blobs
+ * seguem 100% locais, como antes.
  */
 export interface ColecaoSync {
   colecao: string
   chave: string
 }
 
-export const COLECOES: ColecaoSync[] = [
+/**
+ * Liga a sincronização de anexos (metadados via `documentos` + binário via
+ * Storage). Mantido DESLIGADO até o bucket `anexos` existir no Supabase e o
+ * fluxo ser validado em dois aparelhos reais. Ligar = criar o bucket + policies
+ * (SETUP-SUPABASE.md) e trocar isto para `true`.
+ */
+export const ANEXOS_ATIVO = false
+
+/** Tabelas de anexo → campo que guarda o Blob (removido no push, preservado no pull). */
+export const TABELAS_BLOB: Record<string, string> = {
+  arquivos: 'blob',
+  arquivosLivros: 'blob',
+  petArquivos: 'blob',
+}
+
+export function ehTabelaBlob(colecao: string): boolean {
+  return Object.prototype.hasOwnProperty.call(TABELAS_BLOB, colecao)
+}
+
+const COLECOES_BASE: ColecaoSync[] = [
   { colecao: 'tasks', chave: 'id' },
   { colecao: 'projetos', chave: 'id' },
   { colecao: 'eventos', chave: 'id' },
@@ -70,6 +94,11 @@ export const COLECOES: ColecaoSync[] = [
   { colecao: 'rotinas', chave: 'id' },
   { colecao: 'rotinaExecucoes', chave: 'id' },
 ]
+
+// Metadados dos anexos só entram na sincronização quando o recurso está ligado.
+const COLECOES_BLOB: ColecaoSync[] = Object.keys(TABELAS_BLOB).map((colecao) => ({ colecao, chave: 'id' }))
+
+export const COLECOES: ColecaoSync[] = ANEXOS_ATIVO ? [...COLECOES_BASE, ...COLECOES_BLOB] : COLECOES_BASE
 
 export const NOMES_SYNC = COLECOES.map((c) => c.colecao)
 

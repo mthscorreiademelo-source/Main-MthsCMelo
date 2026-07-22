@@ -4,6 +4,7 @@ import { obterCliente } from '../cliente'
 import { cursorLocalStorage, localDexie } from './dexieLocal'
 import { sincronizar } from './engine'
 import { definirStatus } from './estado'
+import { sincronizarAnexos } from './anexos'
 import { transporteSupabase } from './supabaseTransporte'
 
 const INTERVALO_MS = 12000
@@ -33,6 +34,8 @@ function iniciar(clienteUid: { cliente: Awaited<ReturnType<typeof obterCliente>>
     definirStatus({ estado: 'sincronizando' })
     try {
       await sincronizar(localDexie, transporte, cursor)
+      // Binários dos anexos (Storage) — isolado e defensivo, nunca derruba o sync.
+      await sincronizarAnexos(cliente, uid)
       definirStatus({ estado: 'ok', em: Date.now() })
     } catch (e) {
       console.error('[lume sync] falha:', e)
