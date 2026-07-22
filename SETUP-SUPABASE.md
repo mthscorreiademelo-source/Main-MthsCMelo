@@ -112,3 +112,34 @@ confirmar que a imagem aparece no outro.)
 Enquanto `ANEXOS_ATIVO` estiver `false`, **nada muda**: os blobs continuam
 locais e o backup JSON segue sendo a forma de levá-los para outro aparelho.
 Custo: o Storage do Supabase inclui **1 GB grátis**, suficiente para uso pessoal.
+
+## IA na Captura Rápida (Gemini grátis, opcional)
+
+A Captura Rápida entende texto por heurística (offline, sempre). Dá para
+turbiná-la com IA de graça: uma Edge Function chama o **Google Gemini** (tier
+gratuito) e devolve uma interpretação melhor — que você ainda confirma. Fica
+**desligada** até você publicar a função; se ela falhar/estiver off, o app cai
+na heurística (zero regressão).
+
+**1. Pegue uma chave grátis do Gemini** em https://aistudio.google.com/apikey
+(botão *Create API key*). O tier gratuito cobre uso pessoal com folga.
+
+**2. Publique a função** (precisa do [Supabase CLI](https://supabase.com/docs/guides/cli)):
+
+```bash
+supabase login                       # abre o navegador uma vez
+supabase link --project-ref SEU_REF  # o ref está na URL do seu projeto
+supabase secrets set GEMINI_API_KEY=coloque-sua-chave-aqui
+supabase functions deploy interpretar
+```
+
+(O código da função já está no repositório em `supabase/functions/interpretar/`.
+Ela verifica o login do usuário automaticamente — só quem está logado chama.)
+
+**3. Ligue no app:** em `src/core/captura/ia.ts`, troque
+`export const IA_CAPTURA_ATIVA = false` para `true` e faça o deploy. (Me avise
+que eu troco e a gente testa: digitar "reunião com a Ana quinta 15h, cobrar
+R$200" deve virar um evento certinho.)
+
+Custo: a Edge Function é grátis (500k invocações/mês) e o Gemini free também —
+para uso pessoal, **R$0/mês**.

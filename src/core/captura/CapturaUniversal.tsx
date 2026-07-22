@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
-import { rotuloData } from '../dates'
+import { hojeISO, rotuloData } from '../dates'
 import { formatarBRL } from '../../modules/financas/db'
 import { interpretar } from './interpretar'
+import { interpretarIA } from './ia'
 import { aplicarInterpretacao, desfazer } from './fluxos'
 import { criarCaptura } from './db'
 import { mostrarToast } from './store'
@@ -37,27 +38,37 @@ export function CapturaUniversal({ textoInicial, autoFocus, aoFechar }: {
 }) {
   const [texto, setTexto] = useState(textoInicial ?? '')
   const [analisado, setAnalisado] = useState<string | null>(null)
+  const [cands, setCands] = useState<Interpretacao[]>([])
+  const [analisando, setAnalisando] = useState(false)
+  const [fonteIA, setFonteIA] = useState(false)
   const [caret, setCaret] = useState(0)
   const ref = useRef<HTMLTextAreaElement>(null)
   const fontes = useFontesTokens()
 
   useEffect(() => { if (autoFocus) ref.current?.focus() }, [autoFocus])
 
-  // Aplica os tokens (#/@) resolvidos sobre cada candidato heurístico.
-  const comTokens = useMemo(() => {
-    return (t: string): Interpretacao[] => {
+  // Resolve os tokens (#/@) e devolve o texto limpo + os campos extras.
+  const resolverExtra = useMemo(() => {
+    return (t: string) => {
       const tk = resolverTokens(t, fontes)
       const base = tk.textoLimpo.trim().length > 1 ? tk.textoLimpo : t
       const extra: Partial<Interpretacao['campos']> = {}
       if (tk.pessoa) extra.pessoa = tk.pessoa
       if (tk.categoria) extra.categoria = tk.categoria
       if (tk.projetoId) { extra.projetoId = tk.projetoId; extra.projetoNome = tk.projetoNome }
-      return interpretar(base).map((i) => ({ ...i, campos: { ...i.campos, ...extra } }))
+      return { base, extra }
     }
   }, [fontes])
 
-  const cands = useMemo(() => (analisado ? comTokens(analisado) : []), [analisado, comTokens])
-  const previa = useMemo(() => (texto.trim().length > 2 ? comTokens(texto)[0] : null), [texto, comTokens])
+  const mesclar = (lista: Interpretacao[], extra: Partial<Interpretacao['campos']>) =>
+    lista.map((i) => ({ ...i, campos: { ...i.campos, ...extra } }))
+
+  // Prévia instantânea (só heurística local, sem rede).
+  const previa = useMemo(() => {
+    if (texto.trim().length <= 2) return null
+    const { base, extra } = resolverExtra(texto)
+    return mesclar(interpretar(base), extra)[0] ?? null
+  }, [texto, resolverExtra])
 
   const ativo = useMemo(() => (analisado ? null : tokenAtivo(texto, caret)), [texto, caret, analisado])
   const sugestoes = useMemo(() => (ativo ? sugestoesPara(ativo, fontes) : []), [ativo, fontes])
@@ -85,9 +96,16 @@ export function CapturaUniversal({ textoInicial, autoFocus, aoFechar }: {
     })
   }
 
-  function analisar() {
+  async function analisar() {
     if (texto.trim().length < 2) return
     setAnalisado(texto)
+    setAnalisando(true)
+    const { base, extra } = resolverExtra(texto)
+    const ia = await interpretarIA(base, hojeISO())
+    const lista = ia ?? interpretar(base)
+    setCands(mesclar(lista, extra))
+    setFonteIA(!!ia)
+    setAnalisando(false)
   }
 
   async function salvar(i: Interpretacao) {
@@ -97,7 +115,8 @@ export function CapturaUniversal({ textoInicial, autoFocus, aoFechar }: {
   }
 
   async function paraCaixa() {
-    const melhor = cands[0] ?? comTokens(texto)[0]
+    const { base, extra } = resolverExtra(texto)
+    const melhor = cands[0] ?? mesclar(interpretar(base), extra)[0]
     await criarCaptura({
       origem: 'universal',
       textoBruto: texto.trim(),
@@ -116,7 +135,7 @@ export function CapturaUniversal({ textoInicial, autoFocus, aoFechar }: {
         <textarea
           ref={ref}
           value={texto}
-          onChange={(e) => { setTexto(e.target.value); setCaret(e.target.selectionStart ?? 0); if (analisado) setAnalisado(null) }}
+          onChange={(e) => { setTexto(e.target.value); setCaret(e.target.selectionStart ?? 0); if (analisado) { setAnalisado(null); setCands([]) } }}
           onKeyUp={sincronizarCaret}
           onClick={sincronizarCaret}
           onKeyDown={(e) => {
@@ -166,11 +185,16 @@ export function CapturaUniversal({ textoInicial, autoFocus, aoFechar }: {
         >
           Interpretar
         </button>
+      ) : analisando ? (
+        <div className="flex min-h-11 items-center justify-center gap-2 text-[13px] text-muted">
+          <span className="size-3 animate-spin rounded-full border-2 border-line border-t-accent" />
+          Interpretando…
+        </div>
       ) : (
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className="text-[12px] font-semibold uppercase tracking-wide text-muted">Como guardar?</span>
-            <span className="text-[10.5px] text-muted/70">interpretação automática (heurística)</span>
+            <span className="text-[10.5px] text-muted/70">{fonteIA ? '✨ IA · Gemini' : 'heurística local'} — confirme antes</span>
           </div>
           {cands.map((i, idx) => {
             const info = TIPO_INFO[i.tipo]
