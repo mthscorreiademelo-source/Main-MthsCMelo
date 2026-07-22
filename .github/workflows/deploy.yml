@@ -23,6 +23,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Portões de qualidade: só publica se lint e testes passarem.
+      - run: npm run lint
+      - run: npm test
       - run: npm run build
         env:
           # Ligam a nuvem quando os segredos existirem; sem eles, build local-first.

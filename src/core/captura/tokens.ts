@@ -5,9 +5,10 @@
  * dados que já existem no app (projetos de Tarefas, categorias do orçamento,
  * pessoas que já apareceram em eventos). O `#` casa com um projeto existente
  * pelo nome; se não casar, vale como rótulo de categoria livre.
+ *
+ * Este módulo é PURO (sem Dexie/React) para poder ser testado isolado. O hook
+ * que lê as fontes do banco fica em `tokens-fontes.ts`.
  */
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../db/db'
 
 export type TipoToken = 'projeto' | 'categoria' | 'pessoa'
 
@@ -30,31 +31,6 @@ export interface FontesTokens {
 
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const semEspaco = (s: string) => s.replace(/\s+/g, '')
-
-/** Reúne, de forma reativa, as fontes de sugestão a partir do banco. */
-export function useFontesTokens(): FontesTokens {
-  return (
-    useLiveQuery(async () => {
-      const [projetos, linhas, eventos] = await Promise.all([
-        db.projetos.toArray(),
-        db.orcamentoLinhas.toArray(),
-        db.eventos.toArray(),
-      ])
-      const cats = new Set<string>()
-      for (const l of linhas) {
-        if (l.nome) cats.add(l.nome)
-        for (const c of l.categorias ?? []) cats.add(c)
-      }
-      const pessoas = new Set<string>()
-      for (const e of eventos) for (const p of e.participantes ?? []) if (p?.trim()) pessoas.add(p.trim())
-      return {
-        projetos: projetos.map((p) => ({ id: p.id, nome: p.nome, cor: p.cor })),
-        categorias: [...cats].sort((a, b) => a.localeCompare(b, 'pt-BR')),
-        pessoas: [...pessoas].sort((a, b) => a.localeCompare(b, 'pt-BR')),
-      }
-    }, []) ?? { projetos: [], categorias: [], pessoas: [] }
-  )
-}
 
 /** Resultado de resolver os tokens de um texto. */
 export interface TokensResolvidos {

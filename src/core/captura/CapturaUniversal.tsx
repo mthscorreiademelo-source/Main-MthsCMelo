@@ -6,7 +6,8 @@ import { aplicarInterpretacao, desfazer } from './fluxos'
 import { criarCaptura } from './db'
 import { mostrarToast } from './store'
 import { CONF, TIPO_INFO } from './rotulos'
-import { useFontesTokens, resolverTokens, tokenAtivo, sugestoesPara, type Sugestao } from './tokens'
+import { resolverTokens, tokenAtivo, sugestoesPara, type Sugestao } from './tokens'
+import { useFontesTokens } from './tokens-fontes'
 import type { Interpretacao } from './types'
 
 function resumoCampos(i: Interpretacao): string {
