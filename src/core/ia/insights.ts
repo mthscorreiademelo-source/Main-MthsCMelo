@@ -35,14 +35,14 @@ interface Cache {
 
 function lerCache(chave: string): Cache | null {
   try {
-    return JSON.parse(localStorage.getItem(`lume:insight:${chave}`) || 'null')
+    return JSON.parse(localStorage.getItem(`lume:insight:v2:${chave}`) || 'null')
   } catch {
     return null
   }
 }
 function gravarCache(chave: string, c: Cache) {
   try {
-    localStorage.setItem(`lume:insight:${chave}`, JSON.stringify(c))
+    localStorage.setItem(`lume:insight:v2:${chave}`, JSON.stringify(c))
   } catch {
     /* ignora localStorage cheio */
   }
