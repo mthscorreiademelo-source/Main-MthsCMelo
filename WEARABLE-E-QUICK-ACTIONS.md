@@ -158,15 +158,29 @@ MVP recomendado = **Fase 1 + Fase 2**: já entrega "me avisa em qualquer lugar" 
 - **iOS:** Web Push só em PWA instalado (iOS 16.4+); Health Connect é Android — no
   iPhone o equivalente é Apple Health (muda o companion).
 
-## 7. Decisões abertas (dependem de você)
+## 7. Decisões (atualizado)
 
-1. **Celular é Android ou iPhone?** Muda o caminho de saúde (Health Connect vs
-   Apple Health) e alguns detalhes de push.
-2. **Publicar na Zepp Store** algum dia ou manter **só em modo dev** (pessoal)?
-3. Prioridade do MVP: começar por **notificações (Fase 1)** ou por **Quick Actions
-   no pulso (Fase 2)**?
-4. Saúde: aceitar a rota **Health Connect/companion (A2)** como base, ou você quer
-   fazer questão da coleta **nativa no relógio (A1)** desde já?
+- ✅ **Celular: Android** → saúde via **Google Health Connect** + companion Android.
+- ✅ **MVP começa pela Fase 1 (Notificações / Web Push)** — roda dentro do PWA +
+  Supabase atuais, sem código de relógio, e o Bip 6 espelha os avisos de graça.
+- ⏳ Publicar na Zepp Store vs. só modo dev — decidir quando chegarmos na Fase 2.
+- ⏳ Saúde nativa no relógio (A1) — opcional, depois da rota Health Connect (A2).
+
+### Fase 1 — recorte de responsabilidades
+
+**Eu escrevo (no PWA/repo):**
+- Service worker: handlers `push` e `notificationclick` (abre a tela certa do Lume).
+- Fluxo de assinatura: pedir permissão + `pushManager.subscribe(VAPID)` + salvar a
+  subscription no Supabase.
+- SQL de uma tabela `push_assinaturas` (com RLS por `user_id`).
+- Edge Function `enviar-lembretes`: monta e dispara os pushes (Web Push + VAPID).
+- Lógica de "o que avisar e quando" (hábito do dia, tarefa vencendo, remédio, conta,
+  evento) + tela de Ajustes para ligar/escolher os lembretes.
+
+**Você configura (no seu Supabase, que não alcanço deste ambiente):**
+- Rodar o SQL da tabela nova.
+- Definir os segredos `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` (eu gero o par).
+- Fazer deploy da Edge Function e agendar (pg_cron/Scheduler) a execução periódica.
 
 ---
 
