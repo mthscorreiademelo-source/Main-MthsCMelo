@@ -148,3 +148,19 @@ R$200" deve virar um evento certinho.)
 
 Custo: a Edge Function é grátis (500k invocações/mês) e o Gemini free também —
 para uso pessoal, **R$0/mês**.
+
+## IA nos Insights (observações em linguagem natural, opcional)
+
+Além da Captura Rápida, dá para deixar os **insights/observações** do app serem
+redigidos por IA — sempre em cima dos **números reais** calculados no aparelho
+(a IA só redige, não inventa) e com **cache** para não estourar o free tier.
+Desligado até publicar a função `insights`.
+
+1. Publique a segunda função (mesmo fluxo da `interpretar`, pelo painel ou CLI):
+   o código está em `supabase/functions/insights/`. Reutiliza o mesmo segredo
+   `GEMINI_API_KEY`.
+2. Ligue no app: em `src/core/ia/insights.ts`, troque `IA_INSIGHTS_ATIVA = false`
+   para `true` e faça o deploy. (Me avise que eu troco.)
+
+Cache: cada observação é gerada no máximo a cada 6h (ou ao regenerar), então um
+usuário pessoal faz pouquíssimas chamadas/dia — segue **grátis** no free tier.

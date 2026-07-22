@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { IconeFator } from '../../core/components/icones'
 import { db } from '../../core/db/db'
+import { useInsightIA } from '../../core/ia/insights'
 import { dataPorExtenso, hojeISO, saudacao } from '../../core/dates'
 import { emojiEspecie } from '../pets/db'
 import { catInfo, diasRestantes, statusValidade } from '../compras/db'
@@ -521,25 +522,53 @@ export function HojePage() {
     })
   }
 
-  /* ----------------------------- Insight do dia -------------------------- */
-  // Observação factual do dia, escolhida entre vários sinais dos módulos.
-  // Sempre honesta: descreve um padrão/contagem, nunca afirma causa.
-  const insight = insightDoDia({
+  /* ----------------------------- Observação do dia ----------------------- */
+  // A heurística de sempre é o fallback; a IA (quando ligada) redige em cima
+  // dos MESMOS números reais. Sempre honesta: padrão observado, nunca causa.
+  const insightHeur = insightDoDia({
     habitos: habitos ?? [],
     regHabitos: regHabitos ?? [],
     movimentos: movimentos ?? [],
     regHumor: regHumor ?? [],
     hoje,
   })
-  if (insight) {
+  const streakGeralHoje = habitos && regHabitos ? streakGeral(habitos, regHabitos) : 0
+  const resumoHabHoje = habitos && regHabitos ? resumoDoDia(habitos, regHabitos, hoje) : null
+  const gastoHojeCent = (movimentos ?? [])
+    .filter((m) => m.data === hoje && m.tipo === 'saida')
+    .reduce((s, m) => s + m.valorCentavos, 0)
+  const dadosInsight = {
+    faixaDoDia: FAIXAS[faixa].rotulo,
+    eventosHoje: cronologicos.length,
+    tarefasHoje: tarefasHoje.length,
+    tarefasAtrasadas: atrasadas,
+    habitosFeitos: resumoHabHoje?.feitos ?? null,
+    habitosTotal: resumoHabHoje?.total ?? null,
+    sequenciaHabitosDias: streakGeralHoje,
+    gastoHojeReais: Math.round(gastoHojeCent) / 100,
+  }
+  const assinaturaInsight = `${hoje}|${cronologicos.length}|${tarefasHoje.length}|${atrasadas}|${resumoHabHoje?.feitos ?? -1}/${resumoHabHoje?.total ?? -1}|${streakGeralHoje}|${gastoHojeCent}`
+  const insightIA = useInsightIA({
+    chave: 'hoje',
+    contexto: 'resumo e observação do dia de hoje de uma pessoa',
+    dados: dadosInsight,
+    assinatura: assinaturaInsight,
+    heuristico: insightHeur?.texto ?? null,
+  })
+  if (insightIA.texto || insightIA.fonte === 'carregando') {
+    const emoji = insightIA.fonte === 'ia' ? '✨' : (insightHeur?.emoji ?? '💡')
     blocos.push({
       id: 'insight',
       prioridade: 50,
       tamanho: 'pequeno',
       render: (t) => (
         <CartaoHoje tamanho={t} className="bg-ink/[0.03]">
-          <span className="text-[12px] font-semibold uppercase tracking-wide text-muted">Observação {insight.emoji}</span>
-          <p className="mt-1 text-[14px] font-medium">{insight.texto}</p>
+          <span className="text-[12px] font-semibold uppercase tracking-wide text-muted">Observação {emoji}</span>
+          {insightIA.fonte === 'carregando' && !insightIA.texto ? (
+            <p className="mt-1 text-[13px] text-muted">Pensando…</p>
+          ) : (
+            <p className="mt-1 text-[14px] font-medium">{insightIA.texto}</p>
+          )}
         </CartaoHoje>
       ),
     })
