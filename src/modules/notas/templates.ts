@@ -3,7 +3,7 @@
  * blocos; nada trava o conteúdo depois.
  */
 import { db } from '../../core/db/db'
-import { criarPagina, novoBloco } from './db'
+import { criarPagina, novoBloco, registrarSeedNota } from './db'
 import type { TipoBloco } from './types'
 
 export interface TemplateNota {
@@ -79,10 +79,14 @@ export const TEMPLATES_NOTA: TemplateNota[] = [
 
 export async function criarPaginaDeTemplate(tpl: TemplateNota, grupoId?: string): Promise<string> {
   const id = await criarPagina(grupoId, 'texto')
+  const blocos = tpl.blocos.map((b) => novoBloco(b.tipo, b.texto))
   await db.paginas.update(id, {
     titulo: tpl.titulo ?? '',
-    blocos: tpl.blocos.map((b) => novoBloco(b.tipo, b.texto)),
+    blocos,
     atualizadaEm: Date.now(),
   })
+  // Assinatura do modelo "de partida": se fechar sem editar, é descartado.
+  const pagina = await db.paginas.get(id)
+  if (pagina) registrarSeedNota(pagina)
   return id
 }

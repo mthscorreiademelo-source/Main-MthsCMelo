@@ -42,6 +42,10 @@ export interface CampoInterpretado {
   categoria?: string
   local?: string
   pessoa?: string
+  /** Projeto marcado com `#` na captura (Tarefas/Notas). */
+  projetoId?: string
+  /** Nome do projeto (só para exibição no preview). */
+  projetoNome?: string
 }
 
 /** Um palpite de interpretação — sempre confirmável, nunca gravado sozinho. */

@@ -74,6 +74,25 @@ export async function excluirEvento(id: string) {
   await db.eventos.delete(id)
 }
 
+/** Evento recém-criado sem nenhuma informação real (só o nome padrão). */
+export function eventoVazio(e: Evento): boolean {
+  return (
+    (!e.titulo || e.titulo.trim() === '' || e.titulo === 'Novo evento') &&
+    !e.local && !e.descricao && !(e.participantes?.length) &&
+    !e.custoCentavos && !e.diaInteiro && !e.recorrencia && !e.cronogramaId
+  )
+}
+
+/** Apaga o evento se estiver vazio. Retorna `true` se descartou. */
+export async function descartarEventoSeVazio(id: string): Promise<boolean> {
+  const e = await db.eventos.get(id)
+  if (e && eventoVazio(e)) {
+    await db.eventos.delete(id)
+    return true
+  }
+  return false
+}
+
 /* ---------- cronogramas ---------- */
 
 export async function criarCronograma(dados: Partial<Cronograma> & { nome: string }): Promise<string> {

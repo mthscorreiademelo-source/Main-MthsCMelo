@@ -9,7 +9,7 @@ import { ChipsRelacao } from './components/RelacoesNota'
 import { ExtrairAcoes } from './components/ExtrairAcoes'
 import { baixarNotaMd } from './markdown'
 import { DesenhoTela } from './components/DesenhoTela'
-import { excluirPagina, novoBloco, ordenarGrupos, salvarPagina } from './db'
+import { excluirPagina, finalizarEdicaoNota, novoBloco, ordenarGrupos, salvarPagina } from './db'
 import { useGrupos } from './hooks'
 import type { Pagina, TipoBloco } from './types'
 
@@ -23,6 +23,8 @@ export function EditorNotaPage() {
   const [extrair, setExtrair] = useState(false)
   const carregouEm = useRef(0)
   const tituloRef = useRef<HTMLTextAreaElement>(null)
+  const paginaRef = useRef<Pagina | null>(null)
+  const encerradaRef = useRef(false)
 
   useEffect(() => {
     if (!id) return
@@ -35,6 +37,17 @@ export function EditorNotaPage() {
       }
     })
   }, [id, navigate])
+
+  // Mantém a referência com a versão mais recente para o descarte no fechamento.
+  useEffect(() => { paginaRef.current = pagina }, [pagina])
+
+  // Ao sair do editor: descarta notas vazias / modelos não editados, ou salva.
+  useEffect(() => {
+    return () => {
+      const p = paginaRef.current
+      if (p && !encerradaRef.current) finalizarEdicaoNota(p)
+    }
+  }, [])
 
   // Salvamento automático com debounce (ignora o set inicial do carregamento)
   useEffect(() => {
@@ -87,6 +100,7 @@ export function EditorNotaPage() {
       setConfirmandoExclusao(true)
       return
     }
+    encerradaRef.current = true
     await excluirPagina(pagina!.id)
     navigate(rotaVoltar)
   }
@@ -103,6 +117,7 @@ export function EditorNotaPage() {
         onMudar={(mudancas) => setPagina((p) => (p ? { ...p, ...mudancas } : p))}
         onVoltar={() => navigate(rotaVoltar)}
         onExcluir={async () => {
+          encerradaRef.current = true
           await excluirPagina(pagina.id)
           navigate(rotaVoltar)
         }}

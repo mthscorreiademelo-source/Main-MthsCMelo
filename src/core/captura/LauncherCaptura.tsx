@@ -9,7 +9,7 @@ import { useProjetos } from '../../modules/tarefas/hooks'
 import { AddMovimento } from '../../modules/financas/components/AddMovimento'
 import { EditorEvento } from '../../modules/agenda/components/EditorEvento'
 import { useCronogramas } from '../../modules/agenda/hooks'
-import { criarEvento } from '../../modules/agenda/db'
+import { criarEvento, descartarEventoSeVazio } from '../../modules/agenda/db'
 import { criarPagina } from '../../modules/notas/db'
 import { criarItemCompra, criarLista } from '../../modules/compras/db'
 import { useListas } from '../../modules/compras/hooks'
@@ -147,7 +147,7 @@ export function LauncherCaptura() {
       <EditorEvento
         evento={eventoEdit}
         cronogramas={cronogramas ?? []}
-        onFechar={() => setEventoEdit(null)}
+        onFechar={() => { descartarEventoSeVazio(eventoEdit.id); setEventoEdit(null) }}
       />
     )
   }

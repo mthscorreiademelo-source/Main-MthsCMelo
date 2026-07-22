@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { EmptyState } from '../../../core/components/EmptyState'
 import { FolhaInferior } from '../../../core/components/FolhaInferior'
 import { IconMais } from '../../../core/components/Icons'
 import { db } from '../../../core/db/db'
 import { mostrarToast } from '../../../core/captura/store'
 import { useHabitos } from '../hooks'
-import { agendarRotina, arquivarRotina, criarRotinaDeTemplate, excluirRotina, TEMPLATES_ROTINA, useRotinas } from './db'
+import { agendarRotina, arquivarRotina, criarRotinaDeTemplate, descartarRotinaSeVazia, excluirRotina, TEMPLATES_ROTINA, useRotinas } from './db'
 import { EditorRotina } from './EditorRotina'
 import { ExecucaoGuiada } from './ExecucaoGuiada'
 import { ROTULO_PERIODO, type Rotina } from './types'
@@ -51,6 +51,7 @@ export function AbaRotinas() {
   const [editando, setEditando] = useState<Rotina | null>(null)
   const [executando, setExecutando] = useState<Rotina | null>(null)
   const [criando, setCriando] = useState(false)
+  const recemCriada = useRef<string | null>(null)
 
   const ativas = (rotinas ?? []).filter((r) => !r.arquivada)
 
@@ -58,7 +59,15 @@ export function AbaRotinas() {
     const rid = await criarRotinaDeTemplate(id)
     setCriando(false)
     const r = await db.rotinas.get(rid)
-    if (r) setEditando(r)
+    if (r) { recemCriada.current = rid; setEditando(r) }
+  }
+
+  // Ao fechar o editor: descarta a rotina recém-criada se ficou em branco.
+  function fecharEditor() {
+    const id = editando?.id
+    if (id && recemCriada.current === id) descartarRotinaSeVazia(id)
+    recemCriada.current = null
+    setEditando(null)
   }
 
   return (
@@ -95,7 +104,7 @@ export function AbaRotinas() {
         </FolhaInferior>
       )}
 
-      {editando && <EditorRotina rotina={ativas.find((r) => r.id === editando.id) ?? editando} habitos={habitos ?? []} onFechar={() => setEditando(null)} />}
+      {editando && <EditorRotina rotina={ativas.find((r) => r.id === editando.id) ?? editando} habitos={habitos ?? []} onFechar={fecharEditor} />}
       {executando && <ExecucaoGuiada rotina={ativas.find((r) => r.id === executando.id) ?? executando} onFechar={() => setExecutando(null)} />}
     </div>
   )

@@ -10,6 +10,7 @@ import { db } from '../db/db'
 import { criarTarefa, excluirTarefa } from '../../modules/tarefas/db'
 import { criarEvento, excluirEvento } from '../../modules/agenda/db'
 import { criarPagina, excluirPagina, novoBloco } from '../../modules/notas/db'
+import { adicionarRelacao } from '../../modules/notas/acoes'
 import { criarItemCompra, criarLista, excluirItem } from '../../modules/compras/db'
 import { criarMovimento, excluirMovimento, formatarBRL } from '../../modules/financas/db'
 import type { Interpretacao } from './types'
@@ -65,7 +66,7 @@ export async function aplicarInterpretacao(interp: Interpretacao): Promise<Resul
   switch (interp.tipo) {
     case 'tarefa':
     case 'lembrete': {
-      const id = await criarTarefa({ titulo, data: c.data, horario: c.horaInicio })
+      const id = await criarTarefa({ titulo, data: c.data, horario: c.horaInicio, projetoId: c.projetoId })
       if (!id) return null
       return { colecao: 'tasks', id, confirmacao: `Tarefa criada${c.data ? '' : ''}` }
     }
@@ -75,6 +76,7 @@ export async function aplicarInterpretacao(interp: Interpretacao): Promise<Resul
         data: c.data ?? hojeISO(),
         inicio: c.horaInicio ?? '09:00',
         local: c.local,
+        participantes: c.pessoa ? [c.pessoa] : undefined,
       })
       return { colecao: 'eventos', id, confirmacao: 'Evento criado na agenda' }
     }
@@ -103,6 +105,10 @@ export async function aplicarInterpretacao(interp: Interpretacao): Promise<Resul
     case 'desenho':
     default: {
       const id = await criarNotaComTexto(titulo)
+      if (c.projetoId) {
+        const pagina = await db.paginas.get(id)
+        if (pagina) await adicionarRelacao(pagina, { tipo: 'projeto', id: c.projetoId })
+      }
       return { colecao: 'paginas', id, confirmacao: 'Nota salva' }
     }
   }

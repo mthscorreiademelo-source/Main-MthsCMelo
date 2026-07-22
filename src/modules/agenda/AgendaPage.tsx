@@ -13,7 +13,7 @@ import { GerenciarCronogramas } from './components/GerenciarCronogramas'
 import { PlannerTresDias } from './components/PlannerTresDias'
 import { VistaMes } from './components/VistaMes'
 import { VistaMultiMes } from './components/VistaMultiMes'
-import { criarEvento, excluirEvento, expandirEventos, paraHHMM, rotuloRecorrencia, semearContextosSePreciso } from './db'
+import { criarEvento, eventoVazio, excluirEvento, expandirEventos, paraHHMM, rotuloRecorrencia, semearContextosSePreciso } from './db'
 import { useCronogramas, useEventos } from './hooks'
 import type { Evento } from './types'
 
@@ -59,13 +59,7 @@ export function AgendaPage() {
    *  nenhuma informação (nome padrão e nada preenchido). */
   function fecharEditorEvento() {
     const e = editorEvento && evs.find((x) => x.id === editorEvento.id)
-    if (e && recemCriado.current === e.id) {
-      const vazio =
-        (!e.titulo || e.titulo === 'Novo evento') &&
-        !e.local && !e.descricao && !(e.participantes?.length) &&
-        !e.custoCentavos && !e.diaInteiro && !e.recorrencia && !e.cronogramaId
-      if (vazio) excluirEvento(e.id)
-    }
+    if (e && recemCriado.current === e.id && eventoVazio(e)) excluirEvento(e.id)
     recemCriado.current = null
     setEditorEvento(null)
   }

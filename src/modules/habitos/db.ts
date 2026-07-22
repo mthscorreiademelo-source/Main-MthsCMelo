@@ -106,7 +106,8 @@ export function novaFrequencia(): Frequencia {
   return { tipo: 'diario' }
 }
 
-export async function criarHabito(dados: Partial<Habito> & { nome: string }): Promise<string> {
+export async function criarHabito(dados: Partial<Habito> & { nome: string }): Promise<string | undefined> {
+  if (!dados.nome?.trim()) return
   const agora = Date.now()
   const max = await db.habitos.orderBy('ordem').last()
   const id = dados.id ?? nanoid()
@@ -119,6 +120,7 @@ export async function criarHabito(dados: Partial<Habito> & { nome: string }): Pr
     ordem: (max?.ordem ?? 0) + 1,
     criadoEm: agora,
     ...dados,
+    nome: dados.nome.trim(),
   })
   return id
 }

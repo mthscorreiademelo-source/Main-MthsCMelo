@@ -24,6 +24,7 @@ export async function criarPagina(
     ...(tipo === 'arquivos' ? { tipo, arquivos: [] } : {}),
   }
   await db.paginas.add(pagina)
+  registrarSeedNota(pagina)
   return pagina.id
 }
 
@@ -41,6 +42,54 @@ export async function excluirPagina(id: string) {
   const pagina = await db.paginas.get(id)
   if (pagina?.arquivos?.length) await excluirArquivos(pagina.arquivos)
   await db.paginas.delete(id)
+}
+
+/* ---------- descarte automático de notas vazias ---------- */
+
+/**
+ * Assinatura determinística do conteúdo "de partida" de uma nota, para detectar
+ * se um modelo foi aberto e fechado sem nenhuma edição do usuário.
+ */
+export function assinaturaNota(pagina: Pagina): string {
+  return JSON.stringify({
+    t: (pagina.titulo ?? '').trim(),
+    b: (pagina.blocos ?? []).map((b) => [b.tipo, (b.texto ?? '').trim(), b.feito ? 1 : 0]),
+    r: pagina.tracos?.length ?? 0,
+    a: pagina.arquivos?.length ?? 0,
+  })
+}
+
+// Guarda a assinatura inicial de notas recém-criadas (inclusive modelos) só
+// enquanto a sessão vive — some no reload, e nesse caso vale a regra "vazia".
+const seedInicial = new Map<string, string>()
+
+export function registrarSeedNota(pagina: Pagina) {
+  seedInicial.set(pagina.id, assinaturaNota(pagina))
+}
+
+/** Nota sem nenhum conteúdo real: sem título, sem texto, sem traços, sem arquivos. */
+export function notaVazia(pagina: Pagina): boolean {
+  if ((pagina.titulo ?? '').trim()) return false
+  if (pagina.tipo === 'desenho') return (pagina.tracos?.length ?? 0) === 0
+  if (pagina.tipo === 'arquivos') return (pagina.arquivos?.length ?? 0) === 0
+  return (pagina.blocos ?? []).every((b) => !(b.texto ?? '').trim())
+}
+
+/**
+ * Ao sair do editor: apaga a nota se estiver vazia OU se for um modelo/nota
+ * recém-criada que o usuário fechou sem alterar nada. Caso contrário, garante o
+ * salvamento final. Retorna `true` se a nota foi descartada.
+ */
+export async function finalizarEdicaoNota(pagina: Pagina): Promise<boolean> {
+  const seed = seedInicial.get(pagina.id)
+  seedInicial.delete(pagina.id)
+  const inalteradaDeModelo = seed !== undefined && assinaturaNota(pagina) === seed
+  if (notaVazia(pagina) || inalteradaDeModelo) {
+    await excluirPagina(pagina.id)
+    return true
+  }
+  await salvarPagina(pagina)
+  return false
 }
 
 /** Primeira linha de conteúdo, para o preview na lista. */

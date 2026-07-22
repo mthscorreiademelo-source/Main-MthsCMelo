@@ -94,6 +94,22 @@ export async function criarRotinaDeTemplate(templateId: string): Promise<string>
 export const atualizarRotina = (id: string, m: Partial<Rotina>) =>
   db.rotinas.update(id, { ...m, atualizadoEm: Date.now() })
 
+/** Rotina recém-criada que ficou sem etapas e com o nome padrão. */
+export function rotinaVazia(r: Rotina): boolean {
+  const semNome = !r.nome?.trim() || r.nome.trim() === 'Nova rotina'
+  return semNome && (r.etapas?.length ?? 0) === 0 && !r.horario && !(r.dias?.length)
+}
+
+/** Apaga a rotina se estiver vazia. Retorna `true` se descartou. */
+export async function descartarRotinaSeVazia(id: string): Promise<boolean> {
+  const r = await db.rotinas.get(id)
+  if (r && rotinaVazia(r)) {
+    await db.rotinas.delete(id)
+    return true
+  }
+  return false
+}
+
 export const arquivarRotina = (id: string, arquivada = true) => atualizarRotina(id, { arquivada })
 
 export async function excluirRotina(id: string) {
