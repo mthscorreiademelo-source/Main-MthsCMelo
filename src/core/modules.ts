@@ -23,7 +23,6 @@ import { AgendaPage } from '../modules/agenda/AgendaPage'
 import { HabitosPage } from '../modules/habitos/HabitosPage'
 import { HabitoDetalhePage } from '../modules/habitos/HabitoDetalhePage'
 import { HabitosEstatisticasPage } from '../modules/habitos/HabitosEstatisticasPage'
-import { HabitosHoje } from '../modules/habitos/components/HabitosHoje'
 import { HumorPage } from '../modules/humor/HumorPage'
 import { SaudePage } from '../modules/saude/SaudePage'
 import { FinancasPage } from '../modules/financas/FinancasPage'
@@ -38,22 +37,6 @@ import { ComprasPage } from '../modules/compras/ComprasPage'
 import { ItemDespensaPage } from '../modules/compras/ItemDespensaPage'
 import { AquisicaoPage } from '../modules/compras/AquisicaoPage'
 import { LugaresPage } from '../modules/lugares/LugaresPage'
-import { SecaoHoje as TarefasHoje } from '../modules/tarefas/SecaoHoje'
-import { SecaoHoje as NotasHoje } from '../modules/notas/SecaoHoje'
-import { SecaoHoje as HumorHoje } from '../modules/humor/SecaoHoje'
-import { SecaoHoje as SaudeHoje } from '../modules/saude/SecaoHoje'
-import { SecaoHoje as FinancasHoje } from '../modules/financas/SecaoHoje'
-import { SecaoHoje as BibliotecaHoje } from '../modules/biblioteca/SecaoHoje'
-import { SecaoHoje as AgendaHoje } from '../modules/agenda/SecaoHoje'
-import { SecaoHoje as PetsHoje } from '../modules/pets/SecaoHoje'
-import { HojeResumo as PetsResumo } from '../modules/pets/HojeResumo'
-import { SecaoHoje as ComprasHoje } from '../modules/compras/SecaoHoje'
-import { HojeResumo as ComprasResumo } from '../modules/compras/HojeResumo'
-import { HojeResumo as TarefasResumo } from '../modules/tarefas/HojeResumo'
-import { HojeResumo as AgendaResumo } from '../modules/agenda/HojeResumo'
-import { HojeResumo as HabitosResumo } from '../modules/habitos/HojeResumo'
-import { HojeResumo as HumorResumo } from '../modules/humor/HojeResumo'
-import { HojeResumo as SaudeResumo } from '../modules/saude/HojeResumo'
 
 export interface ModuloDef {
   id: string
@@ -65,16 +48,6 @@ export interface ModuloDef {
   subRotas?: { caminho: string; Pagina: ComponentType }[]
   /** Módulo gerencia o próprio layout (sem padding/scroll do shell). */
   telaCheia?: boolean
-  /**
-   * Contribuição do módulo para o dashboard Hoje. O Hoje compõe todas as
-   * seções registradas — módulo novo aparece sozinho, sem tocar no Hoje.
-   * Retorne null quando não houver nada relevante no dia.
-   */
-  SecaoHoje?: ComponentType
-  /** Mini-tile glanceável do "cockpit" no topo do Hoje (null se nada). */
-  HojeResumo?: ComponentType
-  /** Peso do cartão na grade do Hoje: 'destaque' (ancora o topo) ou 'compacto'. */
-  hojeTamanho?: 'destaque' | 'compacto'
 }
 
 /**
@@ -90,9 +63,6 @@ export const MODULOS: ModuloDef[] = [
     rota: '/tarefas',
     Icone: IconCheckCircle,
     Pagina: TarefasPage,
-    SecaoHoje: TarefasHoje,
-    HojeResumo: TarefasResumo,
-    hojeTamanho: 'destaque',
   },
   {
     id: 'agenda',
@@ -100,9 +70,6 @@ export const MODULOS: ModuloDef[] = [
     rota: '/agenda',
     Icone: IconCalendario,
     Pagina: AgendaPage,
-    SecaoHoje: AgendaHoje,
-    HojeResumo: AgendaResumo,
-    hojeTamanho: 'compacto',
   },
   {
     id: 'notas',
@@ -114,8 +81,6 @@ export const MODULOS: ModuloDef[] = [
       { caminho: '/notas/grupo/:id', Pagina: GrupoPage },
       { caminho: '/notas/:id', Pagina: EditorNotaPage },
     ],
-    SecaoHoje: NotasHoje,
-    hojeTamanho: 'compacto',
   },
   {
     id: 'habitos',
@@ -127,9 +92,6 @@ export const MODULOS: ModuloDef[] = [
       { caminho: '/habitos/estatisticas', Pagina: HabitosEstatisticasPage },
       { caminho: '/habitos/:id', Pagina: HabitoDetalhePage },
     ],
-    SecaoHoje: HabitosHoje,
-    HojeResumo: HabitosResumo,
-    hojeTamanho: 'destaque',
   },
   {
     id: 'humor',
@@ -138,9 +100,6 @@ export const MODULOS: ModuloDef[] = [
     Icone: IconHumor,
     Pagina: HumorPage,
     telaCheia: true,
-    SecaoHoje: HumorHoje,
-    HojeResumo: HumorResumo,
-    hojeTamanho: 'compacto',
   },
   {
     id: 'saude',
@@ -148,9 +107,6 @@ export const MODULOS: ModuloDef[] = [
     rota: '/saude',
     Icone: IconSaude,
     Pagina: SaudePage,
-    SecaoHoje: SaudeHoje,
-    HojeResumo: SaudeResumo,
-    hojeTamanho: 'compacto',
   },
   {
     id: 'financas',
@@ -158,8 +114,6 @@ export const MODULOS: ModuloDef[] = [
     rota: '/financas',
     Icone: IconCifrao,
     Pagina: FinancasPage,
-    SecaoHoje: FinancasHoje,
-    hojeTamanho: 'compacto',
   },
   {
     id: 'biblioteca',
@@ -172,8 +126,6 @@ export const MODULOS: ModuloDef[] = [
       { caminho: '/biblioteca/:id/ler', Pagina: LeitorPage },
       { caminho: '/biblioteca/:id', Pagina: LivroPage },
     ],
-    SecaoHoje: BibliotecaHoje,
-    hojeTamanho: 'compacto',
   },
   {
     id: 'projetos',
@@ -190,9 +142,6 @@ export const MODULOS: ModuloDef[] = [
     Icone: IconPata,
     Pagina: PetsPage,
     subRotas: [{ caminho: '/pets/:id', Pagina: PetWorkspacePage }],
-    SecaoHoje: PetsHoje,
-    HojeResumo: PetsResumo,
-    hojeTamanho: 'compacto',
   },
   {
     id: 'compras',
@@ -204,9 +153,6 @@ export const MODULOS: ModuloDef[] = [
       { caminho: '/compras/despensa/:id', Pagina: ItemDespensaPage },
       { caminho: '/compras/aquisicao/:id', Pagina: AquisicaoPage },
     ],
-    SecaoHoje: ComprasHoje,
-    HojeResumo: ComprasResumo,
-    hojeTamanho: 'compacto',
   },
   {
     id: 'lugares',

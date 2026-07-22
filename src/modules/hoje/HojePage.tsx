@@ -1,7 +1,12 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { IconeFator } from '../../core/components/icones'
+import { db } from '../../core/db/db'
 import { dataPorExtenso, hojeISO, saudacao } from '../../core/dates'
+import { emojiEspecie } from '../pets/db'
+import { catInfo, diasRestantes, statusValidade } from '../compras/db'
+import type { ItemDespensa, MovDespensa } from '../compras/types'
 import { eventosDoDia } from '../agenda/db'
 import { useEventos } from '../agenda/hooks'
 import { AnelProgresso } from '../habitos/components/AnelProgresso'
@@ -67,6 +72,41 @@ export function HojePage() {
   const movimentos = useMovimentos()
   const livros = useLivros()
   const paginas = usePaginas()
+
+  // Pets: cuidados de hoje ainda pendentes, por pet.
+  const petsPendentes = useLiveQuery(async () => {
+    const dia = agora.getDay()
+    const pets = await db.pets.filter((p) => p.status !== 'arquivado').toArray()
+    const out: { id: string; nome: string; emoji: string; pendentes: number; total: number }[] = []
+    for (const p of pets) {
+      const cuidados = await db.petCuidados.where('petId').equals(p.id).toArray()
+      const doDia = cuidados.filter((c) => c.ativo && (!c.dias || c.dias.length === 0 || c.dias.includes(dia)))
+      if (doDia.length === 0) continue
+      const regs = await db.petCuidadoRegistros.where('petId').equals(p.id).filter((r) => r.data === hoje && r.feito).toArray()
+      const feitos = new Set(regs.map((r) => r.cuidadoId))
+      const pendentes = doDia.filter((c) => !feitos.has(c.id)).length
+      if (pendentes > 0) out.push({ id: p.id, nome: p.nome, emoji: p.emoji ?? emojiEspecie(p.especie), pendentes, total: doDia.length })
+    }
+    return out
+  }, [hoje])
+
+  // Compras: itens da despensa provavelmente acabando ou vencendo.
+  const despensaAlertas = useLiveQuery(async () => {
+    const itens = (await db.despensa.toArray()) as ItemDespensa[]
+    if (itens.length === 0) return []
+    const hist = await db.despensaHistorico.toArray()
+    const mapa: Record<string, MovDespensa[]> = {}
+    for (const m of hist) (mapa[m.despensaId] ??= []).push(m)
+    const out: { id: string; nome: string; icone: string; motivo: string }[] = []
+    for (const i of itens) {
+      const dias = i.monitorarIA === false ? null : diasRestantes(i, mapa[i.id] ?? [])
+      const val = statusValidade(i)
+      if (dias != null && dias <= 3) out.push({ id: i.id, nome: i.nome, icone: catInfo(i.categoria).icone, motivo: `~${dias} ${dias === 1 ? 'dia' : 'dias'}` })
+      else if (i.nivelAprox === 'quase_vazio' && i.monitorarIA !== false) out.push({ id: i.id, nome: i.nome, icone: catInfo(i.categoria).icone, motivo: 'quase acabando' })
+      else if (['vencido', 'hoje'].includes(val)) out.push({ id: i.id, nome: i.nome, icone: catInfo(i.categoria).icone, motivo: val === 'vencido' ? 'vencido' : 'vence hoje' })
+    }
+    return out.slice(0, 5)
+  }, [hoje])
 
   const blocos: Bloco[] = []
 
@@ -424,19 +464,82 @@ export function HojePage() {
     })
   }
 
+  /* ------------------------------- Pets ---------------------------------- */
+  if (petsPendentes && petsPendentes.length > 0) {
+    const totalPend = petsPendentes.reduce((s, l) => s + l.pendentes, 0)
+    blocos.push({
+      id: 'pets',
+      prioridade: 42 + (faixa === 'manha' ? 10 : 0),
+      tamanho: 'medio',
+      render: (t) => (
+        <CartaoHoje tamanho={t}>
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[13px] font-semibold">Cuidados dos pets</span>
+            <Link to="/pets" className="text-[12px] text-muted hover:text-ink">{totalPend} pendente{totalPend > 1 ? 's' : ''}</Link>
+          </div>
+          <ul className="flex flex-col gap-0.5">
+            {petsPendentes.slice(0, 4).map((l) => (
+              <li key={l.id}>
+                <Link to={`/pets/${l.id}`} className="flex items-center gap-2.5 rounded-lg px-1 py-1.5 transition-colors hover:bg-hover">
+                  <span className="text-[16px]" aria-hidden>{l.emoji}</span>
+                  <span className="flex-1 truncate text-[14px]">{l.nome}</span>
+                  <span className="shrink-0 text-[11px] text-muted">{l.total - l.pendentes}/{l.total}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </CartaoHoje>
+      ),
+    })
+  }
+
+  /* ------------------------------ Compras -------------------------------- */
+  if (despensaAlertas && despensaAlertas.length > 0) {
+    blocos.push({
+      id: 'compras',
+      prioridade: 34,
+      tamanho: 'pequeno',
+      render: (t) => (
+        <CartaoHoje tamanho={t}>
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[13px] font-semibold">Provavelmente acabando</span>
+            <Link to="/compras" className="text-[12px] text-muted hover:text-ink">ver</Link>
+          </div>
+          <ul className="flex flex-col gap-0.5">
+            {despensaAlertas.map((a) => (
+              <li key={a.id}>
+                <Link to={`/compras/despensa/${a.id}`} className="flex items-center gap-2.5 rounded-lg px-1 py-1.5 transition-colors hover:bg-hover">
+                  <span className="text-[15px]" aria-hidden>{a.icone}</span>
+                  <span className="flex-1 truncate text-[14px]">{a.nome}</span>
+                  <span className="shrink-0 text-[11px] text-muted">{a.motivo}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </CartaoHoje>
+      ),
+    })
+  }
+
   /* ----------------------------- Insight do dia -------------------------- */
-  const streak = habitos && regHabitos ? streakGeral(habitos, regHabitos) : 0
-  if (streak >= 3) {
+  // Observação factual do dia, escolhida entre vários sinais dos módulos.
+  // Sempre honesta: descreve um padrão/contagem, nunca afirma causa.
+  const insight = insightDoDia({
+    habitos: habitos ?? [],
+    regHabitos: regHabitos ?? [],
+    movimentos: movimentos ?? [],
+    regHumor: regHumor ?? [],
+    hoje,
+  })
+  if (insight) {
     blocos.push({
       id: 'insight',
       prioridade: 50,
       tamanho: 'pequeno',
       render: (t) => (
         <CartaoHoje tamanho={t} className="bg-ink/[0.03]">
-          <span className="text-[12px] font-semibold uppercase tracking-wide text-muted">Insight</span>
-          <p className="mt-1 text-[14px] font-medium">
-            Você mantém todos os hábitos há {streak} dias seguidos. 🔥
-          </p>
+          <span className="text-[12px] font-semibold uppercase tracking-wide text-muted">Observação {insight.emoji}</span>
+          <p className="mt-1 text-[14px] font-medium">{insight.texto}</p>
         </CartaoHoje>
       ),
     })
@@ -555,6 +658,65 @@ function RibbonDia({
       </div>
     </div>
   )
+}
+
+/**
+ * "Observação do dia": escolhe UM sinal factual entre vários módulos, em ordem
+ * de relevância. É sempre honesta — descreve uma contagem/padrão observado,
+ * nunca afirma causa. Retorna null quando não há nada digno de nota.
+ */
+function insightDoDia({
+  habitos,
+  regHabitos,
+  movimentos,
+  regHumor,
+  hoje,
+}: {
+  habitos: Parameters<typeof streakGeral>[0]
+  regHabitos: Parameters<typeof streakGeral>[1]
+  movimentos: { data: string; tipo: string; valorCentavos: number }[]
+  regHumor: { data: string; nivel: number }[]
+  hoje: string
+}): { texto: string; emoji: string } | null {
+  const dMs = (d: string) => new Date(`${d}T00:00:00`).getTime()
+  const hojeMs = dMs(hoje)
+
+  // 1. Sequência de hábitos mantida.
+  const streak = habitos.length && regHabitos.length ? streakGeral(habitos, regHabitos) : 0
+  if (streak >= 3) return { texto: `Você mantém todos os hábitos há ${streak} dias seguidos.`, emoji: '🔥' }
+
+  // 2. Gasto de hoje comparado à média diária dos últimos 30 dias.
+  const saidas = movimentos.filter((m) => m.tipo === 'saida')
+  if (saidas.length >= 8) {
+    const janela = saidas.filter((m) => { const t = dMs(m.data); return t >= hojeMs - 30 * 86400000 && t < hojeMs })
+    const diasComGasto = new Set(janela.map((m) => m.data)).size
+    const gastoHoje = saidas.filter((m) => m.data === hoje).reduce((s, m) => s + m.valorCentavos, 0)
+    if (diasComGasto >= 5 && gastoHoje > 0) {
+      const media = janela.reduce((s, m) => s + m.valorCentavos, 0) / diasComGasto
+      const dif = media > 0 ? Math.round(((gastoHoje - media) / media) * 100) : 0
+      if (Math.abs(dif) >= 20) {
+        return {
+          texto: `Hoje você gastou ${formatarBRL(gastoHoje)} — ${Math.abs(dif)}% ${dif > 0 ? 'acima' : 'abaixo'} da sua média diária (${formatarBRL(Math.round(media))}).`,
+          emoji: dif > 0 ? '💸' : '🟢',
+        }
+      }
+    }
+  }
+
+  // 3. Humor médio desta semana vs. a anterior (observação, não causa).
+  if (regHumor.length >= 6) {
+    const semana = regHumor.filter((r) => { const t = dMs(r.data); return t > hojeMs - 7 * 86400000 && t <= hojeMs })
+    const anterior = regHumor.filter((r) => { const t = dMs(r.data); return t > hojeMs - 14 * 86400000 && t <= hojeMs - 7 * 86400000 })
+    if (semana.length >= 3 && anterior.length >= 3) {
+      const media = (arr: { nivel: number }[]) => arr.reduce((s, r) => s + r.nivel, 0) / arr.length
+      const dif = media(semana) - media(anterior)
+      if (Math.abs(dif) >= 0.4) {
+        return { texto: `Seu humor médio nesta semana está ${dif > 0 ? 'mais alto' : 'mais baixo'} que na semana anterior.`, emoji: dif > 0 ? '🙂' : '🫂' }
+      }
+    }
+  }
+
+  return null
 }
 
 function MensagemIA({
