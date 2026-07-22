@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
+import { SEMEAR_EXEMPLOS } from '../../core/db/exemplos'
 import type {
   Atividade,
   Consulta,
@@ -324,6 +325,7 @@ function iso(off: number): string {
 
 /** Semeia um prontuário de exemplo na primeira visita (tudo editável). */
 export async function semearSaudeSePreciso() {
+  if (!SEMEAR_EXEMPLOS) return
   const cfg = await db.saudeConfig.get('default')
   if (cfg?.semeado) return
   await salvarSaudeConfig({

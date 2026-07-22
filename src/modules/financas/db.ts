@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
+import { SEMEAR_EXEMPLOS } from '../../core/db/exemplos'
 import type {
   Conta,
   FinancasConfig,
@@ -286,6 +287,7 @@ function tsHoje(h: number, min: number): number {
  * Tudo é editável/removível. Guardado por `config.semeado`.
  */
 export async function semearFinancasSePreciso() {
+  if (!SEMEAR_EXEMPLOS) return
   const cfg = await db.financasConfig.get('default')
   if (cfg?.semeado) return
   const jaTemContas = (await db.contas.count()) > 0

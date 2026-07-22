@@ -1,6 +1,7 @@
 import { addDays, differenceInCalendarDays, differenceInMonths, differenceInYears, format, parseISO } from 'date-fns'
 import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
+import { SEMEAR_EXEMPLOS } from '../../core/db/exemplos'
 import { criarMovimento } from '../financas/db'
 import { hojeISO } from '../../core/dates'
 import type {
@@ -489,6 +490,7 @@ const CHAVE_SEED = 'lume-pets-semeado'
 
 /** Cria um pet de exemplo (Oli) na primeira visita, para o módulo não nascer vazio. */
 export async function semearPetsSePreciso(): Promise<void> {
+  if (!SEMEAR_EXEMPLOS) return
   if (typeof localStorage !== 'undefined' && localStorage.getItem(CHAVE_SEED)) return
   const total = await db.pets.count()
   if (total > 0) {

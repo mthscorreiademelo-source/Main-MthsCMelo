@@ -1,6 +1,7 @@
 import { addDays, addMonths, addWeeks, addYears, format, parseISO, startOfWeek } from 'date-fns'
 import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
+import { SEMEAR_EXEMPLOS } from '../../core/db/exemplos'
 import type { Contexto, Cronograma, Evento, RecorrenciaEvento } from './types'
 
 /** Paleta de cores dos eventos (estilo Google Calendar). */
@@ -152,6 +153,7 @@ export const excluirContexto = (id: string) => db.contextos.delete(id)
 
 /** Semeia contextos padrão na primeira visita (Sono + Trabalho), editáveis. */
 export async function semearContextosSePreciso() {
+  if (!SEMEAR_EXEMPLOS) return
   if ((await db.contextos.count()) > 0) return
   if (localStorage.getItem('lume:contextos:semeado') === '1') return
   localStorage.setItem('lume:contextos:semeado', '1')

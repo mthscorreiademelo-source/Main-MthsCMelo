@@ -1,6 +1,7 @@
 import { addDays, differenceInCalendarDays, format, parseISO } from 'date-fns'
 import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
+import { SEMEAR_EXEMPLOS } from '../../core/db/exemplos'
 import { criarMovimento } from '../financas/db'
 import { hojeISO } from '../../core/dates'
 import type {
@@ -422,6 +423,7 @@ export function statusValidade(item: ItemDespensa): 'vencido' | 'hoje' | 'semana
 const CHAVE_SEED = 'lume-compras-semeado'
 
 export async function semearComprasSePreciso(): Promise<void> {
+  if (!SEMEAR_EXEMPLOS) return
   if (typeof localStorage !== 'undefined' && localStorage.getItem(CHAVE_SEED)) return
   const nListas = await db.comprasListas.count()
   if (nListas > 0) {

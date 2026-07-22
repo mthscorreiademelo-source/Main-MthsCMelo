@@ -11,7 +11,7 @@ import {
   IconUpload,
 } from '../components/Icons'
 import { exportarBackup, importarBackup } from '../db/db'
-import { limparDadosExemplo } from '../db/exemplos'
+import { recomecarDoZero } from '../db/exemplos'
 import { sair, useSessao } from '../nuvem/auth'
 import { nuvemAtiva } from '../nuvem/config'
 import { EntrarModal } from '../nuvem/EntrarModal'
@@ -125,10 +125,25 @@ export function RodapeConta() {
     }
   }
 
-  async function limparExemplos() {
-    if (!confirm('Apagar os dados de exemplo (Oli, itens de exemplo da despensa, "Ovos" e "Notebook novo")?\n\nNão apaga nada que você já tenha criado ou editado.')) return
-    const n = await limparDadosExemplo()
-    avisar(n > 0 ? `${n} registro(s) de exemplo apagado(s)` : 'Nenhum dado de exemplo encontrado')
+  const [recomecando, setRecomecando] = useState(false)
+  async function recomecar() {
+    if (
+      !confirm(
+        'Recomeçar do zero?\n\nIsto APAGA todos os seus dados — aqui e na nuvem (Finanças, Saúde, Humor, Hábitos, Agenda, Pets, Compras, Biblioteca, Projetos, etc.).\n\nSEUS TAREFAS E NOTAS/CADERNOS SÃO PRESERVADOS.\n\nAção irreversível. Continuar?',
+      )
+    )
+      return
+    if (!confirm('Tem certeza? Não dá para desfazer.')) return
+    setRecomecando(true)
+    avisar('Apagando…')
+    try {
+      await recomecarDoZero()
+      avisar('Pronto! Recarregando…')
+      setTimeout(() => window.location.reload(), 900)
+    } catch (e) {
+      setRecomecando(false)
+      avisar(`Falha ao recomeçar: ${String(e).slice(0, 80)}`)
+    }
   }
 
   return (
@@ -250,12 +265,13 @@ export function RodapeConta() {
             <button
               onClick={() => {
                 setPainel(null)
-                limparExemplos()
+                recomecar()
               }}
-              className="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-[13.5px] font-medium text-muted transition-colors hover:bg-hover/70 hover:text-danger"
+              disabled={recomecando}
+              className="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-[13.5px] font-medium text-muted transition-colors hover:bg-hover/70 hover:text-danger disabled:opacity-50"
             >
               <IconLixeira width={16} height={16} />
-              Apagar dados de exemplo
+              Recomeçar do zero
             </button>
           </div>
         )}

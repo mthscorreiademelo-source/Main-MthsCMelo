@@ -1,51 +1,78 @@
 import { db } from './db'
-import { excluirPet } from '../../modules/pets/db'
+import { NOMES_SYNC } from '../nuvem/sync/colecoes'
+import { obterCliente } from '../nuvem/cliente'
 
 /**
- * Remove APENAS os registros de exemplo semeados na 1ª visita (Oli, alguns itens
- * da despensa, a aquisição "Notebook novo" e o item "Ovos"). Não toca em nada
- * que você tenha criado ou editado — se você renomeou um item de exemplo, ele
- * passa a ser "seu" e não é apagado por aqui.
+ * Semeadura de CONTEÚDO de exemplo (finanças, saúde, compras, pets e os
+ * contextos da agenda) fica DESLIGADA: o app começa em branco, esperando dados
+ * reais. Os padrões FUNCIONAIS (rostos de humor, categorias e fatores, categorias
+ * de hábito) continuam sendo semeados pelos próprios módulos — sem eles os
+ * seletores não teriam o que oferecer.
  */
-const DESPENSA_EXEMPLO = ['Café', 'Papel higiênico', 'Arroz', 'Shampoo Elseve']
-const AQUISICAO_EXEMPLO = ['Notebook novo']
-const ITEM_LISTA_EXEMPLO = ['Ovos']
+export const SEMEAR_EXEMPLOS = false
 
-export async function limparDadosExemplo(): Promise<number> {
-  let n = 0
+/**
+ * Coleções preservadas no "Recomeçar do zero":
+ * - dados do usuário: tarefas e notas/cadernos;
+ * - padrões funcionais dos seletores (humor + categorias de hábito);
+ * - identidade (perfil).
+ * Todo o resto é apagado — local e nuvem.
+ */
+const MANTER = new Set<string>([
+  'tasks', // tarefas
+  'paginas', 'grupos', // notas e cadernos
+  'humorTipos', 'categorias', 'fatores', // seletores de humor
+  'categoriasHabito', // categorias de hábito
+  'perfil', // identidade (nome/foto)
+])
 
-  // Pet de exemplo (remove também seu estoque, gastos e eventos vinculados).
-  const oli = (await db.pets.toArray()).find((p) => p.nome === 'Oli')
-  if (oli) {
-    await excluirPet(oli.id)
-    n++
-  }
+/** Coleções sincronizadas que o reset apaga (tudo que não está em MANTER). */
+export function colecoesParaZerar(): string[] {
+  return NOMES_SYNC.filter((c) => !MANTER.has(c))
+}
 
-  // Itens da despensa de exemplo (os não vinculados a pet).
-  for (const d of await db.despensa.toArray()) {
-    if (!d.petId && DESPENSA_EXEMPLO.includes(d.nome)) {
-      const h = await db.despensaHistorico.where('despensaId').equals(d.id).primaryKeys()
-      await db.despensaHistorico.bulkDelete(h as string[])
-      await db.despensa.delete(d.id)
-      n++
+/**
+ * Recomeça do zero: apaga TODO o conteúdo (local + nuvem) MENOS tarefas, notas
+ * e os padrões funcionais. Na nuvem marca os documentos como excluídos (o
+ * "tombstone" propaga a exclusão para os outros aparelhos); no local limpa as
+ * tabelas zeradas e o espelho dessas coleções. Não toca em tarefas/notas nem
+ * nos seletores. Irreversível.
+ */
+export async function recomecarDoZero(): Promise<void> {
+  const zerar = colecoesParaZerar()
+
+  // 1) NUVEM: marca como excluído no servidor. A RLS já restringe às linhas do
+  //    próprio usuário; o `eq(user_id)` é só clareza. Em lotes para não estourar
+  //    o tamanho da query. O gatilho de updated_at faz a exclusão propagar.
+  const cliente = await obterCliente()
+  if (cliente) {
+    const { data } = await cliente.auth.getUser()
+    const uid = data.user?.id
+    if (uid) {
+      for (let i = 0; i < zerar.length; i += 40) {
+        const lote = zerar.slice(i, i + 40)
+        const { error } = await cliente
+          .from('documentos')
+          .update({ deleted: true })
+          .eq('user_id', uid)
+          .in('colecao', lote)
+        if (error) throw error
+      }
     }
   }
 
-  // Item de lista de exemplo.
-  for (const i of await db.comprasItens.toArray()) {
-    if (ITEM_LISTA_EXEMPLO.includes(i.nome)) {
-      await db.comprasItens.delete(i.id)
-      n++
+  // 2) LOCAL: limpa as tabelas zeradas + a tabela legada + o espelho dessas
+  //    coleções (assim o próximo ciclo não tenta reenviar nada).
+  await db.transaction('rw', db.tables, async () => {
+    for (const c of zerar) {
+      const t = (db as unknown as Record<string, { clear?: () => Promise<void> }>)[c]
+      if (t?.clear) await t.clear()
     }
-  }
-
-  // Aquisição de exemplo.
-  for (const a of await db.aquisicoes.toArray()) {
-    if (AQUISICAO_EXEMPLO.includes(a.nome)) {
-      await db.aquisicoes.delete(a.id)
-      n++
-    }
-  }
-
-  return n
+    await db.humores.clear() // humor antigo (legado, não sincroniza)
+    const espelho = await db.espelho.toArray()
+    const remover = espelho
+      .filter((e) => zerar.some((c) => e.chave.startsWith(`${c}:`)))
+      .map((e) => e.chave)
+    if (remover.length) await db.espelho.bulkDelete(remover)
+  })
 }
