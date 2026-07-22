@@ -17,7 +17,32 @@ import { obterCliente } from '../nuvem/cliente'
 export const IA_INSIGHTS_ATIVA = true
 
 /** Por quanto tempo um insight de IA fica em cache antes de poder regenerar. */
-const TTL_MS = 6 * 60 * 60 * 1000
+const TTL_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Teto diário de chamadas de IA por aparelho — folga de sobra para o uso
+ * pessoal (as observações ficam em cache por 24h), mas evita estourar o free
+ * tier do Gemini em rajadas. Ao atingir, cai na heurística até o dia virar.
+ */
+const LIMITE_DIA = 100
+
+function contadorHoje(): { dia: string; n: number } {
+  const hoje = hojeISO()
+  try {
+    const c = JSON.parse(localStorage.getItem('lume:insight:contador') || 'null')
+    if (c && c.dia === hoje) return c
+  } catch { /* ignora */ }
+  return { dia: hoje, n: 0 }
+}
+function podeChamarIA(): boolean {
+  return contadorHoje().n < LIMITE_DIA
+}
+function registrarChamadaIA() {
+  const c = contadorHoje()
+  try {
+    localStorage.setItem('lume:insight:contador', JSON.stringify({ dia: c.dia, n: c.n + 1 }))
+  } catch { /* ignora */ }
+}
 
 export type FonteInsight = 'ia' | 'heuristica' | 'carregando'
 
@@ -92,10 +117,17 @@ export function useInsightIA({
         setFonte('ia')
         return
       }
+      if (!podeChamarIA()) {
+        setErro('teto diário de IA atingido (poupando cota) — usando heurística')
+        setTexto(heuristico)
+        setFonte('heuristica')
+        return
+      }
       setFonte('carregando')
       try {
         const cliente = await obterCliente()
         if (!cliente) { setErro('sem cliente (login/nuvem)'); setTexto(heuristico); setFonte('heuristica'); return }
+        registrarChamadaIA()
         const { data, error } = await cliente.functions.invoke('insights', {
           body: { contexto, dados, hoje: hojeISO() },
         })

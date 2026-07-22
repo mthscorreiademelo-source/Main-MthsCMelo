@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, useEffect } from 'react'
 import { hojeISO, rotuloData } from '../dates'
 import { formatarBRL } from '../../modules/financas/db'
 import { interpretar } from './interpretar'
-import { interpretarIA } from './ia'
+import { interpretarIA, IA_CAPTURA_ATIVA } from './ia'
 import { aplicarInterpretacao, desfazer } from './fluxos'
 import { criarCaptura } from './db'
 import { mostrarToast } from './store'
@@ -174,6 +174,7 @@ export function CapturaUniversal({ textoInicial, autoFocus, aoFechar }: {
       {!analisado && (
         <p className="-mt-1 px-1 text-[11px] text-muted/70">
           Atalhos: <b className="font-semibold">#</b> projeto ou categoria · <b className="font-semibold">@</b> pessoa
+          {IA_CAPTURA_ATIVA && <> · ao interpretar, o texto vai para a IA (Google) para uma leitura melhor</>}
         </p>
       )}
 
