@@ -6,9 +6,12 @@ import {
   IconLua,
   IconNuvem,
   IconSair,
+  IconSino,
   IconSol,
   IconUpload,
 } from '../components/Icons'
+import { NotificacoesSheet } from '../notificacoes/NotificacoesSheet'
+import { pushDisponivel } from '../notificacoes/push'
 import { exportarBackup, importarBackup } from '../db/db'
 import { sair, useSessao } from '../nuvem/auth'
 import { nuvemAtiva } from '../nuvem/config'
@@ -80,6 +83,7 @@ export function RodapeConta() {
   const perfil = usePerfil()
   const [painel, setPainel] = useState<null | 'perfil' | 'config'>(null)
   const [aparencia, setAparencia] = useState(false)
+  const [notificacoes, setNotificacoes] = useState(false)
   const [perfilAberto, setPerfilAberto] = useState(false)
   const [entrando, setEntrando] = useState(false)
   const [status, setStatus] = useState('')
@@ -222,6 +226,18 @@ export function RodapeConta() {
               <span className="text-[15px] leading-none">🎨</span>
               Aparência
             </button>
+            {nuvem && sessao && pushDisponivel() && (
+              <button
+                onClick={() => {
+                  setPainel(null)
+                  setNotificacoes(true)
+                }}
+                className="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-[13.5px] font-medium text-muted transition-colors hover:bg-hover/70"
+              >
+                <IconSino width={16} height={16} />
+                Notificações
+              </button>
+            )}
             <button
               onClick={() => {
                 setPainel(null)
@@ -257,6 +273,7 @@ export function RodapeConta() {
       {status && <p className="px-3 pt-0.5 text-[11px] text-muted">{status}</p>}
 
       {aparencia && <AparenciaSheet tema={tema} alternar={alternar} onFechar={() => setAparencia(false)} />}
+      {notificacoes && <NotificacoesSheet onFechar={() => setNotificacoes(false)} />}
       {entrando && <EntrarModal onFechar={() => setEntrando(false)} />}
       <PerfilSheet aberto={perfilAberto} email={email} onFechar={() => setPerfilAberto(false)} />
     </footer>

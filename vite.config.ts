@@ -30,6 +30,8 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: '/Main-MthsCMelo/index.html',
+        // Injeta os handlers de push/clique no service worker gerado.
+        importScripts: ['push-sw.js'],
       },
     }),
   ],

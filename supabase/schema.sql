@@ -74,3 +74,41 @@ create policy "anexos: dono atualiza" on storage.objects
 drop policy if exists "anexos: dono apaga" on storage.objects;
 create policy "anexos: dono apaga" on storage.objects
   for delete using (bucket_id = 'anexos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ===========================================================================
+-- Notificações push (Web Push / VAPID) — Fase 1 do plano Wearable.
+-- Uma linha por dispositivo/navegador assinado. A Edge Function
+-- `enviar-lembretes` lê daqui e dispara os avisos (que o Android espelha no
+-- relógio). `prefs` guarda o que/quando avisar por dispositivo.
+-- ===========================================================================
+create table if not exists public.push_assinaturas (
+  user_id    uuid        not null references auth.users (id) on delete cascade,
+  endpoint   text        not null,
+  p256dh     text        not null,
+  auth       text        not null,
+  prefs      jsonb       not null default '{}'::jsonb,
+  user_agent text,
+  criado_em  timestamptz not null default now(),
+  primary key (endpoint)
+);
+
+create index if not exists push_assinaturas_user_idx
+  on public.push_assinaturas (user_id);
+
+alter table public.push_assinaturas enable row level security;
+
+drop policy if exists "push: dono lê" on public.push_assinaturas;
+create policy "push: dono lê" on public.push_assinaturas
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "push: dono insere" on public.push_assinaturas;
+create policy "push: dono insere" on public.push_assinaturas
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "push: dono atualiza" on public.push_assinaturas;
+create policy "push: dono atualiza" on public.push_assinaturas
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "push: dono apaga" on public.push_assinaturas;
+create policy "push: dono apaga" on public.push_assinaturas
+  for delete using (auth.uid() = user_id);

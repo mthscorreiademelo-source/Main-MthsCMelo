@@ -137,7 +137,7 @@ Uma extensão do launcher de Quick Actions que o Lume já tem, agora no relógio
 | Fase | Entrega | Esforço | Risco |
 |---|---|---|---|
 | **0** | Confirmar API level do Bip 6 + criar projeto Zepp OS "olá mundo" no relógio, em modo dev | Baixo | Baixo |
-| **1** | **Notificações**: Web Push no PWA + Edge Function de lembretes (espelha no relógio de graça) | Médio | Baixo |
+| **1** ✅ | **Notificações**: Web Push no PWA + Edge Function de lembretes (espelha no relógio de graça) — **código pronto**, falta você configurar o Supabase (ver `NOTIFICACOES-SETUP.md`) | Médio | Baixo |
 | **2** | **Quick Actions no relógio (escrita)**: mini app + side service autenticado → POST em `tasks`/`habitoRegistros`/`registros`/`movimentos` | Médio-alto | Médio |
 | **3** | **Saúde via Health Connect** ↔ companion Android → módulo Saúde | Médio | Médio |
 | **4** | **App Service + System Notification nativas** no relógio (alertas e ações locais, botão "Concluir") | Alto | Médio |
