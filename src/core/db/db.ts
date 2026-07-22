@@ -13,7 +13,7 @@ import type {
 } from '../../modules/financas/types'
 import { deveIgnorarHooks } from '../nuvem/sync/bandeira'
 import { NOMES_SYNC } from '../nuvem/sync/colecoes'
-import { marcarSujo } from '../nuvem/sync/sujos'
+import { agendarReconciliacao, marcarSujo } from '../nuvem/sync/sujos'
 import type { Perfil } from '../perfil/types'
 import type { Captura } from '../captura/types'
 import type { ExecucaoRotina, Rotina } from '../../modules/habitos/rotinas/types'
@@ -383,18 +383,21 @@ export const db = new VidaDB()
 // nuvem) para o motor de sincronização detectar mudanças.
 for (const nome of NOMES_SYNC) {
   const tabela = (db as unknown as Record<string, Table>)[nome]
-  tabela.hook('creating', (_pk, obj: Record<string, unknown>) => {
+  tabela.hook('creating', (pk, obj: Record<string, unknown>) => {
     if (deveIgnorarHooks()) return
     if (obj.atualizadoEm == null) obj.atualizadoEm = Date.now()
-    marcarSujo() // há escrita local pendente → a sync varre no próximo ciclo
+    // Marca a chave suja p/ a sync empurrar sem varrer o banco todo. Se a
+    // chave não veio (raro; nenhuma tabela é auto-incremento), reconcilia tudo.
+    if (pk != null) marcarSujo(nome, String(pk))
+    else agendarReconciliacao()
   })
-  tabela.hook('updating', (_mods, _pk, _obj) => {
+  tabela.hook('updating', (_mods, pk, _obj) => {
     if (deveIgnorarHooks()) return undefined
-    marcarSujo()
+    marcarSujo(nome, String(pk))
     return { atualizadoEm: Date.now() }
   })
-  tabela.hook('deleting', () => {
-    if (!deveIgnorarHooks()) marcarSujo()
+  tabela.hook('deleting', (pk) => {
+    if (!deveIgnorarHooks()) marcarSujo(nome, String(pk))
   })
 }
 
@@ -714,7 +717,7 @@ export async function importarBackup(json: unknown) {
     await db.rotinaExecucoes.bulkPut(ok(dados.rotinaExecucoes))
     await db.flashcards.bulkPut(ok(dados.flashcards))
   })
-  marcarSujo() // garante que a restauração seja empurrada para a nuvem
+  agendarReconciliacao() // varre tudo no próximo ciclo → empurra a restauração
   return {
     tasks: dados.tasks?.length ?? 0,
     paginas: dados.paginas?.length ?? 0,

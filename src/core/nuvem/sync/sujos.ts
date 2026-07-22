@@ -1,39 +1,50 @@
 /**
- * Sinal de "há mudanças locais para empurrar" — evita a sync varrer o banco
- * inteiro (~65 tabelas) a cada ciclo quando NADA mudou.
+ * Rastreio de "o que mudou localmente" para a sync não varrer o banco inteiro
+ * (~65 tabelas) a cada ciclo.
  *
- * De propósito é um sinal GROSSO (um booleano), não um set por-registro: quando
- * sujo, a coleta cai na varredura completa (a lógica de diff já provada); quando
- * limpo, pula o scan e devolve "nada a enviar". Não muda em nada a SEMÂNTICA do
- * que é sincronizado — só corta trabalho ocioso.
+ * Guarda as CHAVES sujas (`colecao:id`) marcadas pelos hooks de escrita do
+ * Dexie e pelo ramo local-vence do pull. A coleta então:
+ *  - modo PARCIAL: lê só as chaves sujas (o caso comum, inclusive edição ativa);
+ *  - modo COMPLETO: varre tudo e reconcilia contra o espelho — usado na 1ª coleta
+ *    após carregar (set em memória vazio) e periodicamente como rede de segurança
+ *    (pega qualquer escrita que tenha escapado dos hooks, ex.: bulk/importação).
  *
- * Redes de segurança: começa sujo (a 1ª coleta após carregar sempre varre, o
- * que cobre escritas feitas antes do primeiro sync e o set em memória perdido
- * num reload) e, mesmo limpo, força uma reconciliação completa a cada N ciclos.
+ * A semântica do que é sincronizado é a MESMA nos dois modos: ambos comparam o
+ * estado atual contra o espelho; o parcial só olha um subconjunto de chaves.
  */
 
-let sujo = true
+const sujos = new Set<string>()
 let ciclos = 0
+let reconciliarNaProxima = true // 1ª coleta após carregar varre tudo
 
-/** A cada quantos ciclos uma varredura completa acontece mesmo sem mudança. */
+/** A cada quantos ciclos uma reconciliação completa acontece de qualquer forma. */
 const RECONCILIAR_A_CADA = 25 // ~5 min a 12s/ciclo
 
-/** Marca que houve escrita local (chamado pelos hooks do Dexie). */
-export function marcarSujo(): void {
-  sujo = true
+/** Marca uma chave (colecao:id) como pendente de envio. */
+export function marcarSujo(colecao: string, id: string): void {
+  sujos.add(`${colecao}:${id}`)
 }
 
+/** Força uma varredura/reconciliação completa na próxima coleta. */
+export function agendarReconciliacao(): void {
+  reconciliarNaProxima = true
+}
+
+export type PlanoColeta = { completo: true } | { completo: false; chaves: string[] }
+
 /**
- * Decide se a coleta de pendências precisa varrer o banco agora e CONSOME o
- * estado (zera o "sujo" e o contador quando decide varrer). Chamar uma vez por
- * ciclo de sync.
+ * Decide o modo da próxima coleta e CONSOME o estado (zera o set sujo e o
+ * contador). Chamar uma vez por ciclo de sync.
  */
-export function precisaVarrer(): boolean {
+export function planoDeColeta(): PlanoColeta {
   ciclos++
-  if (sujo || ciclos >= RECONCILIAR_A_CADA) {
-    sujo = false
+  if (reconciliarNaProxima || ciclos >= RECONCILIAR_A_CADA) {
+    reconciliarNaProxima = false
     ciclos = 0
-    return true
+    sujos.clear() // a varredura completa cobre tudo
+    return { completo: true }
   }
-  return false
+  const chaves = [...sujos]
+  sujos.clear() // consumidas; escritas durante o ciclo se re-marcam
+  return { completo: false, chaves }
 }

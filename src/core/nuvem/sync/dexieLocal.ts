@@ -2,7 +2,14 @@ import { db } from '../../db/db'
 import { comAplicacaoRemota } from './bandeira'
 import { chaveReal, COLECOES, ehTabelaBlob, idDoc, TABELAS_BLOB } from './colecoes'
 import { remotoVence, type Cursor, type LinhaDoc, type LocalStore, type Pendentes } from './engine'
-import { marcarSujo, precisaVarrer } from './sujos'
+import { marcarSujo, planoDeColeta } from './sujos'
+
+/** Tombstone com carimbo fresco: vence por LWW qualquer cópia antiga em outro
+ *  aparelho (senão o item ressuscita a cada sincronização). */
+function tombstone(colecao: string, id: string, espAt: number): LinhaDoc {
+  const at = Math.max(Date.now(), espAt + 1)
+  return { colecao, id, doc: { id, atualizadoEm: at }, atualizadoEm: at, excluido: true }
+}
 
 type Registro = Record<string, unknown> & { atualizadoEm?: number }
 
@@ -53,8 +60,8 @@ export const localDexie: LocalStore = {
           // para o diff perceber que precisamos reenviar a nossa versão.
           await db.espelho.put({ chave: chaveEsp, atualizadoEm: l.atualizadoEm })
           // Esse reenvio pendente não passa pelos hooks de escrita local, então
-          // marcamos sujo aqui para a próxima coleta varrer e empurrar.
-          marcarSujo()
+          // marcamos a chave suja aqui para a próxima coleta empurrá-la.
+          marcarSujo(l.colecao, l.id)
         }
       }
     })
@@ -62,46 +69,15 @@ export const localDexie: LocalStore = {
   },
 
   async coletarPendentes(): Promise<Pendentes> {
-    // Nada mudou localmente desde a última coleta (e não é hora de reconciliar)
-    // → pula a varredura de ~65 tabelas e não há nada a empurrar.
-    if (!precisaVarrer()) return { upserts: [], remocoes: [] }
-
-    const atualPorChave = new Map<string, { colecao: string; id: string; doc: Registro; at: number }>()
-    for (const { colecao } of COLECOES) {
-      if (!tabelaExiste(colecao)) continue
-      const tabela = (db as unknown as Record<string, any>)[colecao]
-      const registros = (await tabela.toArray()) as Registro[]
-      for (const r of registros) {
-        const id = idDoc(colecao, r)
-        // Anexos empurram só os metadados; o binário vai pelo Storage.
-        const doc = semBlob(colecao, r)
-        atualPorChave.set(`${colecao}:${id}`, { colecao, id, doc, at: r.atualizadoEm ?? 0 })
-      }
+    const plano = planoDeColeta()
+    // PARCIAL: só as chaves marcadas sujas pelos hooks (o caso comum). Sem
+    // sujeira → nada a enviar, sem ler tabela nenhuma.
+    if (!plano.completo) {
+      if (plano.chaves.length === 0) return { upserts: [], remocoes: [] }
+      return coletarParcial(plano.chaves)
     }
-    const espelho = new Map((await db.espelho.toArray()).map((e) => [e.chave, e.atualizadoEm]))
-
-    const upserts: LinhaDoc[] = []
-    const remocoes: LinhaDoc[] = []
-    for (const [chave, cur] of atualPorChave) {
-      const esp = espelho.get(chave)
-      if (esp === undefined || esp !== cur.at) {
-        upserts.push({ colecao: cur.colecao, id: cur.id, doc: cur.doc, atualizadoEm: cur.at, excluido: false })
-      }
-    }
-    // Carimbo fresco na exclusão: garante que o "tombstone" vença por LWW
-    // qualquer cópia antiga ainda presente em outro aparelho (senão o item
-    // ressuscita: o outro aparelho reenvia o registro toda sincronização).
-    const agora = Date.now()
-    for (const [chave, espAt] of espelho) {
-      if (!atualPorChave.has(chave)) {
-        const idx = chave.indexOf(':')
-        const colecao = chave.slice(0, idx)
-        const id = chave.slice(idx + 1)
-        const at = Math.max(agora, espAt + 1)
-        remocoes.push({ colecao, id, doc: { id, atualizadoEm: at }, atualizadoEm: at, excluido: true })
-      }
-    }
-    return { upserts, remocoes }
+    // COMPLETO: varre tudo e reconcilia contra o espelho (1ª coleta / periódico).
+    return coletarCompleto()
   },
 
   async confirmarEnviados(p: Pendentes): Promise<void> {
@@ -112,6 +88,65 @@ export const localDexie: LocalStore = {
       await db.espelho.delete(`${r.colecao}:${r.id}`)
     }
   },
+}
+
+/** Varredura completa: compara TODAS as tabelas contra o espelho (reconciliação). */
+async function coletarCompleto(): Promise<Pendentes> {
+  const atualPorChave = new Map<string, { colecao: string; id: string; doc: Registro; at: number }>()
+  for (const { colecao } of COLECOES) {
+    if (!tabelaExiste(colecao)) continue
+    const tabela = (db as unknown as Record<string, any>)[colecao]
+    const registros = (await tabela.toArray()) as Registro[]
+    for (const r of registros) {
+      const id = idDoc(colecao, r)
+      // Anexos empurram só os metadados; o binário vai pelo Storage.
+      const doc = semBlob(colecao, r)
+      atualPorChave.set(`${colecao}:${id}`, { colecao, id, doc, at: r.atualizadoEm ?? 0 })
+    }
+  }
+  const espelho = new Map((await db.espelho.toArray()).map((e) => [e.chave, e.atualizadoEm]))
+
+  const upserts: LinhaDoc[] = []
+  const remocoes: LinhaDoc[] = []
+  for (const [chave, cur] of atualPorChave) {
+    const esp = espelho.get(chave)
+    if (esp === undefined || esp !== cur.at) {
+      upserts.push({ colecao: cur.colecao, id: cur.id, doc: cur.doc, atualizadoEm: cur.at, excluido: false })
+    }
+  }
+  for (const [chave, espAt] of espelho) {
+    if (!atualPorChave.has(chave)) {
+      const idx = chave.indexOf(':')
+      remocoes.push(tombstone(chave.slice(0, idx), chave.slice(idx + 1), espAt))
+    }
+  }
+  return { upserts, remocoes }
+}
+
+/** Coleta parcial: avalia SÓ as chaves sujas contra o espelho (mesma regra do
+ *  modo completo, num subconjunto). O caso comum, incl. edição ativa. */
+async function coletarParcial(chaves: string[]): Promise<Pendentes> {
+  const upserts: LinhaDoc[] = []
+  const remocoes: LinhaDoc[] = []
+  for (const chave of chaves) {
+    const idx = chave.indexOf(':')
+    const colecao = chave.slice(0, idx)
+    const id = chave.slice(idx + 1)
+    if (!tabelaExiste(colecao)) continue
+    const tabela = (db as unknown as Record<string, any>)[colecao]
+    const r = (await tabela.get(chaveReal(colecao, id))) as Registro | undefined
+    const espAt = (await db.espelho.get(chave))?.atualizadoEm
+    if (r) {
+      const at = r.atualizadoEm ?? 0
+      if (espAt === undefined || espAt !== at) {
+        upserts.push({ colecao, id, doc: semBlob(colecao, r), atualizadoEm: at, excluido: false })
+      }
+    } else if (espAt !== undefined) {
+      // Sumiu do local mas ainda no espelho → exclusão a propagar.
+      remocoes.push(tombstone(colecao, id, espAt))
+    }
+  }
+  return { upserts, remocoes }
 }
 
 /** Cursor de PULL persistido em localStorage, por usuário. */

@@ -52,30 +52,23 @@ Sem segredos vazados; RLS correto; sem XSS. O que segue é refino, não resgate.
   agora é tudo-ou-nada (uma falha no meio não deixa o banco pela metade) e só
   grava registros bem-formados (objeto com chave presente); blob corrompido é
   pulado em vez de derrubar a restauração.
-- **Sync não varre mais o banco inteiro a cada 12s quando nada mudou.** Um
-  sinal "sujo" (ligado pelos hooks de escrita do Dexie) faz a coleta pular a
-  varredura de ~65 tabelas quando não houve mudança local; quando há, cai na
-  varredura completa de sempre (semântica de sync intocada). Rede de segurança:
-  reconciliação completa periódica + sempre na 1ª coleta após carregar.
-  _Versão de baixo risco; um set por-registro (evita varrer tudo até durante
-  edição ativa) fica como refino futuro, junto dos testes de sync (item 1)._
+- **Sync com set por-registro (não varre o banco à toa).** Os hooks de escrita
+  do Dexie marcam as CHAVES sujas (`colecao:id`); a coleta empurra só elas
+  (modo parcial), inclusive durante edição ativa — sem ler as ~65 tabelas.
+  Reconciliação completa fica como rede de segurança: 1ª coleta após carregar e
+  periódica (pega qualquer escrita que escape dos hooks, ex.: importação em
+  massa). A semântica do que é sincronizado é a mesma nos dois modos.
+- **Testes de sync na camada Dexie (`fake-indexeddb`).** Cobrem o miolo onde
+  bugs de sync moram: LWW (remoto/local vence), tombstone com carimbo fresco
+  (sem ressurreição), preservação de blob no pull, `semBlob` no push, modo
+  parcial × reconciliação, e round-trip de backup (exporta→apaga→restaura +
+  rejeição de arquivo inválido / registro malformado). Suíte: **72 passando.**
 
 ---
 
 ## 2. Próximos passos — o que EU consigo fazer sozinho
 
 Ordenado por valor/esforço. Nada aqui depende de você; é só dar o "vai".
-
-### Alto valor
-
-1. **Testar o motor de sync na camada Dexie (M).** Hoje só a lógica pura
-   (`engine.test.ts`) é testada. Onde os bugs de sync realmente moram é no
-   `dexieLocal.ts`: o diff do espelho, o tombstone de resurreição e a
-   preservação de blob no pull. Plano: adicionar `fake-indexeddb` (dev dep) e
-   testar: local-mais-novo-vence, tombstone-vence-cópia-velha, blob
-   preservado quando o remoto chega sem ele, e um ciclo backup→apaga→restaura.
-   _É a maior lacuna de teste; fecha o maior risco de perda de dado._ Fazer
-   junto do set por-registro (refino do item de sync já entregue)._
 
 ### Médio / baixo
 

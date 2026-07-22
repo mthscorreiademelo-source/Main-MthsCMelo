@@ -6,37 +6,47 @@ async function carregar() {
   return import('./sujos')
 }
 
-describe('sujos (sinal de varredura da sync)', () => {
-  let sujos: Awaited<ReturnType<typeof carregar>>
+describe('sujos (plano de coleta da sync)', () => {
+  let s: Awaited<ReturnType<typeof carregar>>
   beforeEach(async () => {
-    sujos = await carregar()
+    s = await carregar()
   })
 
-  it('começa sujo: a 1ª coleta após carregar sempre varre', () => {
-    expect(sujos.precisaVarrer()).toBe(true)
+  it('a 1ª coleta após carregar é completa (varre tudo)', () => {
+    expect(s.planoDeColeta()).toEqual({ completo: true })
   })
 
-  it('depois de varrer, fica limpo (pula o scan) até haver mudança', () => {
-    expect(sujos.precisaVarrer()).toBe(true) // consome o estado inicial
-    expect(sujos.precisaVarrer()).toBe(false)
-    expect(sujos.precisaVarrer()).toBe(false)
+  it('sem mudança, coletas seguintes são parciais e vazias', () => {
+    s.planoDeColeta() // consome a completa inicial
+    expect(s.planoDeColeta()).toEqual({ completo: false, chaves: [] })
   })
 
-  it('marcarSujo() força varredura no próximo ciclo', () => {
-    expect(sujos.precisaVarrer()).toBe(true)
-    expect(sujos.precisaVarrer()).toBe(false)
-    sujos.marcarSujo()
-    expect(sujos.precisaVarrer()).toBe(true)
-    expect(sujos.precisaVarrer()).toBe(false)
+  it('marcarSujo entra na próxima coleta parcial e é consumida', () => {
+    s.planoDeColeta() // consome inicial
+    s.marcarSujo('tasks', 'a')
+    s.marcarSujo('tasks', 'b')
+    const plano = s.planoDeColeta()
+    expect(plano.completo).toBe(false)
+    expect((plano as { chaves: string[] }).chaves.sort()).toEqual(['tasks:a', 'tasks:b'])
+    // já consumidas: a coleta seguinte não as repete
+    expect(s.planoDeColeta()).toEqual({ completo: false, chaves: [] })
+  })
+
+  it('agendarReconciliacao força uma coleta completa', () => {
+    s.planoDeColeta() // consome inicial
+    s.marcarSujo('tasks', 'a')
+    s.agendarReconciliacao()
+    // a completa ignora e limpa o set sujo
+    expect(s.planoDeColeta()).toEqual({ completo: true })
+    expect(s.planoDeColeta()).toEqual({ completo: false, chaves: [] })
   })
 
   it('reconcilia sozinho periodicamente mesmo sem mudança', () => {
-    expect(sujos.precisaVarrer()).toBe(true) // consome o inicial
-    // A partir daqui, limpo. Em algum ponto (<= ~30 ciclos) força um reconcile.
-    let reconciliou = false
+    s.planoDeColeta() // consome inicial
+    let completou = false
     for (let i = 0; i < 30; i++) {
-      if (sujos.precisaVarrer()) { reconciliou = true; break }
+      if (s.planoDeColeta().completo) { completou = true; break }
     }
-    expect(reconciliou).toBe(true)
+    expect(completou).toBe(true)
   })
 })
