@@ -18,7 +18,7 @@ export interface ColecaoSync {
  * fluxo ser validado em dois aparelhos reais. Ligar = criar o bucket + policies
  * (SETUP-SUPABASE.md) e trocar isto para `true`.
  */
-export const ANEXOS_ATIVO = false
+export const ANEXOS_ATIVO = true
 
 /** Tabelas de anexo → campo que guarda o Blob (removido no push, preservado no pull). */
 export const TABELAS_BLOB: Record<string, string> = {
