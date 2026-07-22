@@ -10,7 +10,7 @@ import { obterCliente } from '../nuvem/cliente'
 import type { Interpretacao, TipoCaptura } from './types'
 
 /** Ligue após publicar a Edge Function `interpretar` (ver SETUP-SUPABASE.md). */
-export const IA_CAPTURA_ATIVA = false
+export const IA_CAPTURA_ATIVA = true
 
 const TIPOS_VALIDOS: TipoCaptura[] = ['tarefa', 'evento', 'nota', 'compra', 'despesa', 'receita', 'lembrete']
 
