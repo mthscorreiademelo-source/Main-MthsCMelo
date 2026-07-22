@@ -14,7 +14,7 @@ import { hojeISO } from '../dates'
 import { obterCliente } from '../nuvem/cliente'
 
 /** Ligue após publicar a Edge Function `insights`. */
-export const IA_INSIGHTS_ATIVA = false
+export const IA_INSIGHTS_ATIVA = true
 
 /** Por quanto tempo um insight de IA fica em cache antes de poder regenerar. */
 const TTL_MS = 6 * 60 * 60 * 1000
