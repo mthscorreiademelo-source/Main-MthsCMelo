@@ -29,6 +29,59 @@ export function Sparkline({ valores, cor = 'var(--vida-accent)', largura = 120, 
   )
 }
 
+const NOMES_MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+
+/**
+ * Barras agrupadas de receitas × despesas por mês (SVG, identidade do Lume).
+ * Cada mês tem duas barrinhas: receita (accent) e despesa (danger). Clicar num
+ * mês chama `onMes` (drill-down para o extrato daquele mês).
+ */
+export function GraficoBarras({
+  serie,
+  formatarCurto,
+  onMes,
+  mesAtivo,
+}: {
+  serie: { mes: string; entradas: number; saidas: number }[]
+  formatarCurto: (c: number) => string
+  onMes?: (mes: string) => void
+  mesAtivo?: string
+}) {
+  const L = 520
+  const A = 150
+  const padY = 16
+  const padL = 46
+  const max = Math.max(1, ...serie.flatMap((s) => [s.entradas, s.saidas]))
+  const n = Math.max(1, serie.length)
+  const slot = (L - padL - 8) / n
+  const barW = Math.min(13, slot * 0.3)
+  const y0 = A - padY
+  const h = (v: number) => (v / max) * (A - padY * 2)
+  const linhasY = [max, max / 2, 0]
+  return (
+    <svg viewBox={`0 0 ${L} ${A + 18}`} className="w-full">
+      {linhasY.map((v, i) => (
+        <g key={i}>
+          <line x1={padL} y1={y0 - h(v)} x2={L - 8} y2={y0 - h(v)} stroke="var(--vida-line)" strokeWidth="1" strokeDasharray="2 4" />
+          <text x={0} y={y0 - h(v) + 3} className="fill-[var(--vida-muted)]" style={{ fontSize: 9 }}>{formatarCurto(v)}</text>
+        </g>
+      ))}
+      {serie.map((s, i) => {
+        const cx = padL + slot * i + slot / 2
+        const ativo = mesAtivo === s.mes
+        return (
+          <g key={s.mes} onClick={onMes ? () => onMes(s.mes) : undefined} style={{ cursor: onMes ? 'pointer' : 'default' }}>
+            {onMes && <rect x={padL + slot * i} y={padY - 6} width={slot} height={A - padY} fill={ativo ? 'var(--vida-hover)' : 'transparent'} rx={6} />}
+            <rect x={cx - barW - 1} y={y0 - h(s.entradas)} width={barW} height={h(s.entradas)} rx={3} fill="var(--vida-accent)" opacity={ativo ? 1 : 0.85} />
+            <rect x={cx + 1} y={y0 - h(s.saidas)} width={barW} height={h(s.saidas)} rx={3} fill="var(--vida-danger)" opacity={ativo ? 1 : 0.85} />
+            <text x={cx} y={A + 12} textAnchor="middle" className="fill-[var(--vida-muted)]" style={{ fontSize: 9, fontWeight: ativo ? 700 : 400 }}>{NOMES_MES[Number(s.mes.slice(5, 7)) - 1]}</text>
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
 /** Gráfico de linha da evolução patrimonial, com área, pontos e rótulos de mês. */
 export function GraficoEvolucao({
   serie,

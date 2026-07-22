@@ -52,6 +52,21 @@ export function serieEvolucao(
   return ult.map((m) => ({ mes: m, valor: mapa.get(m)! }))
 }
 
+/** Série mensal de entradas × saídas dos últimos N meses (gráfico de barras). */
+export function serieMensal(
+  movimentos: Movimento[],
+  mesAtual: string,
+  meses = 6,
+): { mes: string; entradas: number; saidas: number }[] {
+  const out: { mes: string; entradas: number; saidas: number }[] = []
+  for (let i = meses - 1; i >= 0; i--) {
+    const m = mesDeslocado(mesAtual, -i)
+    const doMes = movimentos.filter((mv) => mv.data.startsWith(m))
+    out.push({ mes: m, entradas: somaEntradas(doMes), saidas: somaSaidas(doMes) })
+  }
+  return out
+}
+
 /* -------------------------- orçamento inteligente ------------------------- */
 
 export interface OrcamentoInteligente {

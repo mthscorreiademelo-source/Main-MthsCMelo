@@ -10,7 +10,7 @@ import { AnelProgresso } from '../habitos/components/AnelProgresso'
 import { useEventos } from '../agenda/hooks'
 import { AddMovimento } from './components/AddMovimento'
 import { AjustesFinancas } from './components/AjustesFinancas'
-import { GraficoEvolucao, Sparkline } from './components/Graficos'
+import { GraficoBarras, GraficoEvolucao, Sparkline } from './components/Graficos'
 import { MovimentoEditorSheet } from './components/MovimentoEditorSheet'
 import { agruparPorDia, filtrarMes, formatarBRL, registrarSnapshot, semearFinancasSePreciso } from './db'
 import {
@@ -30,6 +30,7 @@ import {
   patrimonioLiquido,
   reservaDeEmergencia,
   serieEvolucao,
+  serieMensal,
 } from './orcamento'
 import { MovimentarObjetivo } from './components/MovimentarObjetivo'
 import type { Movimento, Objetivo } from './types'
@@ -80,6 +81,10 @@ export function FinancasPage() {
   const [sheet, setSheet] = useState<'ajustes' | null>(null)
   const [addAberto, setAddAberto] = useState(false)
   const [movimentar, setMovimentar] = useState<Objetivo | null>(null)
+  // Filtros do Extrato
+  const [busca, setBusca] = useState('')
+  const [filtroTipo, setFiltroTipo] = useState<'todos' | 'entrada' | 'saida'>('todos')
+  const [catFiltro, setCatFiltro] = useState<{ rotulo: string; cats: string[] } | null>(null)
 
   const hoje = hojeISO()
   const mesHoje = mesDe(hoje)
@@ -154,10 +159,40 @@ export function FinancasPage() {
     () => [...(movimentos ?? [])].sort((a, b) => b.criadoEm - a.criadoEm).slice(0, 5),
     [movimentos],
   )
-  const extratoDias = useMemo(
-    () => agruparPorDia(filtrarMes(movimentos ?? [], mes)),
-    [movimentos, mes],
+  const movsMes = useMemo(() => filtrarMes(movimentos ?? [], mes), [movimentos, mes])
+  const categoriasPresentes = useMemo(
+    () => [...new Set(movsMes.map((m) => m.categoria ?? 'Outros'))].sort(),
+    [movsMes],
   )
+  const extratoFiltrado = useMemo(() => {
+    let ms = movsMes
+    if (filtroTipo !== 'todos') ms = ms.filter((m) => m.tipo === filtroTipo)
+    if (catFiltro) ms = ms.filter((m) => catFiltro.cats.includes(m.categoria ?? 'Outros'))
+    const q = busca.trim().toLowerCase()
+    if (q) ms = ms.filter((m) => m.descricao.toLowerCase().includes(q) || (m.categoria ?? '').toLowerCase().includes(q))
+    return agruparPorDia(ms)
+  }, [movsMes, filtroTipo, catFiltro, busca])
+  const totaisExtrato = useMemo(() => {
+    const flat = extratoFiltrado.flatMap(([, itens]) => itens)
+    return {
+      entradas: flat.filter((m) => m.tipo === 'entrada').reduce((s, m) => s + m.valorCentavos, 0),
+      saidas: flat.filter((m) => m.tipo === 'saida').reduce((s, m) => s + m.valorCentavos, 0),
+      n: flat.length,
+    }
+  }, [extratoFiltrado])
+  const serieBarras = useMemo(() => serieMensal(movimentos ?? [], mesHoje, 6), [movimentos, mesHoje])
+  const temMovimentoBarras = serieBarras.some((s) => s.entradas > 0 || s.saidas > 0)
+
+  function drillMes(m: string) {
+    setMes(m)
+    setAba('extrato')
+  }
+  function drillCategoria(rotulo: string, cats: string[]) {
+    setCatFiltro({ rotulo, cats })
+    setFiltroTipo('saida')
+    setBusca('')
+    setAba('extrato')
+  }
   const objetivosVis = (objetivos ?? []).slice(0, 3)
   const contasOrdenadas = useMemo(
     () => [...(contas ?? [])].sort((a, b) => a.ordem - b.ordem),
@@ -353,6 +388,25 @@ export function FinancasPage() {
             )}
           </div>
 
+          {/* Receitas × despesas (últimos 6 meses) */}
+          <div className={CARTAO}>
+            <div className="mb-2 flex items-center justify-between">
+              <span className={ROTULO}>Receitas × despesas</span>
+              <div className="flex items-center gap-3 text-[11px] text-muted">
+                <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-accent" />Receitas</span>
+                <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-danger" />Despesas</span>
+              </div>
+            </div>
+            {temMovimentoBarras ? (
+              <>
+                <GraficoBarras serie={serieBarras} formatarCurto={brlCurto} mesAtivo={mes} onMes={drillMes} />
+                <p className="mt-1 text-center text-[11px] text-muted">Toque num mês para ver o extrato</p>
+              </>
+            ) : (
+              <p className="text-[13px] text-muted">Registre entradas e saídas para comparar mês a mês.</p>
+            )}
+          </div>
+
           {/* Reserva + Patrimônio */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className={CARTAO}>
@@ -471,11 +525,47 @@ export function FinancasPage() {
               <IconMais width={13} height={13} /> Registrar
             </button>
           </div>
-          {extratoDias.length === 0 ? (
-            <p className="text-[13px] text-muted">Nenhuma transação neste mês. Toque em Registrar para lançar a primeira.</p>
+
+          {/* Filtros */}
+          <div className="mb-2.5 flex flex-wrap items-center gap-2">
+            <input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar…"
+              className="min-w-32 flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] outline-none placeholder:text-muted/60 focus:border-muted/50"
+            />
+            <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value as typeof filtroTipo)} className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] outline-none">
+              <option value="todos">Tudo</option>
+              <option value="entrada">Entradas</option>
+              <option value="saida">Saídas</option>
+            </select>
+            <select
+              value={catFiltro && catFiltro.cats.length === 1 ? catFiltro.cats[0] : 'todas'}
+              onChange={(e) => setCatFiltro(e.target.value === 'todas' ? null : { rotulo: e.target.value, cats: [e.target.value] })}
+              className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[13px] outline-none"
+            >
+              <option value="todas">Categorias</option>
+              {categoriasPresentes.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          {/* Chip do grupo (quando veio de um drill) + totais */}
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-[12px]">
+            {catFiltro && catFiltro.cats.length > 1 && (
+              <button onClick={() => setCatFiltro(null)} className="flex items-center gap-1 rounded-full bg-hover px-2.5 py-1 font-medium text-ink">
+                {catFiltro.rotulo} <span className="text-muted">✕</span>
+              </button>
+            )}
+            <span className="ml-auto text-muted">{totaisExtrato.n} lançamento(s)</span>
+            {totaisExtrato.entradas > 0 && <span className="font-semibold text-accent tabular-nums">+ {formatarBRL(totaisExtrato.entradas)}</span>}
+            {totaisExtrato.saidas > 0 && <span className="font-semibold tabular-nums">− {formatarBRL(totaisExtrato.saidas)}</span>}
+          </div>
+
+          {extratoFiltrado.length === 0 ? (
+            <p className="text-[13px] text-muted">{movsMes.length === 0 ? 'Nenhuma transação neste mês. Toque em Registrar para lançar a primeira.' : 'Nenhuma transação com esses filtros.'}</p>
           ) : (
             <div className="flex flex-col gap-4">
-              {extratoDias.map(([dia, itens]) => {
+              {extratoFiltrado.map(([dia, itens]) => {
                 const totalDia = itens.reduce((s, m) => s + (m.tipo === 'entrada' ? m.valorCentavos : -m.valorCentavos), 0)
                 return (
                   <section key={dia}>
@@ -579,7 +669,12 @@ export function FinancasPage() {
             <div className="flex flex-col gap-3">
               {dist.length === 0 && <p className="text-[13px] text-muted">Configure suas categorias e limites nos ajustes.</p>}
               {dist.map(({ linha, gastoCentavos, pct }) => (
-                <div key={linha.id}>
+                <button
+                  key={linha.id}
+                  onClick={() => drillCategoria(linha.nome, linha.categorias)}
+                  className="-mx-1 rounded-lg px-1 py-0.5 text-left transition-colors hover:bg-hover/50"
+                  title="Ver lançamentos desta categoria"
+                >
                   <div className="flex items-center gap-2">
                     <span className="text-[13px]">{linha.icone}</span>
                     <span className="flex-1 truncate text-[13px] font-medium">{linha.nome}</span>
@@ -589,7 +684,7 @@ export function FinancasPage() {
                     <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, pct * 100)}%`, backgroundColor: pct > 1 ? 'var(--vida-danger)' : linha.cor }} />
                   </div>
                   <div className="mt-0.5 text-[10.5px] text-muted">{formatarBRL(gastoCentavos)} / {formatarBRL(linha.limiteCentavos)}</div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
