@@ -457,48 +457,6 @@ export function pontoNoPostIt(
   return Math.abs(lx) <= postIt.largura / 2 && Math.abs(ly) <= postIt.altura / 2
 }
 
-/**
- * O traço em curso é uma RASURA (rabisco de vai-e-vem denso)? Serve para
- * apagar por gesto: rabiscar por cima de algo com a caneta/lápis. Detecta
- * muitas reversões bruscas de direção e um caminho bem maior que a caixa.
- */
-export function ehRasura(pontos: number[]): boolean {
-  const n = pontos.length / 3
-  if (n < 14) return false
-  let minX = Infinity
-  let minY = Infinity
-  let maxX = -Infinity
-  let maxY = -Infinity
-  let comp = 0
-  let rev = 0
-  let vpx = 0
-  let vpy = 0
-  for (let k = 0; k < n; k++) {
-    const x = pontos[k * 3]
-    const y = pontos[k * 3 + 1]
-    if (x < minX) minX = x
-    if (x > maxX) maxX = x
-    if (y < minY) minY = y
-    if (y > maxY) maxY = y
-    if (k > 0) {
-      const dx = x - pontos[(k - 1) * 3]
-      const dy = y - pontos[(k - 1) * 3 + 1]
-      const d = Math.hypot(dx, dy)
-      comp += d
-      if (d > 2) {
-        if (vpx || vpy) {
-          const cos = (dx * vpx + dy * vpy) / (d * Math.hypot(vpx, vpy) || 1)
-          if (cos < -0.2) rev++ // virou mais de ~100° = vai-e-vem
-        }
-        vpx = dx
-        vpy = dy
-      }
-    }
-  }
-  const diag = Math.hypot(maxX - minX, maxY - minY) || 1
-  return rev >= 4 && comp / diag >= 2.2
-}
-
 /* ---------- borracha de pixels (dura) ---------- */
 
 /** Ponto onde o segmento A→B cruza o círculo (centro c, raio r). Um endpoint
