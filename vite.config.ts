@@ -4,8 +4,8 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  // Servido em https://mthscorreiademelo-source.github.io/Main-MthsCMelo/
-  base: '/Main-MthsCMelo/',
+  // Servido em https://lume.matheuscmelo.com.br/ (domínio próprio via Cloudflare + GitHub Pages)
+  base: '/',
   plugins: [
     react(),
     tailwindcss(),
@@ -29,7 +29,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        navigateFallback: '/Main-MthsCMelo/index.html',
+        navigateFallback: '/index.html',
         // Injeta os handlers de push/clique no service worker gerado.
         importScripts: ['push-sw.js'],
       },
