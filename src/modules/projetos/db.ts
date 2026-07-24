@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
+import { idsTarefasDoProjeto } from '../tarefas/db'
 import type { ItemProjeto, ModuloProjeto, Projeto, Task } from '../tarefas/types'
 import { modulosDoTemplate, TEMPLATES } from './modulos'
 
@@ -41,13 +42,13 @@ export async function criarProjetoWorkspace(dados: {
 export const atualizarProjetoWS = (id: string, m: Partial<Projeto>) =>
   db.projetos.update(id, { ...m, atualizadoEm: Date.now() })
 
-/** Exclui o projeto: desvincula tarefas/eventos/movimentos/notas e apaga itens locais. */
+/** Exclui o projeto: APAGA as tarefas dele (e subtarefas); desvincula eventos/movimentos/notas e apaga itens locais. */
 export async function excluirProjetoWS(id: string) {
   await db.transaction(
     'rw',
     [db.projetos, db.tasks, db.eventos, db.movimentos, db.paginas, db.projetoItens],
     async () => {
-      await db.tasks.where('projetoId').equals(id).modify({ projetoId: undefined })
+      await db.tasks.bulkDelete(await idsTarefasDoProjeto(id))
       await db.eventos.where('projetoId').equals(id).modify({ projetoId: undefined })
       await db.movimentos.where('projetoId').equals(id).modify({ projetoId: undefined })
       await db.paginas.where('projetoId').equals(id).modify({ projetoId: undefined })

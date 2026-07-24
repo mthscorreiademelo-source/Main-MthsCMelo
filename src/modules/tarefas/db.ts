@@ -253,10 +253,28 @@ export async function atualizarProjeto(id: string, mudancas: Partial<Projeto>) {
   await db.projetos.update(id, mudancas)
 }
 
-/** Exclui o projeto e move suas tarefas para a Entrada (sem projeto). */
+/** IDs de todas as tarefas de um projeto, incluindo subtarefas descendentes. */
+export async function idsTarefasDoProjeto(projetoId: string): Promise<string[]> {
+  const todas = await db.tasks.toArray()
+  const paraExcluir = new Set<string>()
+  for (const t of todas) if (t.projetoId === projetoId) paraExcluir.add(t.id)
+  let cresceu = true
+  while (cresceu) {
+    cresceu = false
+    for (const t of todas) {
+      if (t.paiId && paraExcluir.has(t.paiId) && !paraExcluir.has(t.id)) {
+        paraExcluir.add(t.id)
+        cresceu = true
+      }
+    }
+  }
+  return [...paraExcluir]
+}
+
+/** Exclui o projeto e TODAS as tarefas dele (incluindo subtarefas). */
 export async function excluirProjeto(id: string) {
   await db.transaction('rw', db.projetos, db.tasks, async () => {
-    await db.tasks.where('projetoId').equals(id).modify({ projetoId: undefined })
+    await db.tasks.bulkDelete(await idsTarefasDoProjeto(id))
     await db.projetos.delete(id)
   })
 }
