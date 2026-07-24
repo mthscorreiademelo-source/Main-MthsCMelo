@@ -32,6 +32,28 @@ export default defineConfig({
         navigateFallback: '/index.html',
         // Injeta os handlers de push/clique no service worker gerado.
         importScripts: ['push-sw.js'],
+        runtimeCaching: [
+          {
+            // Imagens de OUTROS sites (ex.: capas de livros por link): cacheia por
+            // aparelho pra aparecer offline. StaleWhileRevalidate mostra o cache na
+            // hora E revalida na rede em segundo plano — assim uma falha momentânea
+            // no 1º acesso se conserta sozinha no próximo (o CacheFirst "grudava" o
+            // erro por muito tempo). É cache LOCAL — não pesa na nuvem.
+            urlPattern: ({ request, sameOrigin }) =>
+              request.destination === 'image' && !sameOrigin,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'lume-imagens-externas',
+              expiration: {
+                maxEntries: 150,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+                purgeOnQuotaError: true,
+              },
+              // 0 = resposta "opaca" (imagem de outro site sem CORS) também é cacheada.
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
     }),
   ],

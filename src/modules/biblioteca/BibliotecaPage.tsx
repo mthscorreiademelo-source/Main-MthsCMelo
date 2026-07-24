@@ -5,6 +5,7 @@ import { ptBR } from 'date-fns/locale'
 import { EmptyState } from '../../core/components/EmptyState'
 import { IconLivro, IconMais } from '../../core/components/Icons'
 import { AdicionarLivro } from './components/AdicionarLivro'
+import { CapaImg } from './components/CapaImg'
 import { CartaoLivro } from './components/CartaoLivro'
 import { Estante } from './components/Estante'
 import { statusDerivadoSerie } from './db'
@@ -256,10 +257,18 @@ export function BibliotecaPage() {
 
 /** Capa do livro (imagem ou fallback com título). */
 function Capa({ livro }: { livro: Livro }) {
-  if (livro.capa) return <img src={livro.capa} alt="" className="aspect-[2/3] w-full rounded-lg object-cover shadow-sm" />
-  return (
+  const semCapa = (
     <div className="flex aspect-[2/3] w-full flex-col items-center justify-center rounded-lg bg-hover p-2 text-center shadow-sm">
       <span className="line-clamp-4 text-[11px] font-semibold">{livro.titulo}</span>
     </div>
   )
+  if (livro.capa)
+    return (
+      <CapaImg
+        src={livro.capa}
+        className="aspect-[2/3] w-full rounded-lg object-cover shadow-sm"
+        fallback={semCapa}
+      />
+    )
+  return semCapa
 }

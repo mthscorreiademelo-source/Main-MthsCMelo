@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { IconAbrir, IconLivro, IconLixeira, IconSetaEsquerda, IconUpload } from '../../core/components/Icons'
 import { rotuloData } from '../../core/dates'
+import { CapaImg } from './components/CapaImg'
 import { EditorTags } from './components/EditorTags'
+import { EntradaLinkCapa } from './components/EntradaLinkCapa'
 import { EstrelasNota } from './components/EstrelasNota'
 import { LivroNotas } from './components/LivroNotas'
 import { apagarArquivo, guardarArquivo, removerLivro, rotuloTipo, salvarLivro, STATUS } from './db'
@@ -134,7 +136,16 @@ export function LivroPage() {
             aria-label={livro.capa ? 'Trocar capa' : 'Adicionar capa'}
           >
             {livro.capa ? (
-              <img src={livro.capa} alt="" className="h-full w-full object-cover" />
+              <CapaImg
+                src={livro.capa}
+                className="h-full w-full object-cover"
+                fallback={
+                  <span className="flex flex-col items-center gap-1 text-muted/60">
+                    <IconLivro width={26} height={26} />
+                    <span className="text-[11px]">Adicionar capa</span>
+                  </span>
+                }
+              />
             ) : (
               <span className="flex flex-col items-center gap-1 text-muted/60">
                 <IconLivro width={26} height={26} />
@@ -150,6 +161,7 @@ export function LivroPage() {
               remover capa
             </button>
           )}
+          <EntradaLinkCapa onLink={(u) => salvar({ capa: u })} />
           <input
             ref={inputCapa}
             type="file"

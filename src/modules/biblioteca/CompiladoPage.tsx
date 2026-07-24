@@ -3,8 +3,10 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { EmptyState } from '../../core/components/EmptyState'
 import { IconLivro, IconMais, IconLixeira, IconSetaEsquerda } from '../../core/components/Icons'
 import { AdicionarLivro } from './components/AdicionarLivro'
+import { CapaImg } from './components/CapaImg'
 import { CartaoLivro } from './components/CartaoLivro'
 import { EditorTags } from './components/EditorTags'
+import { EntradaLinkCapa } from './components/EntradaLinkCapa'
 import { removerCompilado, rotuloStatus, rotuloTipo, salvarLivro, statusDerivadoSerie } from './db'
 import { useLivro, useVolumes } from './hooks'
 import { gerarMiniatura } from './importar'
@@ -66,7 +68,16 @@ export function CompiladoPage() {
             aria-label={compilado.capa ? 'Trocar capa' : 'Adicionar capa'}
           >
             {compilado.capa ? (
-              <img src={compilado.capa} alt="" className="h-full w-full object-cover" />
+              <CapaImg
+                src={compilado.capa}
+                className="h-full w-full object-cover"
+                fallback={
+                  <span className="flex flex-col items-center gap-1 text-muted/60">
+                    <IconLivro width={26} height={26} />
+                    <span className="text-[11px]">Adicionar capa</span>
+                  </span>
+                }
+              />
             ) : (
               <span className="flex flex-col items-center gap-1 text-muted/60">
                 <IconLivro width={26} height={26} />
@@ -74,6 +85,9 @@ export function CompiladoPage() {
               </span>
             )}
           </button>
+          <div className="mt-1">
+            <EntradaLinkCapa onLink={(u) => salvar({ capa: u })} />
+          </div>
           <input
             ref={inputCapa}
             type="file"

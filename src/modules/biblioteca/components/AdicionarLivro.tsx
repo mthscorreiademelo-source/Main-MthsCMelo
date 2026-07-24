@@ -4,7 +4,9 @@ import { IconLivro, IconMais, IconUpload } from '../../../core/components/Icons'
 import { guardarArquivo, novoLivro, salvarLivro, STATUS, TIPOS } from '../db'
 import { detectarFormato, extrairMetadados, gerarMiniatura } from '../importar'
 import type { FormatoArquivo, StatusLeitura, TipoObra } from '../types'
+import { CapaImg } from './CapaImg'
 import { EditorTags } from './EditorTags'
+import { EntradaLinkCapa } from './EntradaLinkCapa'
 
 const CAMPO =
   'min-h-11 w-full rounded-lg border border-line bg-surface px-3 text-[15px] outline-none focus:border-muted/60'
@@ -104,6 +106,13 @@ export function AdicionarLivro({
     onFechar()
   }
 
+  const semCapaMini = (
+    <span className="flex flex-col items-center gap-1 text-muted">
+      <IconMais width={18} height={18} />
+      <span className="text-[11px]">Capa</span>
+    </span>
+  )
+
   const tituloFolha = souVolume
     ? `Novo volume · ${compiladoAlvo!.titulo}`
     : ehComp
@@ -114,20 +123,20 @@ export function AdicionarLivro({
     <FolhaInferior titulo={tituloFolha} onFechar={onFechar}>
       <div className="flex gap-3">
         {/* Capa (imagem) — pode ser definida mesmo sem o arquivo do livro */}
-        <button
-          onClick={() => inputCapa.current?.click()}
-          className="flex aspect-[2/3] w-24 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-line bg-surface transition-colors hover:border-muted/50"
-          aria-label="Escolher capa"
-        >
-          {capa ? (
-            <img src={capa} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span className="flex flex-col items-center gap-1 text-muted">
-              <IconMais width={18} height={18} />
-              <span className="text-[11px]">Capa</span>
-            </span>
-          )}
-        </button>
+        <div className="flex w-24 shrink-0 flex-col gap-1">
+          <button
+            onClick={() => inputCapa.current?.click()}
+            className="flex aspect-[2/3] w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-line bg-surface transition-colors hover:border-muted/50"
+            aria-label="Escolher capa"
+          >
+            {capa ? (
+              <CapaImg src={capa} className="h-full w-full object-cover" fallback={semCapaMini} />
+            ) : (
+              semCapaMini
+            )}
+          </button>
+          <EntradaLinkCapa onLink={setCapa} />
+        </div>
 
         {/* Arquivo do livro (compilado não tem arquivo próprio) */}
         <div className="flex flex-1 flex-col justify-center gap-2">

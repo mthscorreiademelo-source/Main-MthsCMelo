@@ -17,7 +17,11 @@ export interface Livro {
   colecao?: string
   /** Número do volume dentro da coleção (1, 2, 3…). */
   numero?: number
-  /** Miniatura da capa (data URL pequeno) — sincroniza junto. */
+  /**
+   * Capa: pode ser uma miniatura embutida (data URL) OU um link da web.
+   * Sincroniza junto (o link é levíssimo; a imagem em si é cacheada por
+   * aparelho pelo service worker, então aparece offline).
+   */
   capa?: string
   /** Nota de 0 a 5 (0 = sem nota). */
   nota?: number

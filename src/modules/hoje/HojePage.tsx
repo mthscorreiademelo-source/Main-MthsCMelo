@@ -10,6 +10,7 @@ import { catInfo, diasRestantes, statusValidade } from '../compras/db'
 import type { ItemDespensa, MovDespensa } from '../compras/types'
 import { eventosDoDia } from '../agenda/db'
 import { useEventos } from '../agenda/hooks'
+import { CapaImg } from '../biblioteca/components/CapaImg'
 import { AnelProgresso } from '../habitos/components/AnelProgresso'
 import { cicloSimNao } from '../habitos/db'
 import { devidoNoDia } from '../habitos/freq'
@@ -430,7 +431,11 @@ export function HojePage() {
         <CartaoHoje tamanho={t} to={`/biblioteca/${lendo.id}`}>
           <div className="flex items-center gap-3">
             {lendo.capa ? (
-              <img src={lendo.capa} alt="" className="h-14 w-10 shrink-0 rounded object-cover shadow-sm" />
+              <CapaImg
+                src={lendo.capa}
+                className="h-14 w-10 shrink-0 rounded object-cover shadow-sm"
+                fallback={<span className="h-14 w-10 shrink-0 rounded bg-hover" />}
+              />
             ) : (
               <span className="h-14 w-10 shrink-0 rounded bg-hover" />
             )}
