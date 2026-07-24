@@ -20,7 +20,7 @@ import {
 import type { Camera, ItemQuadro, PostIt, TipoCaneta, Traco } from '../types'
 
 export interface FerramentaAtiva {
-  modo: TipoCaneta | 'borracha' | 'selecao' | 'ponteiro'
+  modo: TipoCaneta | 'borracha' | 'selecao' | 'ponteiro' | 'texto'
   cor: string
   espessura: number
   suavizacao: number
@@ -60,6 +60,10 @@ interface Props {
   onApagarTraco: (indice: number) => void
   onSubstituir: (tracos: Traco[], itens: ItemQuadro[], postIts: PostIt[]) => void
   onCamera: (camera: Camera) => void
+  /** Câmera "ao vivo" (a cada quadro) para camadas sobrepostas acompanharem o pan/zoom. */
+  onCameraVivo?: (camera: Camera) => void
+  /** Ferramenta de texto: pediu criar um bloco de texto no ponto de mundo. */
+  onCriarTexto?: (wx: number, wy: number) => void
   /** ativa = há seleção; pagerId = id do PDF folheador se ele estiver sozinho na seleção */
   onSelecaoMudou: (ativa: boolean, pagerId: string | null) => void
   /** Toque longo (dedo) ou clique direito: posição de tela e de mundo */
@@ -98,6 +102,8 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     onApagarTraco,
     onSubstituir,
     onCamera,
+    onCameraVivo,
+    onCriarTexto,
     onSelecaoMudou,
     onMenuContexto,
   },
@@ -115,6 +121,10 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   const tracoNoPostIt = useRef<string | null>(null)
   const tracoNoItem = useRef<{ id: string; pagina: number } | null>(null)
   const ultimaTela = useRef<{ x: number; y: number } | null>(null)
+  // pan com o botão do meio do mouse (arrastar a página, estilo Miro)
+  const panMouse = useRef<{ x: number; y: number } | null>(null)
+  // toque simples pendente para criar texto (só cria se não virar pan/zoom)
+  const tapTexto = useRef<{ x: number; y: number } | null>(null)
   const pressaoSuave = useRef(0.5)
   const dedos = useRef(new Map<number, { x: number; y: number }>())
   const pinca = useRef<{ dist: number; midX: number; midY: number; ang: number } | null>(null)
@@ -157,6 +167,10 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   borrachaRef.current = configBorracha
   const selecaoTipoRef = useRef(selecaoTipo)
   selecaoTipoRef.current = selecaoTipo
+  const onCameraVivoRef = useRef(onCameraVivo)
+  onCameraVivoRef.current = onCameraVivo
+  const onCriarTextoRef = useRef(onCriarTexto)
+  onCriarTextoRef.current = onCriarTexto
 
   useEffect(() => {
     const w = window as unknown as {
@@ -404,7 +418,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     // traço em curso (com clip se estiver sobre um post-it)
     if (tracoEmCurso.current && tracoEmCurso.current.length >= 3) {
       const f = ferramentaRef.current
-      if (f.modo !== 'borracha' && f.modo !== 'selecao' && f.modo !== 'ponteiro') {
+      if (f.modo !== 'borracha' && f.modo !== 'selecao' && f.modo !== 'ponteiro' && f.modo !== 'texto') {
         ctx.save()
         transformMundo(ctx, dpr)
         // recorta o traço em curso ao papel (post-it) ou à página (PDF)
@@ -578,6 +592,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   const moverCamera = useCallback(
     (nova: Camera) => {
       cam.current = nova
+      onCameraVivoRef.current?.(nova)
       cenaSuja.current = true
       pedirRender()
       if (timerCamera.current) clearTimeout(timerCamera.current)
@@ -687,6 +702,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
           }
         }
       }
+      onCameraVivoRef.current?.({ ...cam.current })
       cenaSuja.current = true
       pedirRender()
     }
@@ -763,6 +779,53 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     }
     canvas.addEventListener('wheel', aoRolar, { passive: false })
     return () => canvas.removeEventListener('wheel', aoRolar)
+  }, [moverCamera])
+
+  // Pan com o botão do meio do mouse. Escuta na JANELA (não no canvas) para
+  // funcionar em qualquer lugar — inclusive sobre blocos de texto ou a barra —
+  // e impede o auto-scroll nativo do navegador.
+  useEffect(() => {
+    const aoBaixar = (e: PointerEvent) => {
+      if (e.button !== 1) return
+      e.preventDefault()
+      panMouse.current = { x: e.clientX, y: e.clientY }
+      document.body.style.cursor = 'grabbing'
+    }
+    const aoMoverJanela = (e: PointerEvent) => {
+      if (!panMouse.current) return
+      const c = cam.current
+      const dsx = e.clientX - panMouse.current.x
+      const dsy = e.clientY - panMouse.current.y
+      panMouse.current = { x: e.clientX, y: e.clientY }
+      const cos = Math.cos(c.rot ?? 0)
+      const sin = Math.sin(c.rot ?? 0)
+      moverCamera({
+        ...c,
+        x: c.x - (dsx * cos + dsy * sin) / c.escala,
+        y: c.y - (-dsx * sin + dsy * cos) / c.escala,
+      })
+    }
+    const aoSoltarJanela = () => {
+      if (!panMouse.current) return
+      panMouse.current = null
+      document.body.style.cursor = ''
+    }
+    const prevenirAuto = (e: MouseEvent) => {
+      if (e.button === 1) e.preventDefault()
+    }
+    window.addEventListener('pointerdown', aoBaixar)
+    window.addEventListener('pointermove', aoMoverJanela)
+    window.addEventListener('pointerup', aoSoltarJanela)
+    window.addEventListener('pointercancel', aoSoltarJanela)
+    window.addEventListener('mousedown', prevenirAuto)
+    return () => {
+      window.removeEventListener('pointerdown', aoBaixar)
+      window.removeEventListener('pointermove', aoMoverJanela)
+      window.removeEventListener('pointerup', aoSoltarJanela)
+      window.removeEventListener('pointercancel', aoSoltarJanela)
+      window.removeEventListener('mousedown', prevenirAuto)
+      document.body.style.cursor = ''
+    }
   }, [moverCamera])
 
   /* ---------- régua: geometria ---------- */
@@ -1101,14 +1164,24 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   /* ---------- eventos de ponteiro ---------- */
 
   function aoPressionar(e: React.PointerEvent<HTMLCanvasElement>) {
-    // botão direito/central do mouse não desenha nem mexe na seleção
+    // botão do meio/direito do mouse não desenha (meio = pan, tratado na janela; direito = menu)
     if (e.pointerType === 'mouse' && e.button !== 0) return
+    // ferramenta de texto (mouse/caneta): cria o bloco no ponto clicado. No toque,
+    // deixa o gesto normal rolar (pan/zoom) e cria só num toque simples (ver aoSoltar).
+    if (ferramentaRef.current.modo === 'texto' && e.pointerType !== 'touch') {
+      const [wx, wy] = paraMundo(e.clientX, e.clientY)
+      onCriarTextoRef.current?.(wx, wy)
+      return
+    }
     const canvas = e.currentTarget
     canvas.setPointerCapture(e.pointerId)
 
     if (e.pointerType === 'touch') {
       dedos.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
       if (dedos.current.size === 1) {
+        // modo texto: guarda o ponto; vira texto só se for um toque simples (aoSoltar)
+        tapTexto.current =
+          ferramentaRef.current.modo === 'texto' ? { x: e.clientX, y: e.clientY } : null
         gestoRegua.current = dedoNaRegua(e.clientX, e.clientY) ? 'mover' : null
         // toque longo parado abre o menu de contexto
         inicioToque.current = { x: e.clientX, y: e.clientY }
@@ -1117,12 +1190,14 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
           const t = inicioToque.current
           if (t && dedos.current.size === 1) {
             ultimoMenu.current = Date.now()
+            tapTexto.current = null
             const [wx, wy] = paraMundo(t.x, t.y)
             onMenuContexto(t.x, t.y, wx, wy)
           }
         }, 550)
       }
       if (dedos.current.size === 2) {
+        tapTexto.current = null
         if (timerToqueLongo.current) clearTimeout(timerToqueLongo.current)
         const [a, b] = [...dedos.current.values()]
         pinca.current = {
@@ -1234,6 +1309,14 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       ) {
         clearTimeout(timerToqueLongo.current)
         timerToqueLongo.current = null
+      }
+      // dedo andou: não é mais um toque simples para criar texto
+      if (
+        tapTexto.current &&
+        inicioToque.current &&
+        Math.hypot(atual.x - inicioToque.current.x, atual.y - inicioToque.current.y) > 10
+      ) {
+        tapTexto.current = null
       }
 
       if (dedos.current.size >= 2 && pinca.current) {
@@ -1373,6 +1456,12 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       }
       if (dedos.current.size < 2) pinca.current = null
       if (dedos.current.size === 0) gestoRegua.current = null
+      // toque simples com a ferramenta de texto: cria o bloco no ponto tocado
+      if (dedos.current.size === 0 && tapTexto.current && ferramentaRef.current.modo === 'texto') {
+        const [wx, wy] = paraMundo(tapTexto.current.x, tapTexto.current.y)
+        tapTexto.current = null
+        onCriarTextoRef.current?.(wx, wy)
+      }
       return
     }
 

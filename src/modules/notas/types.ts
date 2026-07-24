@@ -42,6 +42,21 @@ export interface PostIt {
   cor: string
 }
 
+/** Bloco de texto digitado no quadro (escrito com o teclado). */
+export interface TextoQuadro {
+  id: string
+  /** Centro em coordenadas de mundo */
+  x: number
+  y: number
+  /** Conteúdo (pode ter várias linhas) */
+  texto: string
+  cor: string
+  /** Tamanho da fonte em unidades de mundo */
+  tamanho: number
+  /** Rotação em radianos */
+  rotacao?: number
+}
+
 /** Posição/zoom do quadro infinito (canto superior esquerdo em mundo + escala). */
 export interface Camera {
   x: number
@@ -125,6 +140,8 @@ export interface Pagina {
   itens?: ItemQuadro[]
   /** Post-its colados no quadro */
   postIts?: PostIt[]
+  /** Blocos de texto digitados no quadro */
+  textos?: TextoQuadro[]
   /** Arquivos anexados (somente tipo 'arquivos') — metadados; blob na tabela */
   arquivos?: ArquivoRef[]
 }

@@ -20,9 +20,13 @@ import {
   renderizarPaginasPdf,
 } from '../importar'
 import { guardarPrancheta, lerPrancheta } from '../prancheta'
-import type { Grupo, ItemQuadro, Pagina, PostIt, TipoCaneta, Traco } from '../types'
+import type { Grupo, ItemQuadro, Pagina, PostIt, TextoQuadro, TipoCaneta, Traco } from '../types'
 import { BarraDesenho, type ModoBarra } from './BarraDesenho'
+import { CamadaTextos, type CamadaTextosApi } from './CamadaTextos'
 import { QuadroInfinito, type ConfigBorracha, type QuadroApi } from './QuadroInfinito'
+
+const COR_TEXTO_PADRAO = '#37352F'
+const TAMANHO_TEXTO_PADRAO = 28
 
 interface Props {
   pagina: Pagina
@@ -60,13 +64,14 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   const [avisoImportacao, setAvisoImportacao] = useState('')
   const [telaCheia, setTelaCheia] = useState(false)
   const quadro = useRef<QuadroApi>(null)
+  const camadaTextos = useRef<CamadaTextosApi>(null)
   const inputImagem = useRef<HTMLInputElement>(null)
   const inputPdf = useRef<HTMLInputElement>(null)
 
   // Histórico de desfazer/refazer: pilhas de instantâneos do conteúdo do quadro
   // (traços, itens, post-its). Toda alteração passa por `aplicar`, então é ali
   // que empilhamos — cobre desenhar, apagar, mover, colar, limpar etc.
-  type Instantaneo = { tracos: Traco[]; itens: ItemQuadro[]; postIts: PostIt[] }
+  type Instantaneo = { tracos: Traco[]; itens: ItemQuadro[]; postIts: PostIt[]; textos: TextoQuadro[] }
   const desfazerPilha = useRef<Instantaneo[]>([])
   const refazerPilha = useRef<Instantaneo[]>([])
   const [hist, setHist] = useState({ desfazer: 0, refazer: 0 })
@@ -110,8 +115,9 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   const tracos = pagina.tracos ?? []
   const itens = pagina.itens ?? []
   const postIts = pagina.postIts ?? []
+  const textos = pagina.textos ?? []
   const ferramenta =
-    modo === 'borracha' || modo === 'selecao' || modo === 'ponteiro'
+    modo === 'borracha' || modo === 'selecao' || modo === 'ponteiro' || modo === 'texto'
       ? { modo, cor: '', espessura: 0, suavizacao: 0 }
       : { modo, ...configs[modo] }
 
@@ -119,11 +125,12 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
     novosTracos: Traco[],
     novosItens: ItemQuadro[] = itens,
     novosPostIts: PostIt[] = postIts,
+    novosTextos: TextoQuadro[] = textos,
     registrar = true,
   ) {
     if (registrar) {
       // guarda o estado ATUAL (antes da mudança) para poder desfazer
-      desfazerPilha.current.push({ tracos, itens, postIts })
+      desfazerPilha.current.push({ tracos, itens, postIts, textos })
       if (desfazerPilha.current.length > 100) desfazerPilha.current.shift()
       refazerPilha.current = []
       setHist({ desfazer: desfazerPilha.current.length, refazer: 0 })
@@ -132,6 +139,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
       tracos: novosTracos,
       itens: novosItens,
       postIts: novosPostIts,
+      textos: novosTextos,
       miniatura: gerarMiniatura(novosTracos),
     })
   }
@@ -139,7 +147,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   function desfazer() {
     const anterior = desfazerPilha.current.pop()
     if (!anterior) return
-    refazerPilha.current.push({ tracos, itens, postIts })
+    refazerPilha.current.push({ tracos, itens, postIts, textos })
     setHist({ desfazer: desfazerPilha.current.length, refazer: refazerPilha.current.length })
     quadro.current?.limparSelecao()
     onMudar({ ...anterior, miniatura: gerarMiniatura(anterior.tracos) })
@@ -148,7 +156,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   function refazer() {
     const proximo = refazerPilha.current.pop()
     if (!proximo) return
-    desfazerPilha.current.push({ tracos, itens, postIts })
+    desfazerPilha.current.push({ tracos, itens, postIts, textos })
     setHist({ desfazer: desfazerPilha.current.length, refazer: refazerPilha.current.length })
     quadro.current?.limparSelecao()
     onMudar({ ...proximo, miniatura: gerarMiniatura(proximo.tracos) })
@@ -160,7 +168,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
       if (!(e.ctrlKey || e.metaKey)) return
       const k = e.key.toLowerCase()
       const alvo = e.target as HTMLElement | null
-      if (alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA')) return
+      if (alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || alvo.isContentEditable)) return
       if (k === 'z' && !e.shiftKey) {
         e.preventDefault()
         desfazer()
@@ -172,7 +180,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
     window.addEventListener('keydown', aoTecla)
     return () => window.removeEventListener('keydown', aoTecla)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracos, itens, postIts])
+  }, [tracos, itens, postIts, textos])
 
   // Novo desenho aberto: zera o histórico de desfazer/refazer.
   useEffect(() => {
@@ -199,6 +207,17 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
     }
     aplicar(tracos, itens, [...postIts, postIt])
     selecionarInserido({ postItId: postIt.id })
+  }
+
+  /** Ferramenta de texto: cria o bloco no ponto clicado e já abre para digitar. */
+  function criarTexto(wx: number, wy: number) {
+    setModo('ponteiro')
+    setTimeout(() => camadaTextos.current?.novo(wx, wy), 0)
+  }
+
+  /** Commit dos blocos de texto (entra no histórico de desfazer). */
+  function mudarTextos(novos: TextoQuadro[]) {
+    aplicar(tracos, itens, postIts, novos)
   }
 
   function copiar() {
@@ -393,11 +412,23 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
         onApagarTraco={(i) => aplicar(tracos.filter((_, j) => j !== i))}
         onSubstituir={(t, i, p) => aplicar(t, i, p)}
         onCamera={(camera) => onMudar({ camera })}
+        onCameraVivo={(c) => camadaTextos.current?.aplicarCamera(c)}
+        onCriarTexto={criarTexto}
         onSelecaoMudou={(ativa, pagerId) => {
           setSelecaoAtiva(ativa)
           setPagerSelId(pagerId)
         }}
         onMenuContexto={(sx, sy, wx, wy) => setMenuCtx({ sx, sy, wx, wy })}
+      />
+
+      <CamadaTextos
+        ref={camadaTextos}
+        textos={textos}
+        interativo={modo === 'ponteiro' || modo === 'texto'}
+        camInicial={pagina.camera}
+        corPadrao={COR_TEXTO_PADRAO}
+        tamanhoPadrao={TAMANHO_TEXTO_PADRAO}
+        onMudarTextos={mudarTextos}
       />
 
       {/* Menu de contexto (toque longo / clique direito) */}
@@ -666,11 +697,13 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
                 setTimeout(() => setConfirmandoLimpar(false), 3000)
                 return
               }
-              aplicar([], [], [])
+              aplicar([], [], [], [])
               setConfirmandoLimpar(false)
               setMenuAberto(false)
             }}
-            disabled={tracos.length === 0 && itens.length === 0 && postIts.length === 0}
+            disabled={
+              tracos.length === 0 && itens.length === 0 && postIts.length === 0 && textos.length === 0
+            }
             className="self-start"
           >
             {confirmandoLimpar ? 'Confirmar limpeza?' : 'Limpar o quadro'}

@@ -24,7 +24,7 @@ import type { TipoCaneta } from '../types'
 import type { ConfigBorracha } from './QuadroInfinito'
 import { SeletorCor } from './SeletorCor'
 
-export type ModoBarra = TipoCaneta | 'borracha' | 'selecao' | 'ponteiro'
+export type ModoBarra = TipoCaneta | 'borracha' | 'selecao' | 'ponteiro' | 'texto'
 type Lado = 'baixo' | 'cima' | 'esquerda' | 'direita'
 
 const ICONES: Record<TipoCaneta, typeof IconLapis> = {
@@ -104,13 +104,15 @@ export function BarraDesenho({
   const inicioArrasto = useRef<{ x: number; y: number } | null>(null)
 
   const canetaAtiva =
-    modo !== 'borracha' && modo !== 'selecao' && modo !== 'ponteiro' ? CANETAS[modo] : null
+    modo !== 'borracha' && modo !== 'selecao' && modo !== 'ponteiro' && modo !== 'texto'
+      ? CANETAS[modo]
+      : null
   const config = canetaAtiva ? configs[canetaAtiva.id] : null
   const vertical = !arrasto && (lado === 'esquerda' || lado === 'direita')
 
   function aoTocarFerramenta(novo: ModoBarra) {
     if (modo === novo) {
-      if (novo === 'ponteiro') return // ponteiro não tem ajustes
+      if (novo === 'ponteiro' || novo === 'texto') return // sem ajustes
       setPainel((p) => (p === 'ferramenta' ? null : 'ferramenta'))
       setPickerAberto(false)
     } else {
@@ -187,7 +189,11 @@ export function BarraDesenho({
         aria-label="Expandir barra de ferramentas"
         className={`pointer-events-auto absolute flex size-12 cursor-pointer items-center justify-center rounded-full border border-line bg-bg/95 text-ink shadow-lg backdrop-blur ${POSICAO[lado].replace('flex-row', '').replace('flex-col', '')}`}
       >
-        <IconeAtual width={20} height={20} />
+        {modo === 'texto' ? (
+          <span className="text-[18px] font-bold leading-none">T</span>
+        ) : (
+          <IconeAtual width={20} height={20} />
+        )}
       </button>
     )
   }
@@ -502,6 +508,14 @@ export function BarraDesenho({
           className={botao(modo === 'selecao')}
         >
           <IconSelecao width={19} height={19} />
+        </button>
+        <button
+          onClick={() => aoTocarFerramenta('texto')}
+          aria-label="Texto"
+          aria-pressed={modo === 'texto'}
+          className={botao(modo === 'texto')}
+        >
+          <span className="text-[17px] font-bold leading-none">T</span>
         </button>
         <span className={vertical ? 'my-1 h-px w-6 bg-line' : 'mx-1 h-6 w-px bg-line'} />
         <button
