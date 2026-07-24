@@ -7,7 +7,7 @@ import { EditorTags } from './components/EditorTags'
 import { EntradaLinkCapa } from './components/EntradaLinkCapa'
 import { EstrelasNota } from './components/EstrelasNota'
 import { LivroNotas } from './components/LivroNotas'
-import { apagarArquivo, guardarArquivo, removerLivro, rotuloTipo, salvarLivro, STATUS } from './db'
+import { apagarArquivo, autoresDe, guardarArquivo, removerLivro, rotuloTipo, salvarLivro, STATUS } from './db'
 import { useLivro } from './hooks'
 import { detectarFormato, extrairMetadados, gerarMiniatura } from './importar'
 import type { Livro, StatusLeitura } from './types'
@@ -27,7 +27,7 @@ export function LivroPage() {
   const navigate = useNavigate()
 
   const [titulo, setTitulo] = useState('')
-  const [autor, setAutor] = useState('')
+  const [autores, setAutores] = useState<string[]>([])
   const [resenha, setResenha] = useState('')
   const [colecao, setColecao] = useState('')
   const inputCapa = useRef<HTMLInputElement>(null)
@@ -39,7 +39,7 @@ export function LivroPage() {
   useEffect(() => {
     if (!livro) return
     setTitulo(livro.titulo)
-    setAutor(livro.autor ?? '')
+    setAutores(autoresDe(livro))
     setResenha(livro.resenha ?? '')
     setColecao(livro.colecao ?? '')
   }, [livro?.id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -184,12 +184,14 @@ export function LivroPage() {
             className="w-full bg-transparent text-lg font-bold outline-none"
             placeholder="Título"
           />
-          <input
-            value={autor}
-            onChange={(e) => setAutor(e.target.value)}
-            onBlur={() => salvar({ autor: autor.trim() || undefined })}
-            className="w-full bg-transparent text-[14px] text-muted outline-none"
-            placeholder="Autor"
+          <EditorTags
+            tags={autores}
+            onChange={(a) => {
+              setAutores(a)
+              salvar({ autores: a.length ? a : undefined })
+            }}
+            rotulo="Autores"
+            placeholder="Autores (Enter para adicionar)"
           />
           <EstrelasNota nota={livro.nota ?? 0} onChange={(n) => salvar({ nota: n })} />
           <span className="text-[12px] text-muted/70">

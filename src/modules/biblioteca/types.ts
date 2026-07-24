@@ -10,7 +10,10 @@ export type FormatoArquivo = 'epub' | 'pdf' | 'cbz' | 'mobi'
 export interface Livro {
   id: string
   titulo: string
+  /** Autor único — LEGADO. Use `autores`; lido via helper `autoresDe`. */
   autor?: string
+  /** Autores (lista) — permite mais de um, cada um individual na organização. */
+  autores?: string[]
   tipo: TipoObra
   status: StatusLeitura
   /** Nome da coleção/série (ex.: "Harry Potter"). */

@@ -23,7 +23,7 @@ export function AdicionarLivro({
   const inputCapa = useRef<HTMLInputElement>(null)
   const inputTitulo = useRef<HTMLInputElement>(null)
   const [titulo, setTitulo] = useState('')
-  const [autor, setAutor] = useState('')
+  const [autores, setAutores] = useState<string[]>([])
   const [tipo, setTipo] = useState<TipoObra>(compiladoAlvo?.tipo ?? 'livro')
   const [modoCompilado, setModoCompilado] = useState(false)
   const [status, setStatus] = useState<StatusLeitura>('quero_ler')
@@ -55,7 +55,7 @@ export function AdicionarLivro({
       const meta = await extrairMetadados(file)
       if (meta) {
         setTitulo((t) => t || meta.titulo)
-        if (meta.autor) setAutor((a) => a || meta.autor!)
+        if (meta.autor) setAutores((a) => (a.length ? a : [meta.autor!]))
         setTipo(meta.tipo)
         setCapa(meta.capa)
         setPaginas(meta.paginasTotais)
@@ -81,7 +81,7 @@ export function AdicionarLivro({
     }
     const livro = novoLivro({
       titulo: titulo.trim(),
-      autor: autor.trim() || undefined,
+      autores: autores.length ? autores : undefined,
       tipo: compiladoAlvo ? compiladoAlvo.tipo : tipo,
       status,
       colecao: !ehComp && !souVolume ? colecao.trim() || undefined : undefined,
@@ -209,10 +209,15 @@ export function AdicionarLivro({
         />
       </label>
       {!ehComp && (
-        <label className="flex flex-col gap-1">
-          <span className="text-[13px] font-medium text-muted">Autor</span>
-          <input className={CAMPO} value={autor} onChange={(e) => setAutor(e.target.value)} />
-        </label>
+        <div className="flex flex-col gap-1">
+          <span className="text-[13px] font-medium text-muted">Autores</span>
+          <EditorTags
+            tags={autores}
+            onChange={setAutores}
+            rotulo="Autores"
+            placeholder="ex.: Nome do autor (Enter para adicionar)"
+          />
+        </div>
       )}
 
       {/* Tipo (some quando é volume de um compilado — herda o tipo) */}

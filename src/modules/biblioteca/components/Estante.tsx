@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { EmptyState } from '../../../core/components/EmptyState'
 import { IconLivro } from '../../../core/components/Icons'
 import { CartaoLivro } from './CartaoLivro'
-import { statusDerivadoSerie } from '../db'
+import { autoresDe, statusDerivadoSerie } from '../db'
 import { useLivros } from '../hooks'
 import type { Livro, StatusLeitura } from '../types'
 
@@ -23,7 +23,7 @@ function compararPor(criterio: Criterio, a: Livro, b: Livro): number {
   switch (criterio) {
     case 'adicionado': d = a.adicionadoEm - b.adicionadoEm; break
     case 'titulo': d = a.titulo.localeCompare(b.titulo, 'pt', { sensitivity: 'base' }); break
-    case 'autor': d = (a.autor ?? '~').localeCompare(b.autor ?? '~', 'pt', { sensitivity: 'base' }); break
+    case 'autor': d = (autoresDe(a)[0] ?? '~').localeCompare(autoresDe(b)[0] ?? '~', 'pt', { sensitivity: 'base' }); break
     case 'ano': d = (a.ano ?? 0) - (b.ano ?? 0); break
     case 'nota': d = (a.nota ?? 0) - (b.nota ?? 0); break
     default: d = (a.atualizadoEm ?? a.adicionadoEm) - (b.atualizadoEm ?? b.adicionadoEm)
@@ -83,7 +83,7 @@ export function Estante({ generoInicial }: { generoInicial?: string | null }) {
       .filter((l) => !l.compiladoId)
       .filter((l) => (filtro === 'todos' ? true : statusEfetivo(l) === filtro))
       .filter((l) => !genero || (l.generos ?? []).includes(genero))
-      .filter((l) => !b || l.titulo.toLowerCase().includes(b) || (l.autor ?? '').toLowerCase().includes(b) || (l.colecao ?? '').toLowerCase().includes(b) || (l.generos ?? []).some((g) => g.toLowerCase().includes(b)))
+      .filter((l) => !b || l.titulo.toLowerCase().includes(b) || autoresDe(l).some((a) => a.toLowerCase().includes(b)) || (l.colecao ?? '').toLowerCase().includes(b) || (l.generos ?? []).some((g) => g.toLowerCase().includes(b)))
       .sort((a, b2) => (asc ? 1 : -1) * compararPor(ordenarPor, a, b2))
   }, [livros, filtro, genero, busca, ordenarPor, asc]) // eslint-disable-line react-hooks/exhaustive-deps
 

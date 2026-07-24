@@ -8,7 +8,7 @@ import { AdicionarLivro } from './components/AdicionarLivro'
 import { CapaImg } from './components/CapaImg'
 import { CartaoLivro } from './components/CartaoLivro'
 import { Estante } from './components/Estante'
-import { statusDerivadoSerie } from './db'
+import { autoresDe, autorTexto, statusDerivadoSerie } from './db'
 import { useDestaques, useLivros, useNotas } from './hooks'
 import { PainelFlashcards } from './flashcards/PainelFlashcards'
 import type { Livro } from './types'
@@ -68,7 +68,11 @@ export function BibliotecaPage() {
 
   const porAutor = useMemo(() => {
     const m = new Map<string, Livro[]>()
-    for (const l of ls) { const a = l.autor?.trim() || 'Sem autor'; const arr = m.get(a) ?? []; arr.push(l); m.set(a, arr) }
+    // cada autor entra individual: uma obra com 2+ autores aparece em cada um
+    for (const l of ls) {
+      const chaves = autoresDe(l).length ? autoresDe(l) : ['Sem autor']
+      for (const a of chaves) { const arr = m.get(a) ?? []; arr.push(l); m.set(a, arr) }
+    }
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   }, [ls])
 
@@ -106,7 +110,7 @@ export function BibliotecaPage() {
                 </Link>
                 <div className="flex flex-col">
                   <h2 className="text-[19px] font-bold leading-tight">{leituraAtual.titulo}</h2>
-                  <p className="text-[13px] text-muted">{leituraAtual.autor}</p>
+                  <p className="text-[13px] text-muted">{autorTexto(leituraAtual)}</p>
                   <div className="mt-3 text-[12px] font-semibold text-accent">{Math.round(leituraAtual.progresso ?? 0)}% concluído</div>
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-hover"><div className="h-full rounded-full bg-accent" style={{ width: `${leituraAtual.progresso ?? 0}%` }} /></div>
                   <div className="mt-3 flex flex-col gap-1 text-[12.5px] text-muted">

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { IconLivro } from '../../../core/components/Icons'
-import { rotuloStatus, rotuloTipo } from '../db'
+import { autorTexto, rotuloStatus, rotuloTipo } from '../db'
 import type { Livro, StatusLeitura } from '../types'
 import { CapaImg } from './CapaImg'
 
@@ -63,7 +63,7 @@ export function CartaoLivro({
         <p className="truncate text-[11px] text-muted">
           {ehComp
             ? `${rotuloTipo(livro.tipo)} · ${rotuloStatus(status ?? livro.status)}`
-            : livro.autor || livro.colecao || rotuloStatus(livro.status)}
+            : autorTexto(livro) || livro.colecao || rotuloStatus(livro.status)}
         </p>
       </div>
     </Link>

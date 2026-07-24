@@ -65,6 +65,17 @@ export function rotuloTipo(t: TipoObra): string {
   return TIPOS.find((x) => x.valor === t)?.rotulo ?? t
 }
 
+/** Autores de uma obra como lista. Usa `autores`; cai pra `autor` (legado). */
+export function autoresDe(l: Pick<Livro, 'autor' | 'autores'>): string[] {
+  if (l.autores?.length) return l.autores.filter((a) => a.trim())
+  return l.autor?.trim() ? [l.autor.trim()] : []
+}
+
+/** Autores juntos num texto (para exibir num canto só). */
+export function autorTexto(l: Pick<Livro, 'autor' | 'autores'>): string {
+  return autoresDe(l).join(', ')
+}
+
 /**
  * Status de uma SÉRIE derivado dos seus volumes (o nível de baixo manda):
  * algum lendo → lendo; senão algum abandonado → abandonado; senão todos lido →
