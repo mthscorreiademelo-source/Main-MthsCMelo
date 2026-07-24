@@ -46,6 +46,19 @@ function borrachaInicial(): ConfigBorracha {
   return { modo: 'traco', tamanho: 24 }
 }
 
+/**
+ * Dispositivo com o TOQUE como entrada principal (tablet/celular) — não um
+ * desktop/notebook com mouse. Usado para só ativar a tela cheia imersiva
+ * (que some com a barra de navegação do sistema) no tablet.
+ */
+function ehDispositivoToque(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches
+  )
+}
+
 /** Tela cheia de desenho: quadro infinito + barra flutuante + menu. */
 export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Props) {
   const [modo, setModo] = useState<ModoBarra>('tinteiro')
@@ -102,6 +115,9 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   }
 
   function aoPrimeiroToque() {
+    // Só no tablet/celular: some com a barra do sistema (apps recentes, voltar,
+    // início) ao desenhar. No desktop/notebook não deve forçar tela cheia.
+    if (!ehDispositivoToque()) return
     if (
       !document.fullscreenElement &&
       localStorage.getItem('vida:telacheia') !== '0'
