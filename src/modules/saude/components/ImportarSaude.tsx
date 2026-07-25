@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { FolhaInferior } from '../../../core/components/FolhaInferior'
-import { IconDownload, IconNuvem, IconUpload } from '../../../core/components/Icons'
+import { IconDownload, IconNuvem, IconRelogio, IconUpload } from '../../../core/components/Icons'
 import { importarSaude, type ResultadoImport } from '../importar'
+import { importarTreinosFit, type ResultadoImportFit } from '../fitTreinos'
 import { getUrlPlanilha, setUrlPlanilha, sincronizarPlanilha } from '../planilha'
 
 const MODELO = `data,sono,passos,calorias,fc_repouso,exercicio
@@ -10,10 +11,23 @@ const MODELO = `data,sono,passos,calorias,fc_repouso,exercicio
 
 export function ImportarSaude({ onFechar }: { onFechar: () => void }) {
   const input = useRef<HTMLInputElement>(null)
+  const inputFit = useRef<HTMLInputElement>(null)
   const [res, setRes] = useState<ResultadoImport | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [urlPlan, setUrlPlan] = useState(getUrlPlanilha())
+  const [resFit, setResFit] = useState<ResultadoImportFit | null>(null)
+  const [ocupadoFit, setOcupadoFit] = useState(false)
+
+  async function importarFit(arquivos: FileList) {
+    setOcupadoFit(true)
+    setResFit(null)
+    try {
+      setResFit(await importarTreinosFit(arquivos))
+    } finally {
+      setOcupadoFit(false)
+    }
+  }
 
   async function conectarPlanilha() {
     setUrlPlanilha(urlPlan)
@@ -110,6 +124,59 @@ export function ImportarSaude({ onFechar }: { onFechar: () => void }) {
         </div>
       )}
       {erro && <p className="text-[13px] text-danger">{erro}</p>}
+
+      {/* Importar treinos do relógio (arquivos .FIT do Amazfit/Zepp) */}
+      <div className="mt-1 flex flex-col gap-2 border-t border-line pt-4">
+        <p className="flex items-center gap-1.5 text-[14px] font-semibold">
+          <IconRelogio width={16} height={16} className="text-accent" />
+          Treinos do relógio (.FIT)
+        </p>
+        <p className="text-[12px] leading-relaxed text-muted">
+          Cada treino do seu relógio Amazfit/Zepp vira um arquivo <strong>.FIT</strong>. Baixe do app
+          Zepp (ou do e-mail/Drive) e envie aqui — pode escolher <strong>vários de uma vez</strong>{' '}
+          pra trazer o histórico inteiro. O Lume lê tipo, duração, distância, calorias, ritmo e
+          batimento médio. Reenviar o mesmo treino não duplica.
+        </p>
+        <button
+          onClick={() => inputFit.current?.click()}
+          disabled={ocupadoFit}
+          className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-full bg-ink text-[15px] font-semibold text-bg disabled:opacity-50"
+        >
+          <IconUpload width={18} height={18} />
+          {ocupadoFit ? 'Importando treinos…' : 'Escolher arquivos .FIT'}
+        </button>
+        <input
+          ref={inputFit}
+          type="file"
+          accept=".fit,application/octet-stream"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            const fs = e.target.files
+            if (fs && fs.length) importarFit(fs)
+            e.target.value = ''
+          }}
+        />
+        {resFit && (
+          <div className="rounded-xl border border-line bg-surface/60 p-3 text-[13px]">
+            <p className="font-semibold text-ink">
+              {resFit.importados} treino(s) importado(s).
+              {resFit.jaExistiam > 0 && (
+                <span className="font-normal text-muted"> {resFit.jaExistiam} já existia(m).</span>
+              )}
+            </p>
+            {resFit.arquivosComErro > 0 && (
+              <p className="mt-1 text-danger">
+                {resFit.arquivosComErro} arquivo(s) não reconhecido(s)
+                {resFit.nomesComErro.length > 0 ? `: ${resFit.nomesComErro.join(', ')}` : ''}.
+              </p>
+            )}
+            {resFit.importados > 0 && (
+              <p className="mt-1 text-muted">Veja em Saúde → aba Treinos.</p>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Conectar planilha do Google (importação recorrente) */}
       <div className="mt-1 flex flex-col gap-2 border-t border-line pt-4">

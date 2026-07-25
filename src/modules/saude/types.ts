@@ -14,8 +14,41 @@ export interface SaudeDia {
   exercicioMin?: number
   /** Água ingerida no dia (ml) */
   aguaMl?: number
-  /** Saturação de oxigênio (%) */
+  /** Saturação de oxigênio (%) — último valor lido */
   spo2?: number
+
+  /* --- Campos adicionais vindos do relógio (Bip 6). Todos opcionais e
+     aditivos: preenchidos automaticamente pelo lume-pulso ao abrir o app do
+     relógio; nunca sobrescrevem o que o usuário digita à mão. --- */
+
+  /** Calorias totais do dia (kcal). O sensor do relógio devolve UM número só
+   *  (não separa ativa/basal); por ora carrega o mesmo valor de `caloriasAtivas`. */
+  caloriasTotal?: number
+  /** Frequência cardíaca máxima do dia (bpm) */
+  fcMax?: number
+  /** Frequência cardíaca mínima do dia (bpm) */
+  fcMin?: number
+  /** Frequência cardíaca média do dia (bpm) */
+  fcMedia?: number
+  /** Índice de estresse atual/último do dia (0–100) */
+  estresse?: number
+  /** Índice de estresse médio do dia (0–100) */
+  estresseMedio?: number
+  /** PAI (Personal Activity Intelligence) acumulado do dia */
+  pai?: number
+  /** Sono profundo (min) */
+  sonoProfundoMin?: number
+  /** Sono REM (min) */
+  sonoRemMin?: number
+  /** Sono leve (min) */
+  sonoLeveMin?: number
+  /** Pontuação de sono (0–100) */
+  sonoScore?: number
+  /** Menor SpO2 do dia (%) — tendência/pior valor das últimas 24 h */
+  spo2Min?: number
+  /** Distância percorrida no dia (metros) */
+  distanciaM?: number
+
   criadoEm: number
   atualizadoEm?: number
 }
@@ -66,6 +99,8 @@ export interface Atividade {
   distanciaKm?: number
   /** Ritmo (ex.: "5:30 /km") — texto livre. */
   ritmo?: string
+  /** Frequência cardíaca média durante o treino (bpm). Vem do .FIT do relógio. */
+  fcMediaTreino?: number
   /** Fonte do dado (Garmin, Apple Watch, Manual…). */
   origem?: string
   obs?: string

@@ -153,7 +153,7 @@ export function AbaTreinos() {
           <span className="flex size-10 items-center justify-center rounded-full bg-hover text-[18px]">🏃</span>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[14px] font-semibold">{a.tipo}</div>
-            <div className="text-[12px] text-muted">{a.data === hojeISO() ? 'Hoje' : format(parseISO(a.data), 'dd/MM')}{a.hora ? ` · ${a.hora}` : ''}{a.duracaoMin ? ` · ${a.duracaoMin} min` : ''}{a.distanciaKm ? ` · ${a.distanciaKm} km` : ''}{a.ritmo ? ` · ${a.ritmo}` : ''}</div>
+            <div className="text-[12px] text-muted">{a.data === hojeISO() ? 'Hoje' : format(parseISO(a.data), 'dd/MM')}{a.hora ? ` · ${a.hora}` : ''}{a.duracaoMin ? ` · ${a.duracaoMin} min` : ''}{a.distanciaKm ? ` · ${a.distanciaKm} km` : ''}{a.ritmo ? ` · ${a.ritmo}` : ''}{a.fcMediaTreino ? ` · ${a.fcMediaTreino} bpm` : ''}</div>
           </div>
           {a.calorias != null && <span className="text-[13px] font-semibold text-muted">{a.calorias} kcal</span>}
           <BotaoExcluir onClick={() => excluirAtividade(a.id)} />
