@@ -8,6 +8,7 @@ import { dataPorExtenso, hojeISO, saudacao } from '../../core/dates'
 import { emojiEspecie } from '../pets/db'
 import { catInfo, diasRestantes, statusValidade } from '../compras/db'
 import type { ItemDespensa, MovDespensa } from '../compras/types'
+import { corEfetiva, iconeEvento } from '../agenda/categorias'
 import { eventosDoDia } from '../agenda/db'
 import { useEventos } from '../agenda/hooks'
 import { CapaImg } from '../biblioteca/components/CapaImg'
@@ -215,7 +216,25 @@ export function HojePage() {
                   <span className={`truncate text-[14px] ${estaAtrasada(tf) ? 'text-danger' : ''}`}>
                     {tf.titulo}
                   </span>
-                  {tf.horario && <span className="ml-auto shrink-0 text-[11px] text-muted">{tf.horario}</span>}
+                  {(() => {
+                    // Horário PLANEJADO (bloco de hoje) tem destaque; o PRAZO fica discreto.
+                    const planejado =
+                      tf.blocoInicio && (!tf.blocoData || tf.blocoData === hoje) ? tf.blocoInicio : undefined
+                    if (planejado) {
+                      return (
+                        <span className="ml-auto flex shrink-0 flex-col items-end leading-tight">
+                          <span className="text-[12px] font-semibold tabular-nums">{planejado}</span>
+                          {tf.horario && (
+                            <span className="text-[10px] tabular-nums text-muted">Prazo: {tf.horario}</span>
+                          )}
+                        </span>
+                      )
+                    }
+                    if (tf.horario) {
+                      return <span className="ml-auto shrink-0 text-[11px] tabular-nums text-muted">{tf.horario}</span>
+                    }
+                    return null
+                  })()}
                 </button>
               </li>
             ))}
@@ -671,21 +690,38 @@ function RibbonDia({
         <span className="font-semibold">Seu dia</span>
         <span className="tabular-nums text-muted/70">{horaAgora} · {FAIXAS[faixa].rotulo.toLowerCase()}</span>
       </div>
-      <div className="relative h-2 rounded-full bg-line">
+      <div className="relative h-7">
+        {/* trilha de base do dia (início → fim) */}
+        <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-line" />
+        {/* preenchimento de progresso do dia até agora */}
         <div
-          className="absolute inset-y-0 left-0 rounded-full"
+          className="absolute left-0 top-1/2 h-2 -translate-y-1/2 rounded-full"
           style={{ width: `${pos(agoraMin)}%`, background: 'linear-gradient(90deg, color-mix(in srgb, var(--vida-accent) 25%, transparent), var(--vida-accent))' }}
         />
-        {comHora.map(({ e, i }) => (
-          <span
-            key={e.id}
-            className="absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-bg"
-            style={{ left: `${pos(i)}%`, backgroundColor: e.cor ?? ACENTO }}
-            title={`${e.inicio} · ${e.titulo}`}
-          />
-        ))}
+        {/* uma barra por evento, ocupando sua duração (início → fim) */}
+        {comHora.map(({ e, i, f }) => {
+          const fim = f ?? i + 60
+          const larguraPct = Math.max(0, pos(fim) - pos(i))
+          const cabeIcone = larguraPct >= 6
+          const rotulo = `${iconeEvento(e)} ${e.inicio}${e.fim ? `–${e.fim}` : ''} · ${e.titulo}`
+          return (
+            <div
+              key={e.id}
+              className="absolute top-1/2 flex h-5 -translate-y-1/2 items-center justify-center overflow-hidden rounded-lg ring-1 ring-bg"
+              style={{ left: `${pos(i)}%`, width: `${larguraPct}%`, minWidth: 8, backgroundColor: corEfetiva(e) }}
+              title={rotulo}
+            >
+              {cabeIcone && (
+                <span className="text-[11px] leading-none" aria-hidden>
+                  {iconeEvento(e)}
+                </span>
+              )}
+            </div>
+          )
+        })}
+        {/* marcador de "agora" (sempre por cima das barras) */}
         <span
-          className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent ring-2 ring-bg"
+          className="absolute top-1/2 z-10 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent ring-2 ring-bg"
           style={{ left: `${pos(agoraMin)}%` }}
         />
       </div>
