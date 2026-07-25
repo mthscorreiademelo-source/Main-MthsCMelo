@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { IconeFator } from '../../core/components/icones'
+import { IconLua, IconSol } from '../../core/components/Icons'
 import { db } from '../../core/db/db'
 import { useInsightIA } from '../../core/ia/insights'
 import { dataPorExtenso, hojeISO, saudacao } from '../../core/dates'
@@ -25,7 +27,14 @@ import {
 import { useRegistros as useRegistrosHumor, useHumorTipos } from '../humor/hooks'
 import { humorDe, mediaNivel, registrosDoDia as registrosHumorDoDia } from '../humor/humor'
 import { formatarBRL } from '../financas/db'
-import { useMovimentos } from '../financas/hooks'
+import { orcamentoInteligente } from '../financas/orcamento'
+import {
+  useContas,
+  useFinancasConfig,
+  useMovimentos,
+  useObjetivos,
+  useRecorrentes,
+} from '../financas/hooks'
 import { exibir, METRICAS } from '../saude/db'
 import { useSaudeDia } from '../saude/hooks'
 import { useLivros } from '../biblioteca/hooks'
@@ -35,6 +44,11 @@ import { useTarefas } from '../tarefas/hooks'
 import type { Tamanho } from './CartaoHoje'
 import { CartaoHoje } from './CartaoHoje'
 import { faixaDoDia, FAIXAS, hhmmParaMin, minutosDoDia, useAgora } from './agora'
+import { modoDoMomento } from './modo'
+import type { Modo } from './modo'
+import { construirAlertas, temAlertaAlta } from './alertas'
+import { SeloModo } from './SeloModo'
+import { BannerAlerta } from './BannerAlerta'
 
 /** Um bloco do dashboard: prioridade decide a ordem; render recebe o tamanho. */
 interface Bloco {
@@ -73,8 +87,15 @@ export function HojePage() {
   const humorTipos = useHumorTipos()
   const saudeHoje = useSaudeDia(hoje)
   const movimentos = useMovimentos()
+  const contas = useContas()
+  const recorrentes = useRecorrentes()
+  const objetivos = useObjetivos()
+  const financasConfig = useFinancasConfig()
   const livros = useLivros()
   const paginas = usePaginas()
+
+  // Assinatura dos alertas já dispensados (X): some da tela até o quadro mudar.
+  const [alertasDispensados, setAlertasDispensados] = useState('')
 
   // Pets: cuidados de hoje ainda pendentes, por pet.
   const petsPendentes = useLiveQuery(async () => {
@@ -170,7 +191,7 @@ export function HojePage() {
           <div className="mt-1.5 flex items-start gap-2.5">
             <span className="mt-1 h-9 w-1 shrink-0 rounded-full" style={{ backgroundColor: cor }} />
             <span className="min-w-0">
-              <span className={`block font-bold leading-tight ${t === 'grande' ? 'text-xl' : 'text-[16px]'}`}>
+              <span className={`block font-bold leading-tight ${t === 'grande' || t === 'hero' ? 'text-xl' : 'text-[16px]'}`}>
                 {proximo.titulo}
               </span>
               <span className="block text-[13px] text-muted">
@@ -601,55 +622,119 @@ export function HojePage() {
     })
   }
 
+  /* ----------------------- Modo do momento + alertas --------------------- */
+  // Orçamento do dia — só considera "estourado" quando as finanças estão de
+  // fato configuradas (senão ignoramos sem quebrar, como pedido).
+  const financasConfiguradas = !!(
+    financasConfig?.rendaMensalCentavos ||
+    (contas && contas.length > 0)
+  )
+  const orc =
+    financasConfiguradas && movimentos && contas && recorrentes && objetivos
+      ? orcamentoInteligente({
+          hoje,
+          movimentos,
+          contas,
+          recorrentes,
+          objetivos,
+          eventos: eventos ?? [],
+          config: financasConfig,
+        })
+      : null
+  const disponivelHoje = orc ? orc.disponivelHoje : null
+
+  // Camada de alerta: sinais urgentes que JÁ conseguimos detectar hoje.
+  const alertas = construirAlertas({
+    agoraMin,
+    eventos: cronologicos.map((e) => ({
+      id: e.id,
+      titulo: e.titulo,
+      inicioMin: hhmmParaMin(e.inicio)!,
+    })),
+    atrasadas,
+    despensa: despensaAlertas ?? [],
+    disponivelHoje,
+    formatarBRL,
+  })
+  const assinaturaAlertas = alertas.map((a) => a.id).join('|')
+  const alertasVisiveis =
+    assinaturaAlertas && assinaturaAlertas !== alertasDispensados ? alertas : []
+
+  // Selo do topo: horário + estado do dia (alerta urgente / sinais de trabalho).
+  const temTrabalho =
+    cronologicos.some((e) => e.categoria === 'trabalho') ||
+    tarefasHoje.some((t) => !!t.projetoId)
+  const modo = modoDoMomento(agora, {
+    temAlertaAlta: temAlertaAlta(alertas),
+    temTrabalho,
+  })
+
   /* ------------------------------ Montagem ------------------------------- */
-  // Prioridade decide a ordem. O primeiro bloco é o "foco" (linha inteira, a
-  // matéria de capa); o restante flui numa grade que se empacota (masonry),
-  // sem os vãos brancos de uma grade rígida — e se reorganiza quando o
-  // conteúdo dos blocos muda ao longo do dia.
+  // Prioridade decide a ordem e o TAMANHO: o 1º bloco vira o card herói (grande,
+  // linha inteira); os demais se dividem em duas faixas visivelmente menores —
+  // médios (2 colunas) e pequenos (3 colunas) — reorganizando ao longo do dia.
   blocos.sort((a, b) => b.prioridade - a.prioridade)
   const foco = blocos[0]
   const resto = blocos.slice(1)
+  const medios = resto.filter((b) => b.tamanho !== 'pequeno')
+  const pequenos = resto.filter((b) => b.tamanho === 'pequeno')
 
   const carregando = eventos === undefined && tarefas === undefined && habitos === undefined
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
       <header className="lume-entrada pt-1">
-        <div className="flex items-baseline justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
           <h1 className="text-2xl font-bold tracking-tight">{saudacao(agora)}</h1>
-          <span className="shrink-0 text-[12px] font-medium text-muted/70">{FAIXAS[faixa].rotulo}</span>
+          <SeloModo modo={modo} />
         </div>
         <p className="mt-1 text-sm text-muted">{dataPorExtenso(agora)}</p>
       </header>
 
-      {!carregando && <RibbonDia eventos={cronologicos} agora={agora} agoraMin={agoraMin} faixa={faixa} />}
+      {!carregando && alertasVisiveis.length > 0 && (
+        <BannerAlerta
+          alertas={alertasVisiveis}
+          onDispensar={() => setAlertasDispensados(assinaturaAlertas)}
+        />
+      )}
 
       {carregando ? (
         <p className="py-16 text-center text-sm text-muted">Organizando o seu dia…</p>
       ) : !foco ? (
-        <p className="py-12 text-center text-sm text-muted">
-          Nada urgente agora. Aproveite para respirar. 🌿
-        </p>
+        <>
+          <RibbonDia eventos={cronologicos} agora={agora} agoraMin={agoraMin} faixa={faixa} />
+          <p className="py-12 text-center text-sm text-muted">
+            Nada urgente agora. Aproveite para respirar. 🌿
+          </p>
+        </>
       ) : (
         <>
-          <div className="lume-entrada">{foco.render(foco.tamanho)}</div>
-          {resto.length > 0 && (
-            <div className="gap-4 sm:columns-2">
-              {resto.map((bl) => (
-                <div key={bl.id} className="mb-4 break-inside-avoid">
-                  {bl.render(bl.tamanho === 'hero' || bl.tamanho === 'grande' ? 'medio' : bl.tamanho)}
-                </div>
+          {/* Card herói — o mais importante agora, grande e em linha inteira. */}
+          <div className="lume-entrada">{foco.render('hero')}</div>
+
+          <RibbonDia eventos={cronologicos} agora={agora} agoraMin={agoraMin} faixa={faixa} />
+
+          {/* Faixa dos médios — duas colunas. */}
+          {medios.length > 0 && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {medios.map((bl) => (
+                <div key={bl.id}>{bl.render('medio')}</div>
+              ))}
+            </div>
+          )}
+
+          {/* Faixa dos pequenos — três colunas, visivelmente menores. */}
+          {pequenos.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {pequenos.map((bl) => (
+                <div key={bl.id}>{bl.render('pequeno')}</div>
               ))}
             </div>
           )}
         </>
       )}
 
-      <MensagemIA
-        faixa={faixa}
-        eventos={cronologicos.length}
-        tarefas={tarefasHoje.length}
-      />
+      <MensagemIA modo={modo} eventos={cronologicos.length} tarefas={tarefasHoje.length} />
     </div>
   )
 }
@@ -793,33 +878,42 @@ function insightDoDia({
 }
 
 function MensagemIA({
-  faixa,
+  modo,
   eventos,
   tarefas,
 }: {
-  faixa: ReturnType<typeof faixaDoDia>
+  modo: Modo
   eventos: number
   tarefas: number
 }) {
+  const Icone = modo.diurno ? IconSol : IconLua
   let msg: string
-  if (faixa === 'manha') {
+  if (modo.tom === 'atencao') {
+    // Quando o modo está em "Atenção", a frase de rodapé acompanha o momento.
+    msg = 'Tem algo pedindo atenção agora. Resolva o urgente e siga com calma.'
+  } else if (modo.faixa === 'manha') {
     msg =
       eventos + tarefas === 0
-        ? 'Uma manhã tranquila pela frente. Um bom momento para começar algo seu.'
-        : `Bom começo de dia. Você tem ${eventos} compromisso${eventos === 1 ? '' : 's'} e ${tarefas} tarefa${tarefas === 1 ? '' : 's'} planejadas.`
-  } else if (faixa === 'meiodia') {
+        ? 'Manhã tranquila pela frente. Um bom momento para começar algo seu.'
+        : `Bom começo de dia. Você tem ${eventos} compromisso${eventos === 1 ? '' : 's'} e ${tarefas} tarefa${tarefas === 1 ? '' : 's'} pela frente.`
+  } else if (modo.faixa === 'meiodia') {
     msg = 'Meio do dia — vale uma pausa e um copo de água antes de seguir.'
-  } else if (faixa === 'tarde') {
+  } else if (modo.faixa === 'tarde') {
     msg =
       tarefas > 0
         ? 'A tarde rende. Talvez seja a hora de avançar na tarefa mais importante.'
         : 'Tarde livre — um bom espaço para foco ou descanso.'
-  } else if (faixa === 'noite') {
-    msg = 'A noite chegou. Hora de encerrar o que dá e desacelerar aos poucos.'
-  } else if (faixa === 'fimdenoite') {
-    msg = 'O dia está quase no fim. Um bom momento para revisar como foi e preparar o amanhã.'
+  } else if (modo.faixa === 'noite') {
+    msg = 'A noite chegou. Encerre o que der e comece a desacelerar.'
+  } else if (modo.faixa === 'fimdenoite') {
+    msg = 'O dia está quase no fim. Reveja como foi e prepare o amanhã.'
   } else {
     msg = 'Ainda é madrugada. Se puder, descanse — o dia começa melhor com sono.'
   }
-  return <p className="lume-entrada px-1 pt-1 pb-2 text-[13px] leading-relaxed text-muted/90">{msg}</p>
+  return (
+    <p className="lume-entrada flex items-center gap-2 px-1 pt-1 pb-2 text-[13px] leading-relaxed text-muted/90">
+      <Icone width={15} height={15} className="shrink-0 opacity-70" />
+      <span>{msg}</span>
+    </p>
+  )
 }
