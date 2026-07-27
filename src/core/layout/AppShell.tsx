@@ -94,8 +94,9 @@ export function AppShell() {
         )}
       </main>
 
-      {/* Captura Rápida (Quick Actions) — global em todas as páginas. */}
-      <BotaoGlobal />
+      {/* Captura Rápida (Quick Actions) — por ora, SÓ na Hoje. As outras
+          páginas (incl. os desenhos) ganharão outro uso pra esse espaço. */}
+      {moduloAtual.id === 'hoje' && <BotaoGlobal />}
       <LauncherCaptura />
       <ToastCaptura />
     </div>

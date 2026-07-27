@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '../../../core/components/Button'
 import { Sheet } from '../../../core/components/Sheet'
 import { IconLixeira } from '../../../core/components/Icons'
@@ -13,10 +13,33 @@ interface Props {
 }
 
 export function EditorProjeto({ projeto, onFechar, onCriado }: Props) {
+  const aberto = projeto !== undefined
   const editando = !!projeto
   const [nome, setNome] = useState(projeto?.nome ?? '')
   const [cor, setCor] = useState(projeto?.cor ?? CORES_PROJETO[6])
   const [confirmar, setConfirmar] = useState(false)
+  const campoNome = useRef<HTMLInputElement>(null)
+
+  // O painel fica sempre montado (escondido fora da tela). Por isso os valores
+  // iniciais do useState só valem na primeira montagem. Sempre que o painel
+  // abre para um alvo (um projeto específico para editar, ou "novo projeto"),
+  // reiniciamos os campos com os valores atuais desse alvo — assim editar traz
+  // o nome/cor do projeto, e "novo" vem em branco.
+  useEffect(() => {
+    if (!aberto) return
+    setNome(projeto?.nome ?? '')
+    setCor(projeto?.cor ?? CORES_PROJETO[6])
+    setConfirmar(false)
+    // Reinicia só quando o painel abre ou troca de projeto-alvo (id); não
+    // relistamos nome/cor de propósito, para não apagar o que o usuário digita.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aberto, projeto?.id])
+
+  // Foca o campo de nome só quando o painel abre — assim o teclado do tablet
+  // não sobe sozinho enquanto o painel está fechado (fora da tela).
+  useEffect(() => {
+    if (aberto) campoNome.current?.focus()
+  }, [aberto])
 
   async function salvar() {
     if (!nome.trim()) return
@@ -45,7 +68,7 @@ export function EditorProjeto({ projeto, onFechar, onCriado }: Props) {
         <label className="flex flex-col gap-1.5">
           <span className="text-[13px] font-medium text-muted">Nome</span>
           <input
-            autoFocus
+            ref={campoNome}
             value={nome}
             onChange={(e) => setNome(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && salvar()}

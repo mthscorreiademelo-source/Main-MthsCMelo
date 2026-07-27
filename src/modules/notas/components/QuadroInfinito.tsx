@@ -171,6 +171,11 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   onCameraVivoRef.current = onCameraVivo
   const onCriarTextoRef = useRef(onCriarTexto)
   onCriarTextoRef.current = onCriarTexto
+  // Câmera inicial lida por ref: usada só na primeira montagem. Deixá-la fora
+  // das dependências do efeito de tamanho evita que salvar a câmera (fim do pan)
+  // ou editar o título re-executem o `ajustar` e realoquem/limpem o canvas.
+  const cameraInicialRef = useRef(cameraInicial)
+  cameraInicialRef.current = cameraInicial
 
   useEffect(() => {
     const w = window as unknown as {
@@ -676,14 +681,27 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     const ajustar = () => {
       const dpr = window.devicePixelRatio || 1
       const rect = canvas.parentElement!.getBoundingClientRect()
-      canvas.width = Math.round(rect.width * dpr)
-      canvas.height = Math.round(rect.height * dpr)
-      canvas.style.width = `${rect.width}px`
-      canvas.style.height = `${rect.height}px`
+      const larguraNova = Math.round(rect.width * dpr)
+      const alturaNova = Math.round(rect.height * dpr)
+      // Durante transições de layout (teclado do tablet abrindo/fechando ao
+      // editar o título, entrada/saída de tela cheia) o tamanho pode chegar
+      // como 0 por um instante. Ignorar esse caso evita zerar o canvas e deixá-lo
+      // em branco/travado.
+      if (larguraNova === 0 || alturaNova === 0) return
+      // Reatribuir canvas.width/height APAGA todo o bitmap (mesmo com o mesmo
+      // valor), causando um flash branco até o próximo quadro. Só realoca quando
+      // o tamanho realmente muda — assim salvar a câmera (ao soltar o dedo no
+      // pan) e voltar de editar o título não piscam nem quebram o quadro.
+      if (canvas.width !== larguraNova || canvas.height !== alturaNova) {
+        canvas.width = larguraNova
+        canvas.height = alturaNova
+        canvas.style.width = `${rect.width}px`
+        canvas.style.height = `${rect.height}px`
+      }
       if (!inicializada.current) {
         inicializada.current = true
-        if (cameraInicial) {
-          cam.current = { ...cameraInicial }
+        if (cameraInicialRef.current) {
+          cam.current = { ...cameraInicialRef.current }
         } else {
           const caixa = limitesDosTracos(tracosRef.current)
           if (caixa && caixa.largura > 0) {
@@ -709,7 +727,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     ajustar()
     window.addEventListener('resize', ajustar)
     return () => window.removeEventListener('resize', ajustar)
-  }, [cameraInicial, pedirRender])
+  }, [pedirRender])
 
   useEffect(() => {
     tracosLocais.current = null
