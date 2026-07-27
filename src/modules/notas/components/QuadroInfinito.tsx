@@ -64,8 +64,12 @@ interface Props {
   onCameraVivo?: (camera: Camera) => void
   /** Ferramenta de texto: pediu criar um bloco de texto no ponto de mundo. */
   onCriarTexto?: (wx: number, wy: number) => void
-  /** ativa = há seleção; pagerId = id do PDF folheador se ele estiver sozinho na seleção */
-  onSelecaoMudou: (ativa: boolean, pagerId: string | null) => void
+  /**
+   * ativa = há seleção; pagerId = id do PDF folheador se ele estiver sozinho na
+   * seleção; postItSelId = id do post-it quando um único post-it está
+   * selecionado (para mostrar a paleta de cor rápida).
+   */
+  onSelecaoMudou: (ativa: boolean, pagerId: string | null, postItSelId?: string | null) => void
   /** Toque longo (dedo) ou clique direito: posição de tela e de mundo */
   onMenuContexto: (sx: number, sy: number, wx: number, wy: number) => void
 }
@@ -983,7 +987,15 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       )
       if (it && it.tipo === 'pdf' && soTintaDele) pagerId = it.id
     }
-    onSelecaoMudou(true, pagerId)
+    // post-it sozinho (pode vir com a própria tinta): habilita a paleta rápida
+    let postItSelId: string | null = null
+    if (sel.postItIds.length === 1 && sel.itemIds.length === 0) {
+      const soTintaDele = sel.indices.every(
+        (i) => tracosRef.current[i]?.postItId === sel.postItIds[0],
+      )
+      if (soTintaDele) postItSelId = sel.postItIds[0]
+    }
+    onSelecaoMudou(true, pagerId, postItSelId)
   }
 
   /** Monta (ou limpa) a seleção a partir dos conjuntos escolhidos. */

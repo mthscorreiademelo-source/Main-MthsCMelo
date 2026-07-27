@@ -11,7 +11,13 @@ import {
 } from '../../../core/components/Icons'
 import { Sheet } from '../../../core/components/Sheet'
 import { nanoid } from 'nanoid'
-import { configsIniciais, gerarMiniatura, limitesDosTracos, type ConfigsCanetas } from '../desenho'
+import {
+  configsIniciais,
+  CORES_POSTIT,
+  gerarMiniatura,
+  limitesDosTracos,
+  type ConfigsCanetas,
+} from '../desenho'
 import { ordenarGrupos } from '../db'
 import {
   imagemParaItem,
@@ -20,8 +26,18 @@ import {
   renderizarPaginasPdf,
 } from '../importar'
 import { guardarPrancheta, lerPrancheta } from '../prancheta'
-import type { Grupo, ItemQuadro, Pagina, PostIt, TextoQuadro, TipoCaneta, Traco } from '../types'
+import type {
+  Comentario,
+  Grupo,
+  ItemQuadro,
+  Pagina,
+  PostIt,
+  TextoQuadro,
+  TipoCaneta,
+  Traco,
+} from '../types'
 import { BarraDesenho, type ModoBarra } from './BarraDesenho'
+import { CamadaComentarios, type CamadaComentariosApi } from './CamadaComentarios'
 import { CamadaTextos, type CamadaTextosApi } from './CamadaTextos'
 import { QuadroInfinito, type ConfigBorracha, type QuadroApi } from './QuadroInfinito'
 
@@ -69,6 +85,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   const [reguaAtiva, setReguaAtiva] = useState(false)
   const [selecaoAtiva, setSelecaoAtiva] = useState(false)
   const [pagerSelId, setPagerSelId] = useState<string | null>(null)
+  const [postItSelId, setPostItSelId] = useState<string | null>(null)
   const [dialogoPdf, setDialogoPdf] = useState<{ paginas: string[]; indice: number; total: number } | null>(null)
   const [menuAberto, setMenuAberto] = useState(false)
   const [confirmandoLimpar, setConfirmandoLimpar] = useState(false)
@@ -78,13 +95,20 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   const [telaCheia, setTelaCheia] = useState(false)
   const quadro = useRef<QuadroApi>(null)
   const camadaTextos = useRef<CamadaTextosApi>(null)
+  const camadaComentarios = useRef<CamadaComentariosApi>(null)
   const inputImagem = useRef<HTMLInputElement>(null)
   const inputPdf = useRef<HTMLInputElement>(null)
 
   // Histórico de desfazer/refazer: pilhas de instantâneos do conteúdo do quadro
   // (traços, itens, post-its). Toda alteração passa por `aplicar`, então é ali
   // que empilhamos — cobre desenhar, apagar, mover, colar, limpar etc.
-  type Instantaneo = { tracos: Traco[]; itens: ItemQuadro[]; postIts: PostIt[]; textos: TextoQuadro[] }
+  type Instantaneo = {
+    tracos: Traco[]
+    itens: ItemQuadro[]
+    postIts: PostIt[]
+    textos: TextoQuadro[]
+    comentarios: Comentario[]
+  }
   const desfazerPilha = useRef<Instantaneo[]>([])
   const refazerPilha = useRef<Instantaneo[]>([])
   const [hist, setHist] = useState({ desfazer: 0, refazer: 0 })
@@ -132,6 +156,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   const itens = pagina.itens ?? []
   const postIts = pagina.postIts ?? []
   const textos = pagina.textos ?? []
+  const comentarios = pagina.comentarios ?? []
   const ferramenta =
     modo === 'borracha' || modo === 'selecao' || modo === 'ponteiro' || modo === 'texto'
       ? { modo, cor: '', espessura: 0, suavizacao: 0 }
@@ -142,11 +167,12 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
     novosItens: ItemQuadro[] = itens,
     novosPostIts: PostIt[] = postIts,
     novosTextos: TextoQuadro[] = textos,
+    novosComentarios: Comentario[] = comentarios,
     registrar = true,
   ) {
     if (registrar) {
       // guarda o estado ATUAL (antes da mudança) para poder desfazer
-      desfazerPilha.current.push({ tracos, itens, postIts, textos })
+      desfazerPilha.current.push({ tracos, itens, postIts, textos, comentarios })
       if (desfazerPilha.current.length > 100) desfazerPilha.current.shift()
       refazerPilha.current = []
       setHist({ desfazer: desfazerPilha.current.length, refazer: 0 })
@@ -156,6 +182,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
       itens: novosItens,
       postIts: novosPostIts,
       textos: novosTextos,
+      comentarios: novosComentarios,
       miniatura: gerarMiniatura(novosTracos),
     })
   }
@@ -163,7 +190,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   function desfazer() {
     const anterior = desfazerPilha.current.pop()
     if (!anterior) return
-    refazerPilha.current.push({ tracos, itens, postIts, textos })
+    refazerPilha.current.push({ tracos, itens, postIts, textos, comentarios })
     setHist({ desfazer: desfazerPilha.current.length, refazer: refazerPilha.current.length })
     quadro.current?.limparSelecao()
     onMudar({ ...anterior, miniatura: gerarMiniatura(anterior.tracos) })
@@ -172,7 +199,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   function refazer() {
     const proximo = refazerPilha.current.pop()
     if (!proximo) return
-    desfazerPilha.current.push({ tracos, itens, postIts, textos })
+    desfazerPilha.current.push({ tracos, itens, postIts, textos, comentarios })
     setHist({ desfazer: desfazerPilha.current.length, refazer: refazerPilha.current.length })
     quadro.current?.limparSelecao()
     onMudar({ ...proximo, miniatura: gerarMiniatura(proximo.tracos) })
@@ -196,7 +223,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
     window.addEventListener('keydown', aoTecla)
     return () => window.removeEventListener('keydown', aoTecla)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracos, itens, postIts, textos])
+  }, [tracos, itens, postIts, textos, comentarios])
 
   // Novo desenho aberto: zera o histórico de desfazer/refazer.
   useEffect(() => {
@@ -211,18 +238,30 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
     setTimeout(() => quadro.current?.selecionarObjeto(alvo), 80)
   }
 
-  function novoPostIt(cor: string) {
-    const centro = quadro.current!.centroMundo()
+  /** Cria um post-it (no ponto dado ou no centro da tela) e já o seleciona. */
+  function novoPostIt(cor: string, wx?: number, wy?: number) {
+    const centro = wx !== undefined && wy !== undefined ? { x: wx, y: wy } : quadro.current!.centroMundo()
     const postIt: PostIt = {
       id: nanoid(),
       x: centro.x,
       y: centro.y,
-      largura: 280,
-      altura: 280,
+      // tamanho confortável para o dedo no tablet
+      largura: 240,
+      altura: 240,
       cor,
     }
     aplicar(tracos, itens, [...postIts, postIt])
     selecionarInserido({ postItId: postIt.id })
+  }
+
+  /** Troca a cor do post-it selecionado (paleta rápida da seleção). */
+  function trocarCorPostIt(cor: string) {
+    if (!postItSelId) return
+    aplicar(
+      tracos,
+      itens,
+      postIts.map((p) => (p.id === postItSelId ? { ...p, cor } : p)),
+    )
   }
 
   /** Ferramenta de texto: cria o bloco no ponto clicado e já abre para digitar. */
@@ -234,6 +273,18 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   /** Commit dos blocos de texto (entra no histórico de desfazer). */
   function mudarTextos(novos: TextoQuadro[]) {
     aplicar(tracos, itens, postIts, novos)
+  }
+
+  /** Cria um comentário no ponto dado e já abre para escrever. */
+  function novoComentario(wx: number, wy: number) {
+    setModo('ponteiro')
+    quadro.current?.limparSelecao()
+    setTimeout(() => camadaComentarios.current?.novo(wx, wy), 0)
+  }
+
+  /** Commit da lista de comentários (entra no histórico de desfazer). */
+  function mudarComentarios(novos: Comentario[]) {
+    aplicar(tracos, itens, postIts, textos, novos)
   }
 
   function copiar() {
@@ -411,6 +462,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
   }
 
   const pagerSel = pagerSelId ? itens.find((i) => i.id === pagerSelId) : undefined
+  const postItSel = postItSelId ? postIts.find((p) => p.id === postItSelId) : undefined
 
   return (
     <div className="fixed inset-0 z-30 overflow-hidden bg-white" onPointerDown={aoPrimeiroToque}>
@@ -428,11 +480,15 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
         onApagarTraco={(i) => aplicar(tracos.filter((_, j) => j !== i))}
         onSubstituir={(t, i, p) => aplicar(t, i, p)}
         onCamera={(camera) => onMudar({ camera })}
-        onCameraVivo={(c) => camadaTextos.current?.aplicarCamera(c)}
+        onCameraVivo={(c) => {
+          camadaTextos.current?.aplicarCamera(c)
+          camadaComentarios.current?.aplicarCamera(c)
+        }}
         onCriarTexto={criarTexto}
-        onSelecaoMudou={(ativa, pagerId) => {
+        onSelecaoMudou={(ativa, pagerId, postSel) => {
           setSelecaoAtiva(ativa)
           setPagerSelId(pagerId)
+          setPostItSelId(postSel ?? null)
         }}
         onMenuContexto={(sx, sy, wx, wy) => setMenuCtx({ sx, sy, wx, wy })}
       />
@@ -447,6 +503,14 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
         onMudarTextos={mudarTextos}
       />
 
+      <CamadaComentarios
+        ref={camadaComentarios}
+        comentarios={comentarios}
+        interativo={modo === 'ponteiro' || modo === 'texto'}
+        camInicial={pagina.camera}
+        onMudar={mudarComentarios}
+      />
+
       {/* Menu de contexto (toque longo / clique direito) */}
       {menuCtx && (
         <>
@@ -459,7 +523,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
             className="absolute z-50 flex w-60 flex-col rounded-xl border border-line bg-bg py-1.5 shadow-xl"
             style={{
               left: Math.min(menuCtx.sx, window.innerWidth - 260),
-              top: Math.min(menuCtx.sy, window.innerHeight - 220),
+              top: Math.min(menuCtx.sy, window.innerHeight - 320),
             }}
           >
             <button
@@ -474,6 +538,27 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
               className="min-h-11 cursor-pointer px-4 text-left text-sm font-medium transition-colors hover:bg-hover"
             >
               Colar aqui
+            </button>
+            <span className="mx-3 my-1 h-px bg-line" />
+            <button
+              onClick={() => {
+                const { wx, wy } = menuCtx
+                setMenuCtx(null)
+                novoPostIt(CORES_POSTIT[0].valor, wx, wy)
+              }}
+              className="min-h-11 cursor-pointer px-4 text-left text-sm font-medium transition-colors hover:bg-hover"
+            >
+              Adicionar post-it
+            </button>
+            <button
+              onClick={() => {
+                const { wx, wy } = menuCtx
+                setMenuCtx(null)
+                novoComentario(wx, wy)
+              }}
+              className="min-h-11 cursor-pointer px-4 text-left text-sm font-medium transition-colors hover:bg-hover"
+            >
+              Adicionar comentário
             </button>
             <span className="mx-3 my-1 h-px bg-line" />
             <button
@@ -543,6 +628,29 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
               >
                 <IconSetaEsquerda width={18} height={18} className="rotate-180" />
               </IconButton>
+              <span className="mx-1 h-6 w-px bg-line" />
+            </span>
+          ) : postItSel ? (
+            <span className="flex items-center gap-1.5 pr-1" data-testid="paleta-postit">
+              {CORES_POSTIT.map((c) => {
+                const ativa = postItSel.cor.toUpperCase() === c.valor.toUpperCase()
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => trocarCorPostIt(c.valor)}
+                    aria-label={`Cor ${c.rotulo.toLowerCase()}`}
+                    aria-pressed={ativa}
+                    className="flex size-8 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-110"
+                  >
+                    <span
+                      className={`size-6 rounded-full border border-black/10 ${
+                        ativa ? 'ring-2 ring-accent ring-offset-2 ring-offset-bg' : ''
+                      }`}
+                      style={{ backgroundColor: c.valor }}
+                    />
+                  </button>
+                )
+              })}
               <span className="mx-1 h-6 w-px bg-line" />
             </span>
           ) : (
@@ -713,12 +821,16 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
                 setTimeout(() => setConfirmandoLimpar(false), 3000)
                 return
               }
-              aplicar([], [], [], [])
+              aplicar([], [], [], [], [])
               setConfirmandoLimpar(false)
               setMenuAberto(false)
             }}
             disabled={
-              tracos.length === 0 && itens.length === 0 && postIts.length === 0 && textos.length === 0
+              tracos.length === 0 &&
+              itens.length === 0 &&
+              postIts.length === 0 &&
+              textos.length === 0 &&
+              comentarios.length === 0
             }
             className="self-start"
           >

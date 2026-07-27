@@ -42,6 +42,21 @@ export interface PostIt {
   cor: string
 }
 
+/**
+ * Comentário no quadro: aparece minimizado como um balãozinho de fala e,
+ * ao tocar, abre um cartão para ler/editar o texto. Move-se e apaga-se
+ * como os outros objetos do quadro.
+ */
+export interface Comentario {
+  id: string
+  /** Centro em coordenadas de mundo */
+  x: number
+  y: number
+  /** Conteúdo do comentário (pode ter várias linhas) */
+  texto: string
+  criadoEm: number
+}
+
 /** Bloco de texto digitado no quadro (escrito com o teclado). */
 export interface TextoQuadro {
   id: string
@@ -142,6 +157,8 @@ export interface Pagina {
   postIts?: PostIt[]
   /** Blocos de texto digitados no quadro */
   textos?: TextoQuadro[]
+  /** Comentários (balõezinhos minimizados) espalhados pelo quadro */
+  comentarios?: Comentario[]
   /** Arquivos anexados (somente tipo 'arquivos') — metadados; blob na tabela */
   arquivos?: ArquivoRef[]
 }
