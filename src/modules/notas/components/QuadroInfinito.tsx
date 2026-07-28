@@ -1078,6 +1078,24 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     definirSelecao([], [], [])
   }
 
+  /** Post-it mais de cima sob um ponto de mundo (ou null). */
+  function postItSobPonto(x: number, y: number): PostIt | null {
+    for (let i = postItsRef.current.length - 1; i >= 0; i--) {
+      const p = postItsRef.current[i]
+      if (pontoNoPostIt(p, x, y)) return p
+    }
+    return null
+  }
+
+  /** Seleciona um post-it (levando junto a tinta colada nele). */
+  function selecionarPostIt(p: PostIt) {
+    const tinta: number[] = []
+    tracosRef.current.forEach((t, k) => {
+      if (t.postItId === p.id) tinta.push(k)
+    })
+    definirSelecao(tinta, [], [p.id])
+  }
+
   /** Posição de tela (client) de um ponto local da caixa da seleção (que gira
    *  junto com a folha e com a rotação própria da seleção). */
   function alcaTela(localX: number, localY: number): [number, number] | null {
@@ -1225,10 +1243,60 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
             onMenuContexto(t.x, t.y, wx, wy)
           }
         }, 550)
+        // DEDO = gesto de manipular: INDEPENDENTE da ferramenta ativa (pincel,
+        // lápis, caneta, régua, marcador...), o dedo pega as alças/caixa da
+        // seleção ou toca um post-it para selecioná-lo. Se cair em espaço vazio,
+        // nada disso ativa e o dedo segue arrastando o quadro (pan), como antes.
+        gestoSel.current = null
+        if (!gestoRegua.current) {
+          const [x, y] = paraMundo(e.clientX, e.clientY)
+          if (alcaDeRotacao(e.clientX, e.clientY)) {
+            const sel = selecao.current!
+            const cx = (sel.caixa.minX + sel.caixa.maxX) / 2
+            const cy = (sel.caixa.minY + sel.caixa.maxY) / 2
+            gestoSel.current = 'girar'
+            inicioGesto.current = { x, y, ang: Math.atan2(y - cy, x - cx), dist: 0 }
+            tapTexto.current = null
+          } else if (alcaDeEscala(e.clientX, e.clientY)) {
+            const sel = selecao.current!
+            const cx = (sel.caixa.minX + sel.caixa.maxX) / 2
+            const cy = (sel.caixa.minY + sel.caixa.maxY) / 2
+            gestoSel.current = 'escala'
+            inicioGesto.current = { x, y, ang: 0, dist: Math.max(1, Math.hypot(x - cx, y - cy)) }
+            tapTexto.current = null
+          } else {
+            const alvo = postItSobPonto(x, y)
+            if (alvo) {
+              // toque sobre um post-it: seleciona já (mostra a paleta rápida) e
+              // prepara mover caso o dedo arraste. Um toque simples (sem arrastar)
+              // só seleciona — não move (ver confirmarTransformacao ao soltar).
+              const jaEste =
+                !!selecao.current &&
+                selecao.current.postItIds.length === 1 &&
+                selecao.current.postItIds[0] === alvo.id
+              if (!jaEste) selecionarPostIt(alvo)
+              gestoSel.current = 'mover'
+              inicioGesto.current = { x, y, ang: 0, dist: 0 }
+              tapTexto.current = null
+            } else if (selecao.current && dentroDaCaixa(x, y)) {
+              // dedo dentro de uma seleção já existente: arrasta para mover
+              gestoSel.current = 'mover'
+              inicioGesto.current = { x, y, ang: 0, dist: 0 }
+              tapTexto.current = null
+            }
+          }
+        }
       }
       if (dedos.current.size === 2) {
         tapTexto.current = null
         if (timerToqueLongo.current) clearTimeout(timerToqueLongo.current)
+        // dois dedos = zoom/rotação da folha: abandona a manipulação da seleção
+        if (gestoSel.current) {
+          gestoSel.current = null
+          inicioGesto.current = null
+          transSel.current = { dx: 0, dy: 0, ang: 0, s: 1 }
+          cenaSuja.current = true
+        }
         const [a, b] = [...dedos.current.values()]
         pinca.current = {
           dist: Math.hypot(a.x - b.x, a.y - b.y),
@@ -1398,6 +1466,29 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
           pedirRender()
           return
         }
+        // DEDO manipulando a seleção (mover/girar/redimensionar) — mesma lógica
+        // da caneta no modo ponteiro, mas aqui vale para qualquer ferramenta.
+        if (gestoSel.current && inicioGesto.current) {
+          const [x, y] = paraMundo(atual.x, atual.y)
+          if (gestoSel.current === 'mover') {
+            transSel.current.dx = x - inicioGesto.current.x
+            transSel.current.dy = y - inicioGesto.current.y
+          } else if (gestoSel.current === 'girar' && selecao.current) {
+            const sel = selecao.current
+            const cx = (sel.caixa.minX + sel.caixa.maxX) / 2
+            const cy = (sel.caixa.minY + sel.caixa.maxY) / 2
+            transSel.current.ang = Math.atan2(y - cy, x - cx) - inicioGesto.current.ang
+          } else if (gestoSel.current === 'escala' && selecao.current) {
+            const sel = selecao.current
+            const cx = (sel.caixa.minX + sel.caixa.maxX) / 2
+            const cy = (sel.caixa.minY + sel.caixa.maxY) / 2
+            const dist = Math.hypot(x - cx, y - cy)
+            transSel.current.s = Math.min(8, Math.max(0.2, dist / inicioGesto.current.dist))
+          }
+          cenaSuja.current = true
+          pedirRender()
+          return
+        }
         const dsx = atual.x - anterior.x
         const dsy = atual.y - anterior.y
         const cos = Math.cos(c.rot ?? 0)
@@ -1486,6 +1577,14 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
       }
       if (dedos.current.size < 2) pinca.current = null
       if (dedos.current.size === 0) gestoRegua.current = null
+      // dedo terminou de manipular a seleção: confirma mover/girar/escala.
+      // Um toque simples deixa a transformação em zero, então nada muda —
+      // só a seleção permanece (paleta de cor à mostra).
+      if (dedos.current.size === 0 && gestoSel.current) {
+        confirmarTransformacao()
+        gestoSel.current = null
+        inicioGesto.current = null
+      }
       // toque simples com a ferramenta de texto: cria o bloco no ponto tocado
       if (dedos.current.size === 0 && tapTexto.current && ferramentaRef.current.modo === 'texto') {
         const [wx, wy] = paraMundo(tapTexto.current.x, tapTexto.current.y)
