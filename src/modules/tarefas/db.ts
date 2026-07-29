@@ -120,94 +120,36 @@ export const CORES_PROJETO = [
   '#808080',
 ]
 
-/* ---------- interpretação do quick-add ---------- */
-
-const PALAVRAS_DIA: Record<string, number> = {
-  domingo: 0, dom: 0,
-  segunda: 1, seg: 1,
-  terca: 2, ['terça']: 2, ter: 2,
-  quarta: 3, qua: 3,
-  quinta: 4, qui: 4,
-  sexta: 5, sex: 5,
-  sabado: 6, ['sábado']: 6, sab: 6,
-}
-
-/** Próxima data (>= amanhã) cujo dia-da-semana bate. */
-function proximoDiaSemana(alvo: number): string {
-  let d = addDays(parseISO(hojeISO()), 1)
-  for (let i = 0; i < 7; i++) {
-    if (getDay(d) === alvo) break
-    d = addDays(d, 1)
-  }
-  return format(d, 'yyyy-MM-dd')
-}
-
-export interface Interpretado {
-  titulo: string
-  data?: string
-  prioridade?: Prioridade
-  projetoId?: string
-}
-
-/**
- * Lê tokens no estilo Todoist do texto do quick-add e devolve os campos
- * separados do título limpo: `p1..p4`, `hoje`/`amanhã`/dias da semana e
- * `#Projeto` (casa pelo nome, sem acento/caixa).
- */
-export function interpretarEntrada(texto: string, projetos: Projeto[]): Interpretado {
-  let titulo = texto
-  let data: string | undefined
-  let prioridade: Prioridade | undefined
-  let projetoId: string | undefined
-
-  const semAcento = (s: string) =>
-    s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
-
-  // #Projeto (nome pode ter espaços? mantemos simples: uma palavra)
-  const mProj = titulo.match(/(?:^|\s)#([\p{L}\p{N}_-]+)/u)
-  if (mProj) {
-    const alvo = semAcento(mProj[1])
-    const p = projetos.find((x) => semAcento(x.nome).replace(/\s+/g, '') === alvo || semAcento(x.nome) === alvo)
-    if (p) {
-      projetoId = p.id
-      titulo = titulo.replace(mProj[0], ' ')
-    }
-  }
-
-  // p1..p4
-  const mPri = titulo.match(/(?:^|\s)!?p([1-4])\b/i)
-  if (mPri) {
-    prioridade = Number(mPri[1]) as Prioridade
-    titulo = titulo.replace(mPri[0], ' ')
-  }
-
-  // datas naturais
-  const tokens = titulo.split(/\s+/)
-  for (const tok of tokens) {
-    const t = semAcento(tok)
-    if (t === 'hoje') { data = hojeISO(); titulo = titulo.replace(tok, ' '); break }
-    if (t === 'amanha') { data = format(addDays(parseISO(hojeISO()), 1), 'yyyy-MM-dd'); titulo = titulo.replace(tok, ' '); break }
-    if (t in PALAVRAS_DIA) { data = proximoDiaSemana(PALAVRAS_DIA[t]); titulo = titulo.replace(tok, ' '); break }
-  }
-
-  return { titulo: titulo.replace(/\s+/g, ' ').trim(), data, prioridade, projetoId }
-}
-
 /* ---------- CRUD de tarefas ---------- */
 
 export interface DadosTarefa {
   titulo: string
   descricao?: string
   data?: string
+  /** Horário-limite (prazo), no dia `data`. */
   horario?: string
   /**
-   * Dia planejado (ISO), independente do prazo — atalho de criação: vira um
-   * único `BlocoTarefa` já `fixado: true` (dia escolhido manualmente/herdado
-   * de um filtro; hora ainda fica em aberto, o Motor sugere depois).
+   * Dia planejado (ISO), independente do prazo — atalho de criação LEGADO:
+   * vira um único `BlocoTarefa` já `fixado: true`, sem hora (o Motor sugere
+   * depois). Preferir `bloco` quando já se sabe dia+hora (ex.: reconhecido
+   * pelo interpretador do "Nova tarefa", `interpretarTarefa`).
    */
   blocoData?: string
+  /**
+   * Bloco de tempo completo (dia+hora+duração), já `fixado: true` — usado
+   * pelo "Nova tarefa" quando a frase reconhece um horário sem palavra de
+   * limite (ver `interpretarTarefa`) ou quando o Matheus ajusta um bloco
+   * manualmente antes de criar. Tem prioridade sobre `blocoData`.
+   */
+  bloco?: { data?: string; inicio?: string; duracaoMin: number }
+  /** Estimativa de duração da tarefa (min) — usada pelo Motor pra sugerir horário quando não há bloco ainda. */
+  duracaoMin?: number
+  /** Tempo mínimo de um pedaço, se o Motor precisar dividir a tarefa em vários blocos (Item 12). */
+  duracaoMinBloco?: number
   prioridade?: Prioridade
   projetoId?: string
+  /** Referência a um Contexto real da Agenda; ausente = "Casa" (sem restrição). */
+  contextoId?: string
   paiId?: string
   labels?: string[]
   recorrencia?: Recorrencia
@@ -219,17 +161,23 @@ export async function criarTarefa(dados: DadosTarefa | string, dataLegado?: stri
   if (!texto) return
   const agora = Date.now()
   const id = nanoid()
+  const bloco: BlocoTarefa | undefined = d.bloco
+    ? { id: nanoid(), data: d.bloco.data, inicio: d.bloco.inicio, duracaoMin: d.bloco.duracaoMin, fixado: true }
+    : d.blocoData
+      ? { id: nanoid(), data: d.blocoData, duracaoMin: DUR_PADRAO_MIGRACAO, fixado: true }
+      : undefined
   await db.tasks.add({
     id,
     titulo: texto,
     descricao: d.descricao?.trim() || undefined,
     data: d.data,
     horario: d.horario,
-    blocos: d.blocoData
-      ? [{ id: nanoid(), data: d.blocoData, duracaoMin: DUR_PADRAO_MIGRACAO, fixado: true }]
-      : undefined,
+    duracaoMin: d.duracaoMin,
+    duracaoMinBloco: d.duracaoMinBloco,
+    blocos: bloco ? [bloco] : undefined,
     prioridade: d.prioridade ?? 4,
     projetoId: d.projetoId,
+    contextoId: d.contextoId,
     paiId: d.paiId,
     labels: d.labels?.length ? d.labels : undefined,
     recorrencia: d.recorrencia,
