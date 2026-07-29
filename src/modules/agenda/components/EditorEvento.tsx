@@ -1,10 +1,20 @@
 import { useEffect, useState } from 'react'
 import { FolhaInferior } from '../../../core/components/FolhaInferior'
 import { IconCheck, IconLixeira } from '../../../core/components/Icons'
-import { atualizarEvento, CORES_EVENTO, excluirEvento, rotuloRecorrencia } from '../db'
+import {
+  atualizarEvento,
+  CORES_EVENTO,
+  destacarOcorrencia,
+  editarSerieApartirDe,
+  excluirApartirDe,
+  excluirEvento,
+  excluirSoEstaOcorrencia,
+  rotuloRecorrencia,
+} from '../db'
 import { CATEGORIAS_EVENTO, ICONES_EVENTO, iniciais } from '../categorias'
+import { DialogoRecorrencia, type ModoRecorrencia } from './DialogoRecorrencia'
 import { EditorRecorrencia } from './EditorRecorrencia'
-import type { Cronograma, Evento, Presenca } from '../types'
+import type { Cronograma, Evento, Presenca, RecorrenciaEvento } from '../types'
 
 const PRESENCAS: { valor: Presenca | undefined; rotulo: string }[] = [
   { valor: 'confirmado', rotulo: 'Vou' },
@@ -18,13 +28,20 @@ const ROTULO = 'text-[13px] font-medium text-muted'
 
 export function EditorEvento({
   evento,
+  dataOcorrencia,
   cronogramas,
   onFechar,
 }: {
   evento: Evento
+  /** Data (ISO) da ocorrência que está sendo aberta — pode diferir de
+   *  `evento.data` quando é uma ocorrência gerada de uma série recorrente.
+   *  Opcional: quando ausente (ex.: abrindo um evento recém-criado, nunca
+   *  recorrente), assume a própria data do evento. */
+  dataOcorrencia?: string
   cronogramas: Cronograma[]
   onFechar: () => void
 }) {
+  const dataOcorrenciaEfetiva = dataOcorrencia ?? evento.data
   const [titulo, setTitulo] = useState(evento.titulo)
   const [data, setData] = useState(evento.data)
   const [dataFim, setDataFim] = useState(evento.dataFim ?? '')
@@ -39,6 +56,15 @@ export function EditorEvento({
   const [custo, setCusto] = useState(evento.custoCentavos ? (evento.custoCentavos / 100).toFixed(2).replace('.', ',') : '')
   const [descricao, setDescricao] = useState(evento.descricao ?? '')
   const [presenca, setPresenca] = useState<Presenca | undefined>(evento.presenca)
+
+  // Evento recorrente: mudanças de campo NÃO são salvas na hora — ficam
+  // pendentes até o Matheus concluir, quando então perguntamos "só esta /
+  // esta e as próximas / todas" (estilo Google Agenda). A regra de repetição
+  // em si (campo "Repetir") é a única exceção: sempre vale pra série inteira,
+  // então salva direto (ver `salvarRecorrencia`).
+  const ehRecorrente = !!evento.recorrencia
+  const [pendentes, setPendentes] = useState<Partial<Evento>>({})
+  const [confirmacao, setConfirmacao] = useState<'editar' | 'excluir' | null>(null)
 
   useEffect(() => {
     setTitulo(evento.titulo)
@@ -55,18 +81,61 @@ export function EditorEvento({
     setCusto(evento.custoCentavos ? (evento.custoCentavos / 100).toFixed(2).replace('.', ',') : '')
     setDescricao(evento.descricao ?? '')
     setPresenca(evento.presenca)
+    setPendentes({})
+    setConfirmacao(null)
   }, [evento.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const salvar = (m: Partial<Evento>) => atualizarEvento(evento.id, m)
+  function salvar(m: Partial<Evento>) {
+    if (ehRecorrente) setPendentes((p) => ({ ...p, ...m }))
+    else atualizarEvento(evento.id, m)
+  }
+
+  // A regra de repetição sempre vale pra série inteira — não passa pelo
+  // diálogo de 3 opções (não existe "só esta" pra regra de repetição).
+  function salvarRecorrencia(r?: RecorrenciaEvento) {
+    atualizarEvento(evento.id, { recorrencia: r })
+  }
+
+  /** Fecha o editor — se há mudanças pendentes num evento recorrente,
+   *  pergunta antes (só esta / esta e as próximas / todas). */
+  function tentarFechar() {
+    // Já tem o diálogo de confirmação aberto — ele cuida do próprio Esc/
+    // cancelar; não fecha a folha inteira por baixo dele.
+    if (confirmacao) return
+    if (ehRecorrente && Object.keys(pendentes).length > 0) {
+      setConfirmacao('editar')
+      return
+    }
+    onFechar()
+  }
 
   async function excluir() {
+    if (ehRecorrente) {
+      setConfirmacao('excluir')
+      return
+    }
     if (!confirm('Excluir este evento?')) return
     await excluirEvento(evento.id)
     onFechar()
   }
 
+  async function aplicarEscolha(modo: ModoRecorrencia) {
+    if (confirmacao === 'editar') {
+      if (modo === 'so-esta') await destacarOcorrencia(evento, dataOcorrenciaEfetiva, pendentes)
+      else if (modo === 'proximas') await editarSerieApartirDe(evento, dataOcorrenciaEfetiva, pendentes)
+      else await atualizarEvento(evento.id, pendentes)
+    } else if (confirmacao === 'excluir') {
+      if (modo === 'so-esta') await excluirSoEstaOcorrencia(evento, dataOcorrenciaEfetiva)
+      else if (modo === 'proximas') await excluirApartirDe(evento, dataOcorrenciaEfetiva)
+      else await excluirEvento(evento.id)
+    }
+    setPendentes({})
+    setConfirmacao(null)
+    onFechar()
+  }
+
   return (
-    <FolhaInferior titulo="Evento" onFechar={onFechar}>
+    <FolhaInferior titulo="Evento" onFechar={tentarFechar}>
       <input
         autoFocus
         value={titulo}
@@ -77,6 +146,12 @@ export function EditorEvento({
         placeholder="Título do evento"
         className="w-full bg-transparent text-lg font-semibold outline-none placeholder:text-muted/60"
       />
+
+      {ehRecorrente && (
+        <p className="-mt-2 text-[12px] text-muted">
+          Este evento se repete. Ao concluir, você escolhe se a mudança vale só para esta vez, a partir de agora, ou para a série inteira.
+        </p>
+      )}
 
       <label className="flex items-center justify-between">
         <span className={ROTULO}>Dia inteiro</span>
@@ -262,7 +337,7 @@ export function EditorEvento({
         <EditorRecorrencia
           recorrencia={evento.recorrencia}
           dataBase={data}
-          onChange={(r) => salvar({ recorrencia: r })}
+          onChange={salvarRecorrencia}
         />
         {evento.recorrencia && (
           <span className="text-[12px] text-muted">{rotuloRecorrencia(evento.recorrencia)}</span>
@@ -365,7 +440,7 @@ export function EditorEvento({
       </label>
 
       <button
-        onClick={onFechar}
+        onClick={tentarFechar}
         className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-ink text-[15px] font-medium text-surface"
       >
         <IconCheck width={17} height={17} /> Concluir
@@ -373,6 +448,10 @@ export function EditorEvento({
       <button onClick={excluir} className="flex items-center justify-center gap-1.5 self-center text-[13px] text-red-500">
         <IconLixeira width={15} height={15} /> Excluir evento
       </button>
+
+      {confirmacao && (
+        <DialogoRecorrencia acao={confirmacao} onEscolher={aplicarEscolha} onCancelar={() => setConfirmacao(null)} />
+      )}
     </FolhaInferior>
   )
 }

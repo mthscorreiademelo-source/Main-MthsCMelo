@@ -26,6 +26,9 @@ export interface ItemPlano {
   participantes?: string[]
   ehOcorrencia?: boolean
   concluida?: boolean
+  /** Só para `tipo === 'evento'`: a data efetiva desta ocorrência (pode ser
+   *  diferente de `ref.data` quando é uma ocorrência gerada de uma série). */
+  dataOcorrencia?: string
 }
 
 /** Grupo de itens que se sobrepõem — renderizados como cartas empilhadas. */
@@ -73,6 +76,7 @@ function itemDoEvento(e: Evento, dia: string, ehOcorrencia: boolean): ItemPlano 
     id: `ev:${e.id}:${dia}`,
     tipo: 'evento',
     ref: e,
+    dataOcorrencia: dia,
     titulo: e.titulo,
     inicioMin: ini,
     fimMin: Math.max(ini + 15, paraMin(e.fim)),

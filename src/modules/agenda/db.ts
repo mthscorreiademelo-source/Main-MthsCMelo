@@ -60,8 +60,10 @@ export async function criarEvento(dados: Partial<Evento> & { titulo: string; dat
     custoCentavos: dados.custoCentavos,
     cronogramaId: dados.cronogramaId,
     petId: dados.petId,
+    projetoId: dados.projetoId,
     descricao: dados.descricao,
     recorrencia: dados.recorrencia,
+    serieId: dados.serieId,
     presenca: dados.presenca ?? 'confirmado',
     criadoEm: Date.now(),
   })
@@ -180,12 +182,17 @@ const CAP_OCORRENCIAS = 1000
  * primeira (a do master). Respeita intervalo, dias da semana, término por data
  * ou por nº de ocorrências. Limitado por `ateISO` (fim da janela visível) e por
  * um teto de segurança.
+ *
+ * `rec.excecoes` (estilo EXDATE do iCalendar): datas que a regra ainda "gasta"
+ * pra contar o limite de ocorrências, mas que NÃO são emitidas (viraram uma
+ * ocorrência avulsa/excluída em separado — ver `destacarOcorrencia` e afins).
  */
-function* gerarOcorrencias(master: Evento, rec: RecorrenciaEvento, ateISO: string): Generator<string> {
+export function* gerarOcorrencias(master: Evento, rec: RecorrenciaEvento, ateISO: string): Generator<string> {
   const n = Math.max(1, rec.intervalo ?? 1)
   const base = parseISO(master.data)
   const limite = rec.ocorrencias && rec.ocorrencias > 0 ? rec.ocorrencias : Infinity
   const fim = rec.ate && rec.ate < ateISO ? rec.ate : ateISO
+  const excecoes = new Set(rec.excecoes ?? [])
   let count = 0
 
   if (rec.tipo === 'semanal' && rec.dias?.length) {
@@ -197,7 +204,7 @@ function* gerarOcorrencias(master: Evento, rec: RecorrenciaEvento, ateISO: strin
         if (iso < master.data) continue
         if (iso > fim || count >= limite) return
         count++
-        yield iso
+        if (!excecoes.has(iso)) yield iso
       }
       semana = addWeeks(semana, n)
       if (format(semana, 'yyyy-MM-dd') > fim) return
@@ -213,9 +220,16 @@ function* gerarOcorrencias(master: Evento, rec: RecorrenciaEvento, ateISO: strin
     const iso = format(d, 'yyyy-MM-dd')
     if (iso > fim || count >= limite) return
     count++
-    yield iso
+    if (!excecoes.has(iso)) yield iso
     d = avancar(d)
   }
+}
+
+/** Quantas ocorrências a regra "pura" (ignorando exceções) gera em
+ *  [master.data, ateISO] — usado para saber quantas já foram "consumidas"
+ *  antes de um corte de série (ver `planoDividirSerie`). */
+function contarOcorrenciasAte(master: Evento, rec: RecorrenciaEvento, ateISO: string): number {
+  return [...gerarOcorrencias(master, { ...rec, excecoes: undefined }, ateISO)].length
 }
 
 /**
@@ -229,7 +243,10 @@ export function expandirEventos(eventos: Evento[], dias: string[]): OcorrenciaEv
   const ultimo = dias[dias.length - 1]
   const out: OcorrenciaEvento[] = []
   for (const e of eventos) {
-    if (set.has(e.data)) out.push({ evento: e, data: e.data, ehOcorrencia: false })
+    // A própria data do master só entra se não tiver virado uma exceção
+    // ("só esta" aplicado exatamente na primeira ocorrência da série).
+    const masterExcluido = !!e.recorrencia?.excecoes?.includes(e.data)
+    if (set.has(e.data) && !masterExcluido) out.push({ evento: e, data: e.data, ehOcorrencia: false })
     if (!e.recorrencia) continue
     for (const data of gerarOcorrencias(e, e.recorrencia, ultimo)) {
       if (data === e.data) continue
@@ -237,6 +254,134 @@ export function expandirEventos(eventos: Evento[], dias: string[]): OcorrenciaEv
     }
   }
   return out
+}
+
+/* ---------- recorrência: editar/excluir por ocorrência (só esta / a partir daqui / todas) ---------- */
+
+/** Data ISO (yyyy-MM-dd) do dia imediatamente anterior. */
+function diaAnteriorISO(dataISO: string): string {
+  return format(addDays(parseISO(dataISO), -1), 'yyyy-MM-dd')
+}
+
+export interface PlanoOcorrenciaUnica {
+  /** Exceção a gravar no master (`null` se o evento nem tinha `recorrencia`). */
+  mudancasMaster: Partial<Evento> | null
+  /** Dados do evento avulso a criar, vinculado à série por `serieId`. */
+  avulso: Partial<Evento> & { titulo: string; data: string }
+}
+
+/**
+ * "Só esta" — plano puro (sem tocar no banco) para destacar UMA ocorrência da
+ * série num evento avulso independente. Usado tanto pelo arrastar (sempre
+ * "só esta", sem perguntar) quanto pela opção "Só esta" do diálogo de
+ * editar/excluir. `mudancas` são os campos alterados (ex.: novo horário); se
+ * incluir `data`, o avulso nasce na nova data — a exceção no master continua
+ * sendo a data ORIGINAL da ocorrência.
+ */
+export function planoDestacarOcorrencia(
+  master: Evento,
+  dataOcorrencia: string,
+  mudancas: Partial<Evento> = {},
+): PlanoOcorrenciaUnica {
+  const rec = master.recorrencia
+  let mudancasMaster: Partial<Evento> | null = null
+  if (rec) {
+    const excecoes = rec.excecoes?.includes(dataOcorrencia) ? rec.excecoes : [...(rec.excecoes ?? []), dataOcorrencia]
+    mudancasMaster = { recorrencia: { ...rec, excecoes } }
+  }
+  const { id: _id, criadoEm: _criadoEm, atualizadoEm: _atualizadoEm, recorrencia: _rec, ...resto } = master
+  return {
+    mudancasMaster,
+    avulso: { ...resto, ...mudancas, data: mudancas.data ?? dataOcorrencia, serieId: master.id },
+  }
+}
+
+export type PlanoEdicaoSerie =
+  | { tipo: 'atualizarMaster'; mudancas: Partial<Evento> }
+  | { tipo: 'dividir'; mudancasMasterAntigo: Partial<Evento>; novoMaster: Partial<Evento> & { titulo: string; data: string } }
+
+/**
+ * "Esta e as próximas" (editar) — plano puro para dividir a série: o master
+ * antigo passa a terminar um dia antes do corte (`recorrencia.ate`), e um
+ * NOVO master nasce na data de corte com os campos alterados e a MESMA regra
+ * restante (herda o que sobrar de `ocorrencias`, mantém `ate` se houver).
+ * Se a data de corte for a própria data do master (não existe "antes"),
+ * equivale a editar a série inteira — sem divisão.
+ */
+export function planoDividirSerie(master: Evento, dataCorte: string, mudancas: Partial<Evento> = {}): PlanoEdicaoSerie {
+  const rec = master.recorrencia
+  if (!rec || dataCorte <= master.data) {
+    return { tipo: 'atualizarMaster', mudancas }
+  }
+
+  const diaAnterior = diaAnteriorISO(dataCorte)
+  const consumidas = contarOcorrenciasAte(master, rec, diaAnterior)
+  const novaRec: RecorrenciaEvento = { ...rec, excecoes: rec.excecoes?.filter((d) => d >= dataCorte) }
+  if (rec.ocorrencias) novaRec.ocorrencias = Math.max(1, rec.ocorrencias - consumidas)
+
+  const { id: _id, criadoEm: _criadoEm, atualizadoEm: _atualizadoEm, ...resto } = master
+  return {
+    tipo: 'dividir',
+    mudancasMasterAntigo: { recorrencia: { ...rec, ate: diaAnterior, ocorrencias: undefined } },
+    novoMaster: { ...resto, ...mudancas, data: mudancas.data ?? dataCorte, recorrencia: novaRec, serieId: undefined },
+  }
+}
+
+export type PlanoExclusaoSerie = { tipo: 'excluirMaster' } | { tipo: 'truncarMaster'; mudancas: Partial<Evento> }
+
+/**
+ * "Esta e as próximas" (excluir) — plano puro: a série simplesmente para na
+ * data de corte (um dia antes), sem criar continuação nenhuma. Se a data de
+ * corte for a própria data do master, exclui a série inteira.
+ */
+export function planoExcluirApartirDe(master: Evento, dataCorte: string): PlanoExclusaoSerie {
+  const rec = master.recorrencia
+  if (!rec || dataCorte <= master.data) return { tipo: 'excluirMaster' }
+  const diaAnterior = diaAnteriorISO(dataCorte)
+  return { tipo: 'truncarMaster', mudancas: { recorrencia: { ...rec, ate: diaAnterior, ocorrencias: undefined } } }
+}
+
+/** "Só esta" (excluir) — plano puro: vira exceção no master, sem criar avulso. */
+export function planoExcluirSoEsta(master: Evento, dataOcorrencia: string): Partial<Evento> {
+  const rec = master.recorrencia
+  const excecoes = rec?.excecoes?.includes(dataOcorrencia) ? rec.excecoes : [...(rec?.excecoes ?? []), dataOcorrencia]
+  return { recorrencia: { ...(rec as RecorrenciaEvento), excecoes } }
+}
+
+/**
+ * "Só esta" — move/edita SÓ esta ocorrência da série, criando um evento
+ * avulso vinculado por `serieId` e marcando a data original como exceção no
+ * master. Usado tanto pelo arrastar (sem perguntar) quanto pela opção
+ * "Só esta" do diálogo de editar/excluir.
+ */
+export async function destacarOcorrencia(master: Evento, dataOcorrencia: string, mudancas: Partial<Evento> = {}): Promise<string> {
+  const plano = planoDestacarOcorrencia(master, dataOcorrencia, mudancas)
+  if (plano.mudancasMaster) await atualizarEvento(master.id, plano.mudancasMaster)
+  return criarEvento(plano.avulso)
+}
+
+/** "Esta e as próximas" (editar) — encerra a série antiga e cria um novo
+ *  master a partir da data de corte, com os campos alterados aplicados. */
+export async function editarSerieApartirDe(master: Evento, dataCorte: string, mudancas: Partial<Evento> = {}): Promise<string> {
+  const plano = planoDividirSerie(master, dataCorte, mudancas)
+  if (plano.tipo === 'atualizarMaster') {
+    await atualizarEvento(master.id, plano.mudancas)
+    return master.id
+  }
+  await atualizarEvento(master.id, plano.mudancasMasterAntigo)
+  return criarEvento(plano.novoMaster)
+}
+
+/** "Só esta" (excluir) — vira exceção no master; some da agenda, sem avulso. */
+export async function excluirSoEstaOcorrencia(master: Evento, dataOcorrencia: string): Promise<void> {
+  await atualizarEvento(master.id, planoExcluirSoEsta(master, dataOcorrencia))
+}
+
+/** "Esta e as próximas" (excluir) — a série simplesmente para na data de corte. */
+export async function excluirApartirDe(master: Evento, dataCorte: string): Promise<void> {
+  const plano = planoExcluirApartirDe(master, dataCorte)
+  if (plano.tipo === 'excluirMaster') await excluirEvento(master.id)
+  else await atualizarEvento(master.id, plano.mudancas)
 }
 
 const NOMES_DIA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']

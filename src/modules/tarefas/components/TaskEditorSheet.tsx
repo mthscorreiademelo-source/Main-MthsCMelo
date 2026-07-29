@@ -2,12 +2,12 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../../../core/components/Button'
 import { Sheet } from '../../../core/components/Sheet'
 import { IconLixeira, IconMais } from '../../../core/components/Icons'
+import { useContextos } from '../../agenda/hooks'
 import {
   alternarConclusao,
   atualizarTarefa,
   corPrioridade,
   criarTarefa,
-  CONTEXTOS,
   excluirTarefa,
   PRIORIDADES,
   subtarefas,
@@ -34,6 +34,7 @@ const RECORRENCIAS: { valor: TipoRecorrencia | ''; rotulo: string }[] = [
 ]
 
 export function TaskEditorSheet({ task, projetos, todas, onFechar }: Props) {
+  const contextosAgenda = useContextos() ?? []
   const [titulo, setTitulo] = useState('')
   const [descricao, setDescricao] = useState('')
   const [data, setData] = useState('')
@@ -235,19 +236,22 @@ export function TaskEditorSheet({ task, projetos, todas, onFechar }: Props) {
           </label>
         </div>
 
-        {/* Contexto */}
+        {/* Contexto — referencia um Contexto real da Agenda; "Casa" = sem restrição */}
         <label className="flex flex-col gap-1.5">
           <span className={ROTULO}>Contexto</span>
-          <input
-            list="contextos-tarefa"
-            value={task.contexto ?? ''}
-            onChange={(e) => atualizarTarefa(task.id, { contexto: e.target.value.trim() || undefined })}
-            placeholder="Casa, Computador…"
+          <select
+            value={task.contextoId ?? ''}
+            onChange={(e) => atualizarTarefa(task.id, { contextoId: e.target.value || undefined })}
             className={CAMPO}
-          />
-          <datalist id="contextos-tarefa">
-            {CONTEXTOS.map((c) => <option key={c} value={c} />)}
-          </datalist>
+          >
+            <option value="">🏠 Casa</option>
+            {contextosAgenda.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.icone ? `${c.icone} ` : ''}
+                {c.nome}
+              </option>
+            ))}
+          </select>
         </label>
 
         {/* Dependências */}

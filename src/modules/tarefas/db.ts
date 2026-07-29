@@ -2,12 +2,42 @@ import { addDays, addMonths, addWeeks, addYears, format, getDay, parseISO } from
 import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
 import { hojeISO } from '../../core/dates'
+import type { Contexto } from '../agenda/types'
 import type { Prioridade, Projeto, Recorrencia, Task } from './types'
 
 /* ---------- contexto ---------- */
 
-/** Contextos sugeridos (o campo é livre — o usuário pode digitar outros). */
-export const CONTEXTOS = ['Casa', 'Trabalho', 'Computador', 'Celular', 'Rua', 'Mercado', 'Faculdade']
+const CHAVE_MIGRACAO_CONTEXTO = 'lume:tarefas:contexto-migrado'
+
+function jaMigrouContexto(): boolean {
+  return typeof localStorage !== 'undefined' && localStorage.getItem(CHAVE_MIGRACAO_CONTEXTO) === '1'
+}
+
+function marcarContextoMigrado(): void {
+  if (typeof localStorage !== 'undefined') localStorage.setItem(CHAVE_MIGRACAO_CONTEXTO, '1')
+}
+
+/**
+ * Migração única (rodar 1x no carregamento do módulo): tarefas antigas tinham
+ * `contexto` (texto livre, ex.: "Trabalho"). Agora usam `contextoId`,
+ * referenciando um Contexto real da Agenda. Casa o texto antigo pelo NOME de
+ * um Contexto existente (sem acento/caixa); se não bater com nenhum, a tarefa
+ * fica sem contexto (= Casa, horário livre). Idempotente: marca uma chave no
+ * `localStorage` pra nunca reprocessar.
+ */
+export async function migrarContextosTarefas(contextosAgenda: Contexto[]): Promise<void> {
+  if (jaMigrouContexto()) return
+  marcarContextoMigrado()
+  const todas = await db.tasks.toArray()
+  for (const t of todas) {
+    if (t.contextoId != null) continue
+    const legado = (t as unknown as { contexto?: string }).contexto
+    if (!legado) continue
+    const alvo = semAcentoLower(legado)
+    const achado = contextosAgenda.find((c) => semAcentoLower(c.nome) === alvo)
+    if (achado) await db.tasks.update(t.id, { contextoId: achado.id })
+  }
+}
 
 /* ---------- prioridades ---------- */
 
@@ -123,6 +153,8 @@ export interface DadosTarefa {
   descricao?: string
   data?: string
   horario?: string
+  /** Bloco de tempo dedicado — dia planejado (ISO), independente do prazo. */
+  blocoData?: string
   prioridade?: Prioridade
   projetoId?: string
   paiId?: string
@@ -142,6 +174,7 @@ export async function criarTarefa(dados: DadosTarefa | string, dataLegado?: stri
     descricao: d.descricao?.trim() || undefined,
     data: d.data,
     horario: d.horario,
+    blocoData: d.blocoData,
     prioridade: d.prioridade ?? 4,
     projetoId: d.projetoId,
     paiId: d.paiId,
@@ -272,6 +305,20 @@ export function estaAtrasada(t: Task) {
   return estaPendente(t) && !!t.data && t.data < hojeISO()
 }
 
+/**
+ * Dia "efetivo" de uma tarefa, pra classificar/agrupar (Hoje/Próximas/
+ * Calendário): o dia planejado (`blocoData`) quando existir, senão o prazo
+ * (`data`). Duas datas distintas — ver Item 4 do plano.
+ */
+export function diaEfetivo(t: Task): string | undefined {
+  return t.blocoData ?? t.data
+}
+
+/** Hoje = dia efetivo é hoje; nunca conta se já está atrasada ou concluída. */
+export function ehHoje(t: Task, hoje: string = hojeISO()): boolean {
+  return estaPendente(t) && !estaAtrasada(t) && diaEfetivo(t) === hoje
+}
+
 /** Ordena por prioridade (P1 primeiro), depois data, depois ordem manual. */
 export function ordenar(tarefas: Task[]): Task[] {
   return [...tarefas].sort((a, b) => {
@@ -288,11 +335,11 @@ export function ordenarManual(tarefas: Task[]): Task[] {
   return [...tarefas].sort((a, b) => a.ordem - b.ordem)
 }
 
-/** Só data primeiro (para as visões por data), depois prioridade. */
+/** Dia efetivo primeiro (para as visões por data: Hoje/Próximas), depois prioridade. */
 export function ordenarPorData(tarefas: Task[]): Task[] {
   return [...tarefas].sort((a, b) => {
-    const da = a.data ?? '9999-99-99'
-    const dbb = b.data ?? '9999-99-99'
+    const da = diaEfetivo(a) ?? '9999-99-99'
+    const dbb = diaEfetivo(b) ?? '9999-99-99'
     if (da !== dbb) return da < dbb ? -1 : 1
     if (a.prioridade !== b.prioridade) return a.prioridade - b.prioridade
     return a.ordem - b.ordem
@@ -311,14 +358,18 @@ export function contarSubtarefas(tarefas: Task[], paiId: string): { total: numbe
 
 /* Visões (todas consideram só pendentes, exceto Concluídas) */
 
+/** Hoje = dia efetivo (bloco planejado, senão prazo) é hoje. Nunca inclui atrasadas. */
 export function filtrarHoje(tarefas: Task[]): Task[] {
   const hoje = hojeISO()
-  return ordenarPorData(tarefas.filter((t) => estaPendente(t) && !!t.data && t.data <= hoje))
+  return ordenarPorData(tarefas.filter((t) => ehHoje(t, hoje)))
 }
 
+/** Próximas = pendentes, não atrasadas, não "hoje", agrupadas pelo dia efetivo. */
 export function filtrarProximas(tarefas: Task[]): Task[] {
   const hoje = hojeISO()
-  return ordenarPorData(tarefas.filter((t) => estaPendente(t) && !!t.data && t.data > hoje))
+  return ordenarPorData(
+    tarefas.filter((t) => estaPendente(t) && !estaAtrasada(t) && !!diaEfetivo(t) && diaEfetivo(t) !== hoje),
+  )
 }
 
 /** Entrada: pendentes sem projeto. Ordem manual (arrastável). */
@@ -337,10 +388,15 @@ export function filtrarConcluidas(tarefas: Task[]): Task[] {
     .sort((a, b) => (b.concluidaEm ?? 0) - (a.concluidaEm ?? 0))
 }
 
+/** Concluídas num dia específico (ISO yyyy-MM-dd), pelo carimbo `concluidaEm`. */
+export function concluidasNoDia(tarefas: Task[], dia: string): Task[] {
+  const inicio = new Date(`${dia}T00:00:00`).getTime()
+  const fim = inicio + 24 * 60 * 60 * 1000
+  return filtrarConcluidas(tarefas).filter((t) => (t.concluidaEm ?? 0) >= inicio && (t.concluidaEm ?? 0) < fim)
+}
+
 export function concluidasHoje(tarefas: Task[]): Task[] {
-  const inicioDoDia = new Date()
-  inicioDoDia.setHours(0, 0, 0, 0)
-  return filtrarConcluidas(tarefas).filter((t) => (t.concluidaEm ?? 0) >= inicioDoDia.getTime())
+  return concluidasNoDia(tarefas, hojeISO())
 }
 
 /* ---------- etiquetas, busca e filtros ---------- */

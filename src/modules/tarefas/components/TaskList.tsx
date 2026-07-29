@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import type { Contexto } from '../../agenda/types'
 import { reordenar } from '../db'
 import type { Projeto, Task } from '../types'
 import { TaskItem } from './TaskItem'
@@ -15,6 +16,8 @@ interface Props {
   mostrarProjeto?: boolean
   /** Habilita reordenar arrastando (visões de ordem manual). */
   arrastavel?: boolean
+  /** Contextos reais da Agenda (para exibir o nome/ícone do `contextoId`). */
+  contextos?: Contexto[]
   vazio: ReactNode
 }
 
@@ -27,6 +30,7 @@ export function TaskList({
   ocultarData,
   mostrarProjeto,
   arrastavel,
+  contextos,
   vazio,
 }: Props) {
   // Ordem local durante o arrasto (null = usa a ordem vinda das props).
@@ -94,6 +98,7 @@ export function TaskList({
           aninhar={aninhar}
           ocultarData={ocultarData}
           mostrarProjeto={mostrarProjeto}
+          contextos={contextos}
           aoIniciarArrasto={arrastavel ? iniciarArrasto : undefined}
         />
       ))}

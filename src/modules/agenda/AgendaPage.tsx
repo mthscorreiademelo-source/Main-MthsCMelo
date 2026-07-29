@@ -45,6 +45,10 @@ export function AgendaPage() {
   const [customN, setCustomN] = useState(5)
   const [ancora, setAncora] = useState(hojeISO())
   const [editorEvento, setEditorEvento] = useState<Evento | null>(null)
+  // Data (ISO) da ocorrência que está aberta no editor — pode diferir de
+  // `editorEvento.data` quando é uma ocorrência gerada de uma série
+  // recorrente (necessário pro diálogo "só esta / a partir daqui / todas").
+  const [dataOcorrenciaEditor, setDataOcorrenciaEditor] = useState<string | null>(null)
   const [editorTarefa, setEditorTarefa] = useState<Task | null>(null)
   const [gerCron, setGerCron] = useState(false)
   const [gerContextos, setGerContextos] = useState(false)
@@ -62,6 +66,15 @@ export function AgendaPage() {
     if (e && recemCriado.current === e.id && eventoVazio(e)) excluirEvento(e.id)
     recemCriado.current = null
     setEditorEvento(null)
+    setDataOcorrenciaEditor(null)
+  }
+
+  /** Abre o editor de evento, lembrando qual ocorrência (data) foi clicada —
+   *  importante pra série recorrente, onde o master fica sempre "vivo" no
+   *  banco mas cada clique pode ser numa ocorrência gerada diferente. */
+  function abrirEvento(e: Evento, dataOcorrencia?: string) {
+    setEditorEvento(e)
+    setDataOcorrenciaEditor(dataOcorrencia ?? e.data)
   }
 
   const evs = useMemo(() => eventos ?? [], [eventos])
@@ -99,10 +112,10 @@ export function AgendaPage() {
     if (!abrirId) return
     const e = evs.find((x) => x.id === abrirId)
     if (e) {
-      setEditorEvento(e)
+      abrirEvento(e)
       setAbrirId(null)
     }
-  }, [abrirId, evs])
+  }, [abrirId, evs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const eventoAtual = editorEvento ? evs.find((e) => e.id === editorEvento.id) ?? null : null
   const tarefaAtual = editorTarefa ? tks.find((t) => t.id === editorTarefa.id) ?? null : null
@@ -203,7 +216,7 @@ export function AgendaPage() {
           eventos={evs}
           tarefas={tks}
           hoje={hojeISO()}
-          onAbrirEvento={setEditorEvento}
+          onAbrirEvento={abrirEvento}
           onAbrirTarefa={setEditorTarefa}
           onCriar={aoCriar}
           onIrSemana={() => setModo('semana')}
@@ -213,14 +226,21 @@ export function AgendaPage() {
         />
       )}
       {pronto && modo === 'mes' && (
-        <VistaMes mesRef={ancora.slice(0, 7)} eventos={evs} onAbrirEvento={setEditorEvento} onIrParaDia={irParaDia} />
+        <VistaMes mesRef={ancora.slice(0, 7)} eventos={evs} onAbrirEvento={abrirEvento} onIrParaDia={irParaDia} />
       )}
       {pronto && modo === 'ano' && <VistaMultiMes meses={meses} eventos={evs} onIrParaDia={irParaDia} />}
       {pronto && modo === 'cronogramas' && (
-        <GanttCronogramas dias={diasMes} eventos={evs} cronogramas={crs} onAbrirEvento={setEditorEvento} onGerenciar={() => setGerCron(true)} />
+        <GanttCronogramas dias={diasMes} eventos={evs} cronogramas={crs} onAbrirEvento={abrirEvento} onGerenciar={() => setGerCron(true)} />
       )}
 
-      {eventoAtual && <EditorEvento evento={eventoAtual} cronogramas={crs} onFechar={fecharEditorEvento} />}
+      {eventoAtual && (
+        <EditorEvento
+          evento={eventoAtual}
+          dataOcorrencia={dataOcorrenciaEditor ?? eventoAtual.data}
+          cronogramas={crs}
+          onFechar={fecharEditorEvento}
+        />
+      )}
       <TaskEditorSheet task={tarefaAtual} projetos={ps} todas={tks} onFechar={() => setEditorTarefa(null)} />
       {gerCron && <GerenciarCronogramas cronogramas={crs} onFechar={() => setGerCron(false)} />}
       {gerContextos && <GerenciarContextos onFechar={() => setGerContextos(false)} />}

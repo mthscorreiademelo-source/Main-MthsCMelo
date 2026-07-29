@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { EmptyState } from '../../core/components/EmptyState'
@@ -14,7 +14,8 @@ import {
 } from '../../core/components/Icons'
 import { hojeISO, rotuloData } from '../../core/dates'
 import { paraHHMM } from '../agenda/db'
-import { useEventos } from '../agenda/hooks'
+import { useContextos, useEventos } from '../agenda/hooks'
+import type { Contexto } from '../agenda/types'
 import { CalendarioTarefas } from './components/CalendarioTarefas'
 import { EditorProjeto } from './components/EditorProjeto'
 import { ModalCentral } from '../../core/components/ModalCentral'
@@ -25,6 +26,7 @@ import {
   atualizarTarefa,
   buscar,
   corPrioridade,
+  diaEfetivo,
   estaAtrasada,
   estaPendente,
   filtrarConcluidas,
@@ -33,6 +35,7 @@ import {
   filtrarLabel,
   filtrarProjeto,
   filtrarProximas,
+  migrarContextosTarefas,
   todasLabels,
 } from './db'
 import {
@@ -64,6 +67,7 @@ export function TarefasPage() {
   const tarefas = useTarefas()
   const projetos = useProjetos()
   const eventos = useEventos()
+  const contextosAgenda = useContextos()
   const [aba, setAba] = useState<Aba>('hoje')
   const [selecionada, setSelecionada] = useState<Task | null>(null)
   const [editorProjeto, setEditorProjeto] = useState<Projeto | null | undefined>(undefined)
@@ -72,11 +76,20 @@ export function TarefasPage() {
   const [quickAberto, setQuickAberto] = useState(false)
   const [ordInteligente, setOrdInteligente] = useState(true)
   const [subTudo, setSubTudo] = useState<'entrada' | 'concluidas' | 'calendario' | { projeto: string } | { label: string }>('entrada')
+  const [diaCalendario, setDiaCalendario] = useState(hojeISO())
 
   const todas = useMemo(() => tarefas ?? [], [tarefas])
   const ps = projetos ?? []
   const hoje = hojeISO()
   const evs = useMemo(() => eventos ?? [], [eventos])
+  const contextos = useMemo<Contexto[]>(() => contextosAgenda ?? [], [contextosAgenda])
+
+  // Migração única: `Task.contexto` (texto livre antigo) → `Task.contextoId`
+  // (referência a um Contexto real da Agenda). Roda quando os contextos já
+  // carregaram, pra poder casar pelo nome.
+  useEffect(() => {
+    if (contextosAgenda) void migrarContextosTarefas(contextosAgenda)
+  }, [contextosAgenda])
 
   const listaHoje = useMemo(() => filtrarHoje(todas), [todas])
   const listaProximas = useMemo(() => filtrarProximas(todas), [todas])
@@ -97,6 +110,29 @@ export function TarefasPage() {
   const feitasFrac = ind.total > 0 ? ind.feitas / ind.total : 0
   const emBusca = buscaAberta && !!busca.trim()
   const resultadosBusca = useMemo(() => (busca.trim() ? buscar(todas, busca) : []), [todas, busca])
+
+  // "Nova tarefa" do cabeçalho herda o contexto da visão atual (Item 2 do plano):
+  // aba Hoje → data de hoje; Tudo→Projeto/Etiqueta → aquele padrão; Tudo→Calendário →
+  // regra de dia passado/hoje/futuro do Item 3. Demais visões: sem padrão (como já era).
+  const padraoNovaTarefa = useMemo((): {
+    dataPadrao?: string
+    projetoPadrao?: string
+    labelPadrao?: string
+    blocoDataPadrao?: string
+  } => {
+    if (aba === 'hoje') return { dataPadrao: hoje }
+    if (aba === 'tudo') {
+      if (typeof subTudo === 'object' && 'projeto' in subTudo) return { projetoPadrao: subTudo.projeto }
+      if (typeof subTudo === 'object' && 'label' in subTudo) return { labelPadrao: subTudo.label }
+      if (subTudo === 'calendario') {
+        // Dia passado selecionado: tarefa nasce sem data nenhuma.
+        if (diaCalendario < hoje) return {}
+        // Hoje ou futuro: nasce com aquele dia como bloco planejado (não como prazo).
+        return { blocoDataPadrao: diaCalendario }
+      }
+    }
+    return {}
+  }, [aba, subTudo, diaCalendario, hoje])
 
   function reservarBloco() {
     if (pmax && sugPmax) atualizarTarefa(pmax.id, { blocoData: hoje, blocoInicio: paraHHMM(sugPmax.inicioMin) })
@@ -176,12 +212,21 @@ export function TarefasPage() {
       )}
       {quickAberto && (
         <ModalCentral titulo="Nova tarefa" onFechar={() => setQuickAberto(false)}>
-          <QuickAdd projetos={ps} dataPadrao={hoje} placeholder="Adicionar tarefa…" autoFocus aoConcluir={() => setQuickAberto(false)} />
+          <QuickAdd
+            projetos={ps}
+            dataPadrao={padraoNovaTarefa.dataPadrao}
+            projetoPadrao={padraoNovaTarefa.projetoPadrao}
+            labelPadrao={padraoNovaTarefa.labelPadrao}
+            blocoDataPadrao={padraoNovaTarefa.blocoDataPadrao}
+            placeholder="Adicionar tarefa…"
+            autoFocus
+            aoConcluir={() => setQuickAberto(false)}
+          />
         </ModalCentral>
       )}
 
       {emBusca ? (
-        <TaskList tarefas={resultadosBusca} todas={todas} projetos={ps} onAbrir={setSelecionada} mostrarProjeto vazio={<EmptyState icone={<IconLupa />} titulo="Nada encontrado" descricao="Tente outro termo ou etiqueta." />} />
+        <TaskList tarefas={resultadosBusca} todas={todas} projetos={ps} contextos={contextos} onAbrir={setSelecionada} mostrarProjeto vazio={<EmptyState icone={<IconLupa />} titulo="Nada encontrado" descricao="Tente outro termo ou etiqueta." />} />
       ) : (
         <>
           {/* Indicadores */}
@@ -215,13 +260,13 @@ export function TarefasPage() {
 
               {aba === 'hoje' && (
                 <div className={CARTAO}>
-                  <TaskList tarefas={hojeOrd} todas={todas} projetos={ps} onAbrir={setSelecionada} ocultarData mostrarProjeto vazio={<EmptyState icone={<IconSol />} titulo="Nada para hoje" descricao="Adicione uma tarefa ou aproveite o dia livre." />} />
+                  <TaskList tarefas={hojeOrd} todas={todas} projetos={ps} contextos={contextos} onAbrir={setSelecionada} ocultarData mostrarProjeto vazio={<EmptyState icone={<IconSol />} titulo="Nada para hoje" descricao="Adicione uma tarefa ou aproveite o dia livre." />} />
                 </div>
               )}
-              {aba === 'proximas' && <ProximasView listas={listaProximas} todas={todas} projetos={ps} onAbrir={setSelecionada} />}
+              {aba === 'proximas' && <ProximasView listas={listaProximas} todas={todas} projetos={ps} contextos={contextos} onAbrir={setSelecionada} />}
               {aba === 'atrasadas' && (
                 <div className={CARTAO}>
-                  <TaskList tarefas={ordenarInteligente(atrasadas, hoje, todas)} todas={todas} projetos={ps} onAbrir={setSelecionada} mostrarProjeto vazio={<EmptyState icone={<IconCheckCircle />} titulo="Nada atrasado" descricao="Você está em dia. 🎉" />} />
+                  <TaskList tarefas={ordenarInteligente(atrasadas, hoje, todas)} todas={todas} projetos={ps} contextos={contextos} onAbrir={setSelecionada} mostrarProjeto vazio={<EmptyState icone={<IconCheckCircle />} titulo="Nada atrasado" descricao="Você está em dia. 🎉" />} />
                 </div>
               )}
               {aba === 'tudo' && (
@@ -231,6 +276,9 @@ export function TarefasPage() {
                   projetos={ps}
                   labels={labels}
                   todas={todas}
+                  contextos={contextos}
+                  diaCalendario={diaCalendario}
+                  setDiaCalendario={setDiaCalendario}
                   onAbrir={setSelecionada}
                   onNovoProjeto={() => setEditorProjeto(null)}
                   onEditarProjeto={setEditorProjeto}
@@ -285,12 +333,26 @@ export function TarefasPage() {
 
 /* ------------------------------ próximas view ----------------------------- */
 
-function ProximasView({ listas, todas, projetos, onAbrir }: { listas: Task[]; todas: Task[]; projetos: Projeto[]; onAbrir: (t: Task) => void }) {
+function ProximasView({
+  listas,
+  todas,
+  projetos,
+  contextos,
+  onAbrir,
+}: {
+  listas: Task[]
+  todas: Task[]
+  projetos: Projeto[]
+  contextos: Contexto[]
+  onAbrir: (t: Task) => void
+}) {
+  // Agrupa pelo dia efetivo (bloco planejado, senão prazo) — regra de duas datas (Item 4).
   const grupos = new Map<string, Task[]>()
   for (const t of listas) {
-    const arr = grupos.get(t.data!) ?? []
+    const dia = diaEfetivo(t)!
+    const arr = grupos.get(dia) ?? []
     arr.push(t)
-    grupos.set(t.data!, arr)
+    grupos.set(dia, arr)
   }
   if (grupos.size === 0) return <EmptyState icone={<IconCalendario />} titulo="Nada agendado" descricao="Tarefas com data futura aparecem aqui." />
   return (
@@ -298,7 +360,7 @@ function ProximasView({ listas, todas, projetos, onAbrir }: { listas: Task[]; to
       {[...grupos.entries()].map(([dia, tks]) => (
         <div key={dia} className="rounded-2xl border border-line bg-surface/50 p-3">
           <h2 className="mb-1 px-1 text-[13px] font-semibold text-muted">{rotuloData(dia)}</h2>
-          <TaskList tarefas={tks} todas={todas} projetos={projetos} onAbrir={onAbrir} ocultarData mostrarProjeto vazio={null} />
+          <TaskList tarefas={tks} todas={todas} projetos={projetos} contextos={contextos} onAbrir={onAbrir} ocultarData mostrarProjeto vazio={null} />
         </div>
       ))}
     </div>
@@ -307,12 +369,27 @@ function ProximasView({ listas, todas, projetos, onAbrir }: { listas: Task[]; to
 
 /* -------------------------------- tudo view ------------------------------- */
 
-function TudoView({ sub, setSub, projetos, labels, todas, onAbrir, onNovoProjeto, onEditarProjeto }: {
+function TudoView({
+  sub,
+  setSub,
+  projetos,
+  labels,
+  todas,
+  contextos,
+  diaCalendario,
+  setDiaCalendario,
+  onAbrir,
+  onNovoProjeto,
+  onEditarProjeto,
+}: {
   sub: 'entrada' | 'concluidas' | 'calendario' | { projeto: string } | { label: string }
   setSub: (s: 'entrada' | 'concluidas' | 'calendario' | { projeto: string } | { label: string }) => void
   projetos: Projeto[]
   labels: { label: string; qtd: number }[]
   todas: Task[]
+  contextos: Contexto[]
+  diaCalendario: string
+  setDiaCalendario: (dia: string) => void
   onAbrir: (t: Task) => void
   onNovoProjeto: () => void
   onEditarProjeto: (p: Projeto) => void
@@ -320,7 +397,7 @@ function TudoView({ sub, setSub, projetos, labels, todas, onAbrir, onNovoProjeto
   const chave = typeof sub === 'string' ? sub : 'projeto' in sub ? `p:${sub.projeto}` : `l:${sub.label}`
   const projAtual = typeof sub === 'object' && 'projeto' in sub ? projetos.find((p) => p.id === sub.projeto) : undefined
   const labelAtual = typeof sub === 'object' && 'label' in sub ? sub.label : undefined
-  const comum = { todas, projetos, onAbrir }
+  const comum = { todas, projetos, contextos, onAbrir }
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-1.5">
@@ -347,7 +424,15 @@ function TudoView({ sub, setSub, projetos, labels, todas, onAbrir, onNovoProjeto
         ) : labelAtual ? (
           <TaskList {...comum} tarefas={filtrarLabel(todas, labelAtual)} mostrarProjeto vazio={<EmptyState icone={<IconEtiqueta />} titulo="Sem tarefas com esta etiqueta" descricao="Adicione a etiqueta a uma tarefa." />} />
         ) : sub === 'calendario' ? (
-          <CalendarioTarefas tarefas={todas} todas={todas} projetos={projetos} onAbrir={onAbrir} />
+          <CalendarioTarefas
+            tarefas={todas}
+            todas={todas}
+            projetos={projetos}
+            contextos={contextos}
+            onAbrir={onAbrir}
+            selecionado={diaCalendario}
+            onSelecionar={setDiaCalendario}
+          />
         ) : sub === 'concluidas' ? (
           <TaskList {...comum} tarefas={filtrarConcluidas(todas)} mostrarProjeto vazio={<EmptyState icone={<IconCheckCircle />} titulo="Nada concluído ainda" descricao="As tarefas finalizadas ficam aqui." />} />
         ) : (

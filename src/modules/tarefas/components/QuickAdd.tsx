@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { IconCalendario, IconMais } from '../../../core/components/Icons'
+import { IconCalendario, IconEtiqueta, IconMais } from '../../../core/components/Icons'
 import { rotuloData } from '../../../core/dates'
 import { corPrioridade, criarTarefa, interpretarEntrada } from '../db'
 import type { Projeto } from '../types'
@@ -10,6 +10,10 @@ interface Props {
   dataPadrao?: string
   /** Projeto aplicado quando o texto não traz `#projeto`. */
   projetoPadrao?: string
+  /** Dia planejado (bloco) aplicado por herdar o contexto da visão atual (ex.: dia do Calendário). */
+  blocoDataPadrao?: string
+  /** Etiqueta aplicada por herdar o contexto da visão atual (ex.: aba de uma etiqueta). */
+  labelPadrao?: string
   placeholder?: string
   /** Texto inicial (ex.: vindo de uma captura rápida). */
   textoInicial?: string
@@ -18,7 +22,17 @@ interface Props {
   autoFocus?: boolean
 }
 
-export function QuickAdd({ projetos, dataPadrao, projetoPadrao, placeholder = 'Adicionar tarefa…', textoInicial, aoConcluir, autoFocus }: Props) {
+export function QuickAdd({
+  projetos,
+  dataPadrao,
+  projetoPadrao,
+  blocoDataPadrao,
+  labelPadrao,
+  placeholder = 'Adicionar tarefa…',
+  textoInicial,
+  aoConcluir,
+  autoFocus,
+}: Props) {
   const [texto, setTexto] = useState(textoInicial ?? '')
   const parsed = useMemo(() => interpretarEntrada(texto, projetos), [texto, projetos])
   const dataFinal = parsed.data ?? dataPadrao
@@ -31,14 +45,16 @@ export function QuickAdd({ projetos, dataPadrao, projetoPadrao, placeholder = 'A
     const id = await criarTarefa({
       titulo: parsed.titulo,
       data: dataFinal,
+      blocoData: blocoDataPadrao,
       prioridade: parsed.prioridade,
       projetoId: projetoFinal,
+      labels: labelPadrao ? [labelPadrao] : undefined,
     })
     setTexto('')
     aoConcluir?.(id)
   }
 
-  const temChips = !!(parsed.data || parsed.prioridade || parsed.projetoId)
+  const temChips = !!(parsed.data || parsed.prioridade || projetoFinal || blocoDataPadrao || labelPadrao)
 
   return (
     <form
@@ -74,10 +90,22 @@ export function QuickAdd({ projetos, dataPadrao, projetoPadrao, placeholder = 'A
               P{parsed.prioridade}
             </span>
           )}
-          {projeto && parsed.projetoId && (
+          {projeto && projetoFinal && (
             <span className="flex items-center gap-1 rounded-full bg-hover px-2 py-1 font-medium">
               <span className="size-2 rounded-full" style={{ backgroundColor: projeto.cor ?? 'var(--vida-muted)' }} />
               {projeto.nome}
+            </span>
+          )}
+          {blocoDataPadrao && (
+            <span className="flex items-center gap-1 rounded-full bg-hover px-2 py-1 font-medium">
+              <IconCalendario width={12} height={12} />
+              Planejada pra {rotuloData(blocoDataPadrao)}
+            </span>
+          )}
+          {labelPadrao && (
+            <span className="flex items-center gap-1 rounded-full bg-hover px-2 py-1 font-medium">
+              <IconEtiqueta width={12} height={12} />
+              {labelPadrao}
             </span>
           )}
           <span className="text-[11px] text-muted/60">

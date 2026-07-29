@@ -20,6 +20,13 @@ export interface RecorrenciaEvento {
   ate?: string
   /** OU termina após N ocorrências (contando a primeira). */
   ocorrencias?: number
+  /**
+   * Datas ISO (yyyy-MM-dd) que a regra deve PULAR ao gerar ocorrências —
+   * estilo EXDATE do iCalendar/Google Agenda. Uma data entra aqui quando
+   * aquela ocorrência vira uma exceção: foi movida/editada/excluída
+   * individualmente ("só esta"), sem afetar o resto da série.
+   */
+  excecoes?: string[]
 }
 
 /** Presença no evento (estilo Google Calendar). Ausente = pendente (não respondi). */
@@ -81,6 +88,14 @@ export interface Evento {
   descricao?: string
   /** Repetição do evento (gera ocorrências nas datas seguintes). */
   recorrencia?: RecorrenciaEvento
+  /**
+   * Presente só em eventos avulsos "destacados" de uma série recorrente
+   * (ver `recorrencia.excecoes` no master): aponta pro `id` do evento master
+   * de origem. É apenas um metadado de rastreio/origem — o evento avulso NÃO
+   * tem `recorrencia` própria e é editável/arrastável livremente dali em
+   * diante, sem afetar a série original.
+   */
+  serieId?: string
   /** Presença: confirmado / recusado / ausente = pendente. */
   presenca?: Presenca
   criadoEm: number

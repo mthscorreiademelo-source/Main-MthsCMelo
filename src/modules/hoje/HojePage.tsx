@@ -185,7 +185,7 @@ export function HojePage() {
 
   /* --------------------------- Tarefas prioritárias ---------------------- */
   const tarefasHoje = tarefas ? filtrarHoje(tarefas) : []
-  const atrasadas = tarefasHoje.filter(estaAtrasada).length
+  const atrasadas = tarefas ? tarefas.filter((t) => !t.paiId && estaAtrasada(t)).length : 0
   if (tarefasHoje.length > 0) {
     const topo = tarefasHoje.slice(0, 3)
     const pesoFaixa = faixa === 'tarde' ? 12 : faixa === 'noite' ? 8 : faixa === 'madrugada' ? -20 : 0

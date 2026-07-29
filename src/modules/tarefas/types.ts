@@ -34,8 +34,12 @@ export interface Task {
   paiId?: string
   /** Etiquetas livres. */
   labels?: string[]
-  /** Contexto necessário (Casa, Trabalho, Computador, Celular, Rua…). */
-  contexto?: string
+  /**
+   * Contexto necessário — referência ao `id` de um Contexto real da Agenda
+   * (`agenda/types.ts`, `Contexto`). Ausente = "Casa" (sem restrição de
+   * contexto, qualquer horário livre que não pertença a nenhum contexto).
+   */
+  contextoId?: string
   /** Ids de tarefas das quais esta depende (precisam ser concluídas antes). */
   dependeDe?: string[]
   /** Repetição; ao concluir, a data avança para a próxima ocorrência. */

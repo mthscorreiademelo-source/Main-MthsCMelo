@@ -8,6 +8,7 @@ import {
   IconRepetir,
 } from '../../../core/components/Icons'
 import { rotuloData } from '../../../core/dates'
+import type { Contexto } from '../../agenda/types'
 import { alternarConclusao, contarSubtarefas, corPrioridade, estaAtrasada, subtarefas } from '../db'
 import { tarefaBloqueada } from '../execucao'
 import { MenuReagendar } from './MenuReagendar'
@@ -24,6 +25,8 @@ interface Props {
   ocultarData?: boolean
   /** Mostra o ponto/nome do projeto (visões mistas: Hoje/Próximas/Entrada). */
   mostrarProjeto?: boolean
+  /** Contextos reais da Agenda (para exibir o nome/ícone do `contextoId`). */
+  contextos?: Contexto[]
   /** Quando definido, mostra a alça de arrastar (reordenar) na raiz. */
   aoIniciarArrasto?: (e: ReactPointerEvent, id: string) => void
 }
@@ -72,6 +75,7 @@ export function TaskItem({
   nivel = 0,
   ocultarData,
   mostrarProjeto,
+  contextos,
   aoIniciarArrasto,
 }: Props) {
   const concluida = !!task.concluidaEm
@@ -79,6 +83,7 @@ export function TaskItem({
   const filhas = aninhar ? subtarefas(todas, task.id) : []
   const cont = contarSubtarefas(todas, task.id)
   const projeto = task.projetoId ? projetos.find((p) => p.id === task.projetoId) : undefined
+  const contexto = task.contextoId ? contextos?.find((c) => c.id === task.contextoId) : undefined
   const [aberto, setAberto] = useState(true)
   const [reagendando, setReagendando] = useState(false)
   const arrastavel = !!aoIniciarArrasto && nivel === 0
@@ -161,8 +166,11 @@ export function TaskItem({
                   {task.duracaoMin >= 60 ? `${Math.floor(task.duracaoMin / 60)}h${task.duracaoMin % 60 ? String(task.duracaoMin % 60) : ''}` : `${task.duracaoMin}m`}
                 </span>
               )}
-              {task.contexto && (
-                <span className="rounded bg-hover px-1.5 py-px text-[11px] text-muted">@{task.contexto}</span>
+              {contexto && (
+                <span className="rounded bg-hover px-1.5 py-px text-[11px] text-muted">
+                  {contexto.icone ? `${contexto.icone} ` : '@'}
+                  {contexto.nome}
+                </span>
               )}
               {tarefaBloqueada(task, todas) && (
                 <span className="flex items-center gap-0.5 text-[11px] text-danger/80" title="Bloqueada por dependência">🔒 bloqueada</span>
@@ -214,6 +222,7 @@ export function TaskItem({
               nivel={nivel + 1}
               ocultarData={ocultarData}
               mostrarProjeto={false}
+              contextos={contextos}
             />
           ))}
         </ul>

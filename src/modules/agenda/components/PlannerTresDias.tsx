@@ -227,7 +227,7 @@ function CorpoDia({
   hpx: number
   agoraMin: number
   ehHoje: boolean
-  onAbrirEvento: (e: Evento) => void
+  onAbrirEvento: (e: Evento, dataOcorrencia?: string) => void
   onAbrirTarefa: (t: Task) => void
   onCriar: (data: string, iniMin: number, fimMin: number) => void
   onAbrirContextos: () => void
@@ -286,7 +286,7 @@ function CorpoDia({
   }
 
   function abrirItem(it: ItemPlano) {
-    if (it.tipo === 'evento') onAbrirEvento(it.ref as Evento)
+    if (it.tipo === 'evento') onAbrirEvento(it.ref as Evento, it.dataOcorrencia)
     else onAbrirTarefa(it.ref as Task)
   }
 
@@ -489,7 +489,7 @@ function PainelInteligente({
   dias: string[]
   hoje: string
   agoraMin: number
-  onAbrirEvento: (e: Evento) => void
+  onAbrirEvento: (e: Evento, dataOcorrencia?: string) => void
   onIrSemana: () => void
   onCriar: () => void
   onIrHoje: () => void
@@ -523,7 +523,7 @@ function PainelInteligente({
       <div className="rounded-2xl border border-line bg-surface/60 p-3.5">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">Próximo compromisso</span>
         {prox ? (
-          <button onClick={() => onAbrirEvento(prox.evento)} className="mt-2 block w-full text-left">
+          <button onClick={() => onAbrirEvento(prox.evento, prox.dia)} className="mt-2 block w-full text-left">
             <div className="flex items-baseline justify-between gap-2">
               <h3 className="min-w-0 flex-1 truncate text-[17px] font-bold leading-tight">{prox.evento.titulo}</h3>
             </div>
@@ -661,7 +661,7 @@ export function PlannerTresDias({
   eventos: Evento[]
   tarefas: Task[]
   hoje: string
-  onAbrirEvento: (e: Evento) => void
+  onAbrirEvento: (e: Evento, dataOcorrencia?: string) => void
   onAbrirTarefa: (t: Task) => void
   onCriar: (data: string, iniMin: number, fimMin: number) => void
   onIrSemana: () => void
