@@ -8,12 +8,11 @@ import {
   corPrioridade,
   criarTarefa,
   CONTEXTOS,
-  ENERGIAS,
   excluirTarefa,
   PRIORIDADES,
   subtarefas,
 } from '../db'
-import type { NivelEnergia, Projeto, Task, TipoRecorrencia } from '../types'
+import type { Projeto, Task, TipoRecorrencia } from '../types'
 
 interface Props {
   task: Task | null
@@ -236,40 +235,20 @@ export function TaskEditorSheet({ task, projetos, todas, onFechar }: Props) {
           </label>
         </div>
 
-        {/* Energia + contexto */}
-        <div className="flex gap-3">
-          <div className="flex flex-1 flex-col gap-1.5">
-            <span className={ROTULO}>Energia</span>
-            <div className="flex gap-1.5">
-              {ENERGIAS.map((en) => {
-                const ativo = task.energia === en.valor
-                return (
-                  <button
-                    key={en.valor}
-                    onClick={() => atualizarTarefa(task.id, { energia: ativo ? undefined : (en.valor as NivelEnergia) })}
-                    className="flex min-h-10 flex-1 items-center justify-center gap-1 rounded-lg border text-[13px] font-semibold transition-colors"
-                    style={{ borderColor: ativo ? en.cor : 'var(--vida-line)', backgroundColor: ativo ? `${en.cor}1a` : 'transparent', color: ativo ? en.cor : 'var(--vida-muted)' }}
-                  >
-                    {en.icone} {en.rotulo}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-          <label className="flex w-40 flex-col gap-1.5">
-            <span className={ROTULO}>Contexto</span>
-            <input
-              list="contextos-tarefa"
-              value={task.contexto ?? ''}
-              onChange={(e) => atualizarTarefa(task.id, { contexto: e.target.value.trim() || undefined })}
-              placeholder="Casa, Computador…"
-              className={CAMPO}
-            />
-            <datalist id="contextos-tarefa">
-              {CONTEXTOS.map((c) => <option key={c} value={c} />)}
-            </datalist>
-          </label>
-        </div>
+        {/* Contexto */}
+        <label className="flex flex-col gap-1.5">
+          <span className={ROTULO}>Contexto</span>
+          <input
+            list="contextos-tarefa"
+            value={task.contexto ?? ''}
+            onChange={(e) => atualizarTarefa(task.id, { contexto: e.target.value.trim() || undefined })}
+            placeholder="Casa, Computador…"
+            className={CAMPO}
+          />
+          <datalist id="contextos-tarefa">
+            {CONTEXTOS.map((c) => <option key={c} value={c} />)}
+          </datalist>
+        </label>
 
         {/* Dependências */}
         <div className="flex flex-col gap-1.5">

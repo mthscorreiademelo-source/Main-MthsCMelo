@@ -54,6 +54,7 @@ export async function criarEvento(dados: Partial<Evento> & { titulo: string; dat
     diaInteiro: dados.diaInteiro,
     cor: dados.cor ?? COR_PADRAO,
     categoria: dados.categoria,
+    icone: dados.icone,
     local: dados.local,
     participantes: dados.participantes,
     custoCentavos: dados.custoCentavos,

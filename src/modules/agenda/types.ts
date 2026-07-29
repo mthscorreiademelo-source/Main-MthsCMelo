@@ -65,8 +65,10 @@ export interface Evento {
   cronogramaId?: string
   diaInteiro?: boolean
   cor?: string
-  /** Categoria (id de CATEGORIAS_EVENTO). Define ícone e cor de destaque. */
+  /** Categoria (id de CATEGORIAS_EVENTO). Sugere ícone e cor de destaque. */
   categoria?: string
+  /** Ícone (emoji) escolhido livremente. Se ausente, usa o da categoria. */
+  icone?: string
   local?: string
   /** Nomes dos participantes (avatares por iniciais nos blocos). */
   participantes?: string[]

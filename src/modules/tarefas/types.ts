@@ -1,9 +1,6 @@
 /** P1 (urgente) … P4 (nenhuma). Espelha o Todoist. */
 export type Prioridade = 1 | 2 | 3 | 4
 
-/** Energia exigida pela tarefa — ajuda a IA a sugerir o melhor momento do dia. */
-export type NivelEnergia = 'alta' | 'media' | 'baixa'
-
 export type TipoRecorrencia = 'diaria' | 'semanal' | 'mensal' | 'anual'
 
 export interface Recorrencia {
@@ -37,8 +34,6 @@ export interface Task {
   paiId?: string
   /** Etiquetas livres. */
   labels?: string[]
-  /** Nível de energia exigido: 'alta' (foco profundo), 'media', 'baixa'. */
-  energia?: NivelEnergia
   /** Contexto necessário (Casa, Trabalho, Computador, Celular, Rua…). */
   contexto?: string
   /** Ids de tarefas das quais esta depende (precisam ser concluídas antes). */

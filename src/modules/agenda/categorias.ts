@@ -21,20 +21,28 @@ export const CATEGORIAS_EVENTO: CategoriaEvento[] = [
   { id: 'importante', nome: 'Importante', cor: '#d1453b', icone: '⭐' },
 ]
 
+/** Conjunto curado de ícones (emoji) para o usuário escolher livremente no evento. */
+export const ICONES_EVENTO: string[] = [
+  '💼', '🏠', '🩺', '📚', '✈️', '🍽️', '🏋️', '💰',
+  '🎉', '👨‍👩‍👧', '🎬', '🎵', '🚗', '📞', '💻', '⚽',
+  '🐾', '🛒', '💇', '🧘', '☕', '🎂', '⭐', '🌿',
+  '🎓', '🛠️', '💊', '🎮',
+]
+
 const POR_ID = new Map(CATEGORIAS_EVENTO.map((c) => [c.id, c]))
 
 export function categoriaDe(e: Pick<Evento, 'categoria'>): CategoriaEvento | undefined {
   return e.categoria ? POR_ID.get(e.categoria) : undefined
 }
 
-/** Cor efetiva do evento: a da categoria, senão a cor livre, senão o padrão. */
+/** Cor efetiva do evento: a cor explícita do evento vence; senão a da categoria; senão o padrão. */
 export function corEfetiva(e: Pick<Evento, 'categoria' | 'cor'>): string {
-  return categoriaDe(e)?.cor ?? e.cor ?? '#4073ff'
+  return e.cor ?? categoriaDe(e)?.cor ?? '#4073ff'
 }
 
-/** Ícone do evento (da categoria) ou um pino neutro. */
-export function iconeEvento(e: Pick<Evento, 'categoria'>): string {
-  return categoriaDe(e)?.icone ?? '📌'
+/** Ícone do evento: o escolhido explicitamente vence; senão o da categoria; senão um pino neutro. */
+export function iconeEvento(e: Pick<Evento, 'categoria' | 'icone'>): string {
+  return e.icone ?? categoriaDe(e)?.icone ?? '📌'
 }
 
 /** Iniciais para o avatar de um participante (1–2 letras). */

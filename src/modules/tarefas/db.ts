@@ -2,26 +2,9 @@ import { addDays, addMonths, addWeeks, addYears, format, getDay, parseISO } from
 import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
 import { hojeISO } from '../../core/dates'
-import type { NivelEnergia, Prioridade, Projeto, Recorrencia, Task } from './types'
+import type { Prioridade, Projeto, Recorrencia, Task } from './types'
 
-/* ---------- energia & contexto ---------- */
-
-export interface InfoEnergia {
-  valor: NivelEnergia
-  rotulo: string
-  cor: string
-  icone: string
-}
-
-export const ENERGIAS: InfoEnergia[] = [
-  { valor: 'alta', rotulo: 'Alta', cor: '#d1453b', icone: '🔥' },
-  { valor: 'media', rotulo: 'Média', cor: '#eb8909', icone: '⚡' },
-  { valor: 'baixa', rotulo: 'Baixa', cor: '#299438', icone: '🍃' },
-]
-
-export function infoEnergia(e: NivelEnergia | undefined): InfoEnergia | undefined {
-  return e ? ENERGIAS.find((x) => x.valor === e) : undefined
-}
+/* ---------- contexto ---------- */
 
 /** Contextos sugeridos (o campo é livre — o usuário pode digitar outros). */
 export const CONTEXTOS = ['Casa', 'Trabalho', 'Computador', 'Celular', 'Rua', 'Mercado', 'Faculdade']

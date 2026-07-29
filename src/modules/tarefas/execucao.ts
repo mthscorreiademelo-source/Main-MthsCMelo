@@ -22,9 +22,9 @@ export function tarefaBloqueada(task: Task, todas: Task[]): boolean {
 /* ---------------------------- ordenação inteligente ----------------------- */
 
 /**
- * Score de "melhor próximo passo": combina prazo, prioridade, compromisso
- * (bloco reservado hoje) e energia. Tarefas bloqueadas afundam. Heurística —
- * sem IA de verdade, mas transparente.
+ * Score de "melhor próximo passo": combina prazo, prioridade e compromisso
+ * (bloco reservado hoje). Tarefas bloqueadas afundam. Heurística — sem IA
+ * de verdade, mas transparente.
  */
 export function scoreInteligente(task: Task, hoje: string, todas: Task[]): number {
   if (tarefaBloqueada(task, todas)) return -1000
@@ -40,7 +40,6 @@ export function scoreInteligente(task: Task, hoje: string, todas: Task[]): numbe
   s += (4 - task.prioridade) * 16
   if (task.blocoData === hoje) s += 45
   if (task.horario) s += 10
-  if (task.energia === 'alta') s += 6
   return s
 }
 

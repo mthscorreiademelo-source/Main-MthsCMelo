@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { FolhaInferior } from '../../../core/components/FolhaInferior'
 import { IconCheck, IconLixeira } from '../../../core/components/Icons'
 import { atualizarEvento, CORES_EVENTO, excluirEvento, rotuloRecorrencia } from '../db'
-import { CATEGORIAS_EVENTO, iniciais } from '../categorias'
+import { CATEGORIAS_EVENTO, ICONES_EVENTO, iniciais } from '../categorias'
 import { EditorRecorrencia } from './EditorRecorrencia'
 import type { Cronograma, Evento, Presenca } from '../types'
 
@@ -33,6 +33,7 @@ export function EditorEvento({
   const [diaInteiro, setDiaInteiro] = useState(!!evento.diaInteiro)
   const [cor, setCor] = useState(evento.cor ?? CORES_EVENTO[0])
   const [categoria, setCategoria] = useState<string | undefined>(evento.categoria)
+  const [icone, setIcone] = useState<string | undefined>(evento.icone)
   const [local, setLocal] = useState(evento.local ?? '')
   const [participantes, setParticipantes] = useState((evento.participantes ?? []).join(', '))
   const [custo, setCusto] = useState(evento.custoCentavos ? (evento.custoCentavos / 100).toFixed(2).replace('.', ',') : '')
@@ -48,6 +49,7 @@ export function EditorEvento({
     setDiaInteiro(!!evento.diaInteiro)
     setCor(evento.cor ?? CORES_EVENTO[0])
     setCategoria(evento.categoria)
+    setIcone(evento.icone)
     setLocal(evento.local ?? '')
     setParticipantes((evento.participantes ?? []).join(', '))
     setCusto(evento.custoCentavos ? (evento.custoCentavos / 100).toFixed(2).replace('.', ',') : '')
@@ -163,8 +165,11 @@ export function EditorEvento({
                   const novo = ativo ? undefined : c.id
                   setCategoria(novo)
                   if (novo) {
+                    // Troca de categoria sugere cor e ícone novos — mas só neste
+                    // momento; se o usuário mudar cor/ícone depois, prevalecem.
                     setCor(c.cor)
-                    salvar({ categoria: novo, cor: c.cor })
+                    setIcone(c.icone)
+                    salvar({ categoria: novo, cor: c.cor, icone: c.icone })
                   } else {
                     salvar({ categoria: undefined })
                   }
@@ -197,6 +202,33 @@ export function EditorEvento({
               style={{ backgroundColor: c }}
             />
           ))}
+        </div>
+      </div>
+
+      {/* Ícone — livre, independente da categoria (a categoria só sugere um padrão) */}
+      <div className="flex flex-col gap-2">
+        <span className={ROTULO}>Ícone</span>
+        <div className="grid grid-cols-7 gap-1.5 sm:grid-cols-10">
+          {ICONES_EVENTO.map((ic) => {
+            const ativo = icone === ic
+            return (
+              <button
+                key={ic}
+                onClick={() => {
+                  const novo = ativo ? undefined : ic
+                  setIcone(novo)
+                  salvar({ icone: novo })
+                }}
+                aria-label={`Ícone ${ic}`}
+                aria-pressed={ativo}
+                className={`flex size-8 items-center justify-center rounded-lg border text-[16px] transition-colors ${
+                  ativo ? 'border-accent bg-accent/15' : 'border-line hover:bg-hover'
+                }`}
+              >
+                {ic}
+              </button>
+            )
+          })}
         </div>
       </div>
 

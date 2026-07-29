@@ -66,6 +66,15 @@ function EventoCard({
   const recusado = it.presenca === 'recusado'
   const baixo = altura < 42
   const minusculo = altura < 26
+  // Quantas linhas o título pode ocupar antes de cortar: 1 linha fixa quando o
+  // card é baixo, mas cresce (quebra) quando sobra altura vertical — em vez do
+  // truncate fixo de 1 linha, que desperdiçava espaço em cards altos (zoom alto).
+  const alturaLinha = minusculo ? 13 : 15.6
+  const paddingVert = minusculo ? 2 : 10
+  const alturaSubtitulo = !baixo ? 15 : 0
+  const alturaParticipantes = !baixo && it.participantes && it.participantes.length > 0 ? 24 : 0
+  const espacoTitulo = altura - paddingVert - alturaSubtitulo - alturaParticipantes
+  const maxLinhas = Math.max(1, Math.min(6, Math.floor(espacoTitulo / alturaLinha)))
   return (
     <button
       onClick={onAbrir}
@@ -89,9 +98,14 @@ function EventoCard({
           {it.icone}
         </span>
         <span
-          className={`min-w-0 flex-1 truncate font-semibold leading-tight ${minusculo ? 'text-[10.5px]' : 'text-[12.5px]'} ${
-            recusado || it.concluida ? 'line-through opacity-70' : ''
-          }`}
+          className={`min-w-0 flex-1 font-semibold leading-tight ${maxLinhas > 1 ? 'whitespace-normal' : 'truncate'} ${
+            minusculo ? 'text-[10.5px]' : 'text-[12.5px]'
+          } ${recusado || it.concluida ? 'line-through opacity-70' : ''}`}
+          style={
+            maxLinhas > 1
+              ? { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: maxLinhas, overflow: 'hidden' }
+              : undefined
+          }
         >
           {it.titulo}
         </span>
@@ -205,6 +219,7 @@ function CorpoDia({
   onAbrirTarefa,
   onCriar,
   onAbrirContextos,
+  ajustarZoom,
 }: {
   plano: PlanoDia
   ini: number
@@ -216,6 +231,8 @@ function CorpoDia({
   onAbrirTarefa: (t: Task) => void
   onCriar: (data: string, iniMin: number, fimMin: number) => void
   onAbrirContextos: () => void
+  /** Ajusta o zoom (horaPx) por um fator — usado também pelo gesto de pinça. */
+  ajustarZoom: (fator: number) => void
 }) {
   const altura = ((fim - ini) / 60) * hpx
   const horas: number[] = []
@@ -225,6 +242,48 @@ function CorpoDia({
   // arrastar ajusta o horário; tocar na prévia confirma e abre "novo evento".
   const [previa, setPrevia] = useState<{ ini: number; fim: number } | null>(null)
   const arrasto = useRef<{ tipo: 'mover' | 'fim'; y0: number; ini0: number; fim0: number; moveu: boolean } | null>(null)
+
+  // Zoom por pinça (2 dedos), mesmo padrão do QuadroInfinito: rastreia até 2
+  // ponteiros por id, mede a distância euclidiana entre eles e, ao mover,
+  // ajusta o zoom pela razão entre a distância nova e a anterior.
+  const dedos = useRef(new Map<number, { x: number; y: number }>())
+  const distPinca = useRef<number | null>(null)
+  const [emPinca, setEmPinca] = useState(false)
+
+  function aoPressionarGrade(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== 'touch') return
+    dedos.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (dedos.current.size === 2) {
+      const [a, b] = [...dedos.current.values()]
+      distPinca.current = Math.hypot(a.x - b.x, a.y - b.y)
+      setEmPinca(true)
+      // duas mãos na grade: cancela qualquer prévia de criação em andamento
+      arrasto.current = null
+    }
+  }
+
+  function aoMoverGrade(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== 'touch' || !dedos.current.has(e.pointerId)) return
+    dedos.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (dedos.current.size === 2) {
+      e.preventDefault()
+      const [a, b] = [...dedos.current.values()]
+      const distNova = Math.hypot(a.x - b.x, a.y - b.y)
+      if (distPinca.current && distPinca.current > 0) {
+        ajustarZoom(distNova / distPinca.current)
+      }
+      distPinca.current = distNova
+    }
+  }
+
+  function aoSoltarGrade(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== 'touch') return
+    dedos.current.delete(e.pointerId)
+    if (dedos.current.size < 2) {
+      distPinca.current = null
+      setEmPinca(false)
+    }
+  }
 
   function abrirItem(it: ItemPlano) {
     if (it.tipo === 'evento') onAbrirEvento(it.ref as Evento)
@@ -297,7 +356,15 @@ function CorpoDia({
       )}
 
       {/* Corpo com eixo de tempo */}
-      <div className="relative shrink-0" style={{ height: altura }} onClick={clicarVazio}>
+      <div
+        className="relative shrink-0"
+        style={{ height: altura, touchAction: emPinca ? 'none' : 'pan-y' }}
+        onClick={clicarVazio}
+        onPointerDown={aoPressionarGrade}
+        onPointerMove={aoMoverGrade}
+        onPointerUp={aoSoltarGrade}
+        onPointerCancel={aoSoltarGrade}
+      >
         {/* Contextos (fundo suave) */}
         {plano.contextos.map((c) => {
           const a = Math.max(c.inicioMin, ini)
@@ -614,6 +681,9 @@ export function PlannerTresDias({
   // Largura da barra de rolagem do corpo — reservada também no cabeçalho fixo
   // para que as colunas de título fiquem alinhadas com as colunas de eventos.
   const [sbw, setSbw] = useState(0)
+  // Altura real do container rolável — usada para esticar a grade quando sobra
+  // espaço (zoom baixo + tela alta), em vez de deixar um vão em branco embaixo.
+  const [altCont, setAltCont] = useState(0)
 
   function ajustarZoom(fator: number) {
     setHoraPx((z) => {
@@ -623,11 +693,19 @@ export function PlannerTresDias({
     })
   }
 
+  // horaPx "efetivo": nunca menor que o zoom escolhido pelo usuário, mas cresce
+  // para preencher a altura real disponível (24h no container) quando sobra
+  // espaço em branco embaixo da grade.
+  const horaPxEfetivo = useMemo(
+    () => Math.max(horaPx, altCont > 0 ? altCont / 24 : 0),
+    [horaPx, altCont],
+  )
+
   // Dia inteiro é alto: ao abrir, rola até perto do horário atual (com folga).
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    const alvo = (Math.max(0, agoraMin - 90) / 60) * horaPx
+    const alvo = (Math.max(0, agoraMin - 90) / 60) * horaPxEfetivo
     el.scrollTop = Math.min(alvo, el.scrollHeight)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dias[0]])
@@ -642,15 +720,25 @@ export function PlannerTresDias({
   const iniH = Math.floor(ini / 60)
   const fimH = Math.ceil(fim / 60)
 
-  // Mede a barra de rolagem (0 em navegadores com overlay). Reavalia quando o
-  // conteúdo muda de altura (dias/zoom) e ao redimensionar a janela.
+  // Mede a barra de rolagem (0 em navegadores com overlay) e a altura real do
+  // container rolável. Reavalia quando o conteúdo muda de altura (dias/zoom),
+  // ao redimensionar a janela e quando o próprio container muda de tamanho
+  // (ex.: rotação do tablet), via ResizeObserver.
   useLayoutEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    const medir = () => setSbw(el.offsetWidth - el.clientWidth)
+    const medir = () => {
+      setSbw(el.offsetWidth - el.clientWidth)
+      setAltCont(el.clientHeight)
+    }
     medir()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(medir) : null
+    ro?.observe(el)
     window.addEventListener('resize', medir)
-    return () => window.removeEventListener('resize', medir)
+    return () => {
+      ro?.disconnect()
+      window.removeEventListener('resize', medir)
+    }
   }, [planos, horaPx])
 
   return (
@@ -693,13 +781,14 @@ export function PlannerTresDias({
                           plano={p}
                           ini={ini}
                           fim={fim}
-                          hpx={horaPx}
+                          hpx={horaPxEfetivo}
                           agoraMin={agoraMin}
                           ehHoje={p.dia === hoje}
                           onAbrirEvento={onAbrirEvento}
                           onAbrirTarefa={onAbrirTarefa}
                           onCriar={onCriar}
                           onAbrirContextos={onAbrirContextos}
+                          ajustarZoom={ajustarZoom}
                         />
                       </div>
                     ))}
