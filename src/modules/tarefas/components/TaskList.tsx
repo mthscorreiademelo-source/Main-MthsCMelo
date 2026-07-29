@@ -18,6 +18,8 @@ interface Props {
   arrastavel?: boolean
   /** Contextos reais da Agenda (para exibir o nome/ícone do `contextoId`). */
   contextos?: Contexto[]
+  /** Ids de tarefas sem horário possível dentro do prazo/contexto (Item 9) — mostra um aviso. */
+  semHorarioIds?: Set<string>
   vazio: ReactNode
 }
 
@@ -31,6 +33,7 @@ export function TaskList({
   mostrarProjeto,
   arrastavel,
   contextos,
+  semHorarioIds,
   vazio,
 }: Props) {
   // Ordem local durante o arrasto (null = usa a ordem vinda das props).
@@ -99,6 +102,7 @@ export function TaskList({
           ocultarData={ocultarData}
           mostrarProjeto={mostrarProjeto}
           contextos={contextos}
+          semHorarioIds={semHorarioIds}
           aoIniciarArrasto={arrastavel ? iniciarArrasto : undefined}
         />
       ))}

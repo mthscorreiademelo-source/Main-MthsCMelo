@@ -27,6 +27,8 @@ interface Props {
   mostrarProjeto?: boolean
   /** Contextos reais da Agenda (para exibir o nome/ícone do `contextoId`). */
   contextos?: Contexto[]
+  /** Ids de tarefas sem horário possível dentro do prazo/contexto (Item 9) — mostra um aviso. */
+  semHorarioIds?: Set<string>
   /** Quando definido, mostra a alça de arrastar (reordenar) na raiz. */
   aoIniciarArrasto?: (e: ReactPointerEvent, id: string) => void
 }
@@ -76,6 +78,7 @@ export function TaskItem({
   ocultarData,
   mostrarProjeto,
   contextos,
+  semHorarioIds,
   aoIniciarArrasto,
 }: Props) {
   const concluida = !!task.concluidaEm
@@ -84,6 +87,7 @@ export function TaskItem({
   const cont = contarSubtarefas(todas, task.id)
   const projeto = task.projetoId ? projetos.find((p) => p.id === task.projetoId) : undefined
   const contexto = task.contextoId ? contextos?.find((c) => c.id === task.contextoId) : undefined
+  const semHorario = semHorarioIds?.has(task.id)
   const [aberto, setAberto] = useState(true)
   const [reagendando, setReagendando] = useState(false)
   const arrastavel = !!aoIniciarArrasto && nivel === 0
@@ -175,6 +179,9 @@ export function TaskItem({
               {tarefaBloqueada(task, todas) && (
                 <span className="flex items-center gap-0.5 text-[11px] text-danger/80" title="Bloqueada por dependência">🔒 bloqueada</span>
               )}
+              {semHorario && (
+                <span className="flex items-center gap-0.5 text-[11px] text-danger/80" title="Sem horário livre encontrado antes do prazo/contexto">⚠️ sem horário</span>
+              )}
               {task.labels?.map((l) => (
                 <span key={l} className="rounded bg-hover px-1.5 py-px text-[11px] text-muted">
                   {l}
@@ -223,6 +230,7 @@ export function TaskItem({
               ocultarData={ocultarData}
               mostrarProjeto={false}
               contextos={contextos}
+              semHorarioIds={semHorarioIds}
             />
           ))}
         </ul>

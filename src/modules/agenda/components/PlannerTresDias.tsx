@@ -1,12 +1,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { format, isToday, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { mostrarToast } from '../../../core/captura/store'
 import { IconMais } from '../../../core/components/Icons'
 import { useAgora, minutosDoDia } from '../../hoje/agora'
+import { fixarBlocoTarefa, moverBlocoFixado } from '../../tarefas/db'
 import { useContextos } from '../hooks'
 import type { Task } from '../../tarefas/types'
 import { iniciais } from '../categorias'
-import { expandirEventos, paraHHMM } from '../db'
+import { atualizarEvento, destacarOcorrencia, expandirEventos, paraHHMM } from '../db'
 import type { Evento } from '../types'
 import {
   analisePeriodo,
@@ -15,6 +17,7 @@ import {
   faixaHoras,
   planoDoDia,
   proximoCompromisso,
+  sugestoesVivas,
   type GrupoSobreposto,
   type ItemPlano,
   type PlanoDia,
@@ -39,12 +42,16 @@ function durLegivel(min: number): string {
   return `${m} min`
 }
 
+/** Distância mínima (px) que o ponteiro precisa mover para virar arrasto (e não um toque). */
+const LIMIAR_ARRASTO_PX = 6
+
 /** Estilo do cartão de evento: fundo claro, barra e ícone na cor da categoria. */
 function EventoCard({
   it,
   ini,
   hpx,
   onAbrir,
+  onMover,
   left = 4,
   right = 4,
   zIndex,
@@ -53,15 +60,25 @@ function EventoCard({
   ini: number
   hpx: number
   onAbrir: () => void
+  /** Arrastar-pra-mover: chamado ao SOLTAR depois de um arrasto de verdade
+   *  (não um toque). Retorna uma mensagem de erro (trava rígida rejeitou o
+   *  movimento) ou `undefined` em caso de sucesso. */
+  onMover?: (it: ItemPlano, novoInicioMin: number) => Promise<string | undefined>
   left?: number
   right?: number
   zIndex?: number
 }) {
-  const top = ((it.inicioMin - ini) / 60) * hpx
+  const [previewIni, setPreviewIni] = useState<number | null>(null)
+  const arrastoRef = useRef<{ pointerId: number; y0: number; ini0: number } | null>(null)
+  const moveuRef = useRef(false)
+
+  const inicioEfetivo = previewIni ?? it.inicioMin
+  const top = ((inicioEfetivo - ini) / 60) * hpx
   // Altura proporcional EXATA à duração — sem mínimo. Quem controla a
   // legibilidade é o zoom (o título aparece quando cabe e some quando não).
   const altura = Math.max(3, ((it.fimMin - it.inicioMin) / 60) * hpx - 1)
   const tarefa = it.tipo === 'tarefa'
+  const fantasma = !!it.fantasma
   const pendente = it.tipo === 'evento' && it.presenca !== 'confirmado'
   const recusado = it.presenca === 'recusado'
   const baixo = altura < 42
@@ -75,22 +92,78 @@ function EventoCard({
   const alturaParticipantes = !baixo && it.participantes && it.participantes.length > 0 ? 24 : 0
   const espacoTitulo = altura - paddingVert - alturaSubtitulo - alturaParticipantes
   const maxLinhas = Math.max(1, Math.min(6, Math.floor(espacoTitulo / alturaLinha)))
+
+  function aoPressionar(e: React.PointerEvent<HTMLButtonElement>) {
+    if (!onMover) return
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    arrastoRef.current = { pointerId: e.pointerId, y0: e.clientY, ini0: it.inicioMin }
+    moveuRef.current = false
+  }
+
+  function aoMoverPonteiro(e: React.PointerEvent<HTMLButtonElement>) {
+    const a = arrastoRef.current
+    if (!a || a.pointerId !== e.pointerId) return
+    const deltaPx = e.clientY - a.y0
+    if (!moveuRef.current && Math.abs(deltaPx) < LIMIAR_ARRASTO_PX) return
+    moveuRef.current = true
+    e.preventDefault()
+    const duracao = it.fimMin - it.inicioMin
+    const deltaMin = Math.round((deltaPx / hpx) * 60 / 15) * 15
+    const novoIni = Math.max(0, Math.min(1440 - duracao, a.ini0 + deltaMin))
+    setPreviewIni(novoIni)
+  }
+
+  async function aoSoltarPonteiro(e: React.PointerEvent<HTMLButtonElement>) {
+    const a = arrastoRef.current
+    arrastoRef.current = null
+    if (!a || a.pointerId !== e.pointerId || !moveuRef.current) return
+    const alvo = previewIni ?? it.inicioMin
+    const erro = onMover ? await onMover(it, alvo) : undefined
+    setPreviewIni(null)
+    if (erro) mostrarToast(erro)
+  }
+
+  function aoCancelarPonteiro() {
+    arrastoRef.current = null
+    setPreviewIni(null)
+  }
+
+  function aoClicar(e: React.MouseEvent<HTMLButtonElement>) {
+    // Um arrasto de verdade não deve também abrir o editor — só um toque simples.
+    if (moveuRef.current) {
+      e.preventDefault()
+      moveuRef.current = false
+      return
+    }
+    onAbrir()
+  }
+
   return (
     <button
-      onClick={onAbrir}
-      title={`${it.titulo} · ${paraHHMM(it.inicioMin)}–${paraHHMM(it.fimMin)}`}
+      onClick={aoClicar}
+      onPointerDown={aoPressionar}
+      onPointerMove={aoMoverPonteiro}
+      onPointerUp={aoSoltarPonteiro}
+      onPointerCancel={aoCancelarPonteiro}
+      title={`${it.titulo} · ${paraHHMM(it.inicioMin)}–${paraHHMM(it.fimMin)}${fantasma ? ' · sugestão' : ''}`}
       className={`group/ev absolute flex flex-col justify-start overflow-hidden rounded-lg text-left shadow-sm transition-all hover:z-30 hover:shadow-md ${
         minusculo ? 'px-1.5 py-0' : 'rounded-xl px-2.5 pt-1 pb-1.5'
-      } ${it.concluida ? 'opacity-60' : ''} ${tarefa ? 'border border-dashed' : 'border-l-4'}`}
+      } ${it.concluida ? 'opacity-60' : ''} ${fantasma ? 'border border-dashed opacity-55' : tarefa ? 'border border-dashed' : 'border-l-4'}`}
       style={{
         top,
         height: altura,
         left,
         right,
-        zIndex,
-        borderColor: it.cor,
-        backgroundColor: tarefa ? 'var(--vida-surface)' : `color-mix(in srgb, ${it.cor} 12%, var(--vida-surface))`,
-        touchAction: 'manipulation',
+        zIndex: previewIni != null ? 40 : zIndex,
+        borderColor: fantasma ? `color-mix(in srgb, ${it.cor} 55%, transparent)` : it.cor,
+        backgroundColor: fantasma
+          ? `color-mix(in srgb, ${it.cor} 7%, transparent)`
+          : tarefa
+            ? 'var(--vida-surface)'
+            : `color-mix(in srgb, ${it.cor} 12%, var(--vida-surface))`,
+        touchAction: onMover ? 'none' : 'manipulation',
+        cursor: onMover ? 'grab' : undefined,
       }}
     >
       <div className={`flex items-start gap-1.5`}>
@@ -112,8 +185,9 @@ function EventoCard({
       </div>
       {!baixo && (
         <div className="mt-0.5 truncate pl-[18px] text-[11px] text-muted">
-          {paraHHMM(it.inicioMin)}–{paraHHMM(it.fimMin)}
+          {paraHHMM(inicioEfetivo)}–{paraHHMM(inicioEfetivo + (it.fimMin - it.inicioMin))}
           {it.local ? ` · ${it.local}` : ''}
+          {fantasma && ' · sugestão'}
         </div>
       )}
       {!baixo && it.participantes && it.participantes.length > 0 && (
@@ -152,15 +226,17 @@ function GrupoBloco({
   ini,
   hpx,
   onAbrirItem,
+  onMoverItem,
 }: {
   grupo: GrupoSobreposto
   ini: number
   hpx: number
   onAbrirItem: (it: ItemPlano) => void
+  onMoverItem: (it: ItemPlano, novoInicioMin: number) => Promise<string | undefined>
 }) {
   if (grupo.itens.length === 1) {
     const it = grupo.itens[0]
-    return <EventoCard it={it} ini={ini} hpx={hpx} onAbrir={() => onAbrirItem(it)} />
+    return <EventoCard it={it} ini={ini} hpx={hpx} onAbrir={() => onAbrirItem(it)} onMover={onMoverItem} />
   }
 
   // Mais longos primeiro (ao fundo); empate desempata pelo horário de início.
@@ -178,6 +254,7 @@ function GrupoBloco({
           ini={ini}
           hpx={hpx}
           onAbrir={() => onAbrirItem(it)}
+          onMover={onMoverItem}
           left={4 + idx * PASSO}
           right={4}
           zIndex={10 + idx}
@@ -219,6 +296,7 @@ function CorpoDia({
   onAbrirTarefa,
   onCriar,
   onAbrirContextos,
+  onMoverItem,
   ajustarZoom,
 }: {
   plano: PlanoDia
@@ -231,6 +309,8 @@ function CorpoDia({
   onAbrirTarefa: (t: Task) => void
   onCriar: (data: string, iniMin: number, fimMin: number) => void
   onAbrirContextos: () => void
+  /** Arrastar-pra-mover um item (evento ou tarefa, fixado ou fantasma) já existente. */
+  onMoverItem: (it: ItemPlano, novoInicioMin: number) => Promise<string | undefined>
   /** Ajusta o zoom (horaPx) por um fator — usado também pelo gesto de pinça. */
   ajustarZoom: (fator: number) => void
 }) {
@@ -421,7 +501,7 @@ function CorpoDia({
 
         {/* Eventos / tarefas */}
         {plano.grupos.map((g) => (
-          <GrupoBloco key={g.id} grupo={g} ini={ini} hpx={hpx} onAbrirItem={abrirItem} />
+          <GrupoBloco key={g.id} grupo={g} ini={ini} hpx={hpx} onAbrirItem={abrirItem} onMoverItem={onMoverItem} />
         ))}
 
         {/* Prévia do novo evento — confirma ao tocar, arrasta para ajustar */}
@@ -712,10 +792,54 @@ export function PlannerTresDias({
 
   const ctx = useMemo(() => contextos ?? [], [contextos])
   const ocorrencias = useMemo(() => expandirEventos(eventos, dias), [eventos, dias])
-  const planos = useMemo(
-    () => dias.map((d) => planoDoDia(d, ocorrencias, tarefas, { contextos: ctx })),
-    [dias, ocorrencias, tarefas, ctx],
+  // Sugestões vivas do Motor (Item 4/9/11/12): calculadas uma vez para todas
+  // as tarefas elegíveis (não por dia — `sugerirBlocos` varre vários dias
+  // sozinho) e recalculadas automaticamente sempre que tarefas/eventos/
+  // contextos mudam OU o relógio avança (`agora`, via `useAgora`, atualiza a
+  // cada 30s) — garante que a sugestão nunca fique presa no passado (Item 12b).
+  const sugestoes = useMemo(
+    () => sugestoesVivas(tarefas, eventos, ctx, agora),
+    [tarefas, eventos, ctx, agora],
   )
+  const planos = useMemo(
+    () => dias.map((d) => planoDoDia(d, ocorrencias, tarefas, { contextos: ctx, sugestoes })),
+    [dias, ocorrencias, tarefas, ctx, sugestoes],
+  )
+
+  /**
+   * Arrastar-pra-mover um item já existente (evento ou tarefa, fixado ou
+   * fantasma) pra um novo horário dentro do MESMO dia (`dia`). Retorna a
+   * mensagem de erro se uma trava rígida rejeitar o movimento (Item 11) —
+   * quem chama (o `EventoCard`) desfaz visualmente e mostra o aviso.
+   */
+  async function moverItem(dia: string, it: ItemPlano, novoInicioMin: number): Promise<string | undefined> {
+    const duracao = it.fimMin - it.inicioMin
+    const novoInicio = paraHHMM(novoInicioMin)
+    const novoFim = paraHHMM(novoInicioMin + duracao)
+
+    if (it.tipo === 'evento') {
+      const ev = it.ref as Evento
+      if (ev.recorrencia) {
+        // Ocorrência de série recorrente: SEMPRE "só esta" ao arrastar, sem
+        // perguntar (Item 8, decisão 1) — nunca move a série inteira.
+        await destacarOcorrencia(ev, it.dataOcorrencia ?? dia, { data: dia, inicio: novoInicio, fim: novoFim })
+      } else {
+        await atualizarEvento(ev.id, { data: dia, inicio: novoInicio, fim: novoFim })
+      }
+      return undefined
+    }
+
+    // tarefa: bloco fantasma (sugestão viva) vira fixado no horário soltado;
+    // bloco já fixado tenta mover (com trava rígida de dependência, Item 11).
+    const t = it.ref as Task
+    if (!it.blocoId) return undefined
+    if (it.fantasma) {
+      await fixarBlocoTarefa(t.id, { id: it.blocoId, data: dia, inicio: novoInicio, duracaoMin: duracao })
+      return undefined
+    }
+    const r = await moverBlocoFixado(t.id, it.blocoId, dia, novoInicio, { tarefas })
+    return r.ok ? undefined : r.motivo
+  }
   const { ini, fim } = useMemo(() => faixaHoras(planos), [planos])
   const iniH = Math.floor(ini / 60)
   const fimH = Math.ceil(fim / 60)
@@ -788,6 +912,7 @@ export function PlannerTresDias({
                           onAbrirTarefa={onAbrirTarefa}
                           onCriar={onCriar}
                           onAbrirContextos={onAbrirContextos}
+                          onMoverItem={(it, novoInicioMin) => moverItem(p.dia, it, novoInicioMin)}
                           ajustarZoom={ajustarZoom}
                         />
                       </div>

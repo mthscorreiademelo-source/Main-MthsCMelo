@@ -1,6 +1,7 @@
 import { parseISO } from 'date-fns'
-import { corPrioridade } from '../tarefas/db'
-import type { Task } from '../tarefas/types'
+import { blocosFixados, corPrioridade } from '../tarefas/db'
+import { sugerirBlocos } from '../tarefas/execucao'
+import type { BlocoTarefa, Task } from '../tarefas/types'
 import { corEfetiva, iconeEvento } from './categorias'
 import { expandirEventos, paraMin } from './db'
 import type { Contexto, Evento, Presenca } from './types'
@@ -29,6 +30,13 @@ export interface ItemPlano {
   /** Só para `tipo === 'evento'`: a data efetiva desta ocorrência (pode ser
    *  diferente de `ref.data` quando é uma ocorrência gerada de uma série). */
   dataOcorrencia?: string
+  /** Só para `tipo === 'tarefa'`: o id do `BlocoTarefa` de origem (fixado ou
+   *  sugerido) — necessário pra saber o que fixar/mover ao arrastar. */
+  blocoId?: string
+  /** Só para `tipo === 'tarefa'`: `true` quando é uma sugestão viva do Motor
+   *  (`fixado: false`), ainda não confirmada — visual "fantasma". Ausente/
+   *  `false` = bloco já fixado. */
+  fantasma?: boolean
 }
 
 /** Grupo de itens que se sobrepõem — renderizados como cartas empilhadas. */
@@ -61,7 +69,10 @@ export interface FaixaContexto {
 
 export interface PlanoDia {
   dia: string
+  /** Todos os itens (eventos + blocos fixados + sugestões fantasma) — usado pra renderizar a grade. */
   grupos: GrupoSobreposto[]
+  /** Só os itens REAIS (sem fantasma) — usado pra estatísticas/carga (uma sugestão não é ocupação de verdade). */
+  gruposReais: GrupoSobreposto[]
   diaInteiro: ItemPlano[]
   deadlines: Deadline[]
   contextos: FaixaContexto[]
@@ -90,19 +101,73 @@ function itemDoEvento(e: Evento, dia: string, ehOcorrencia: boolean): ItemPlano 
   }
 }
 
-function itemDaTarefa(t: Task): ItemPlano {
-  const ini = paraMin(t.blocoInicio!)
+/**
+ * Um `ItemPlano` a partir de um bloco FIXADO específico de uma tarefa (uma
+ * tarefa dividida em vários blocos — Item 12 do plano — gera um item por
+ * bloco fixado naquele dia).
+ */
+function itemDaTarefa(t: Task, bloco: BlocoTarefa): ItemPlano {
+  const ini = paraMin(bloco.inicio!)
   return {
-    id: `ta:${t.id}`,
+    id: `ta:${t.id}:${bloco.id}`,
     tipo: 'tarefa',
     ref: t,
     titulo: t.titulo,
     inicioMin: ini,
-    fimMin: ini + (t.duracaoMin ?? DUR_PADRAO),
+    fimMin: ini + (bloco.duracaoMin ?? DUR_PADRAO),
     cor: corPrioridade(t.prioridade),
     icone: '✓',
     concluida: !!t.concluidaEm,
+    blocoId: bloco.id,
+    fantasma: false,
   }
+}
+
+/**
+ * Um `ItemPlano` "fantasma" — sugestão viva do Motor de Planejamento
+ * (`sugerirBlocos`, ainda não fixada). Visualmente distinto (ver
+ * `EventoCard`), some assim que o Matheus arrasta/fixa ou o dia muda.
+ */
+function itemDaTarefaFantasma(t: Task, bloco: BlocoTarefa): ItemPlano {
+  const ini = paraMin(bloco.inicio!)
+  return {
+    id: `fant:${t.id}:${bloco.id}`,
+    tipo: 'tarefa',
+    ref: t,
+    titulo: t.titulo,
+    inicioMin: ini,
+    fimMin: ini + bloco.duracaoMin,
+    cor: corPrioridade(t.prioridade),
+    icone: '✓',
+    concluida: false,
+    blocoId: bloco.id,
+    fantasma: true,
+  }
+}
+
+/**
+ * Sugestões vivas do Motor de Planejamento (Itens 4/9/11/12) para todas as
+ * tarefas pendentes e elegíveis — calculada UMA VEZ pra todo o período
+ * visível (não por dia: `sugerirBlocos` já varre vários dias internamente
+ * quando precisa). Quem chama filtra por dia ao montar `planoDoDia`.
+ *
+ * Recalcula automaticamente sempre que `tarefas`/`eventos`/`contextos`/`agora`
+ * mudam — quem usa esta função normalmente envolve a chamada num `useMemo`
+ * dependente desses dados (já vêm de hooks reativos/Dexie).
+ */
+export function sugestoesVivas(
+  tarefas: Task[],
+  eventos: Evento[],
+  contextos: Contexto[],
+  agora: Date,
+): Map<string, BlocoTarefa[]> {
+  const mapa = new Map<string, BlocoTarefa[]>()
+  for (const t of tarefas) {
+    if (t.concluidaEm) continue
+    const r = sugerirBlocos(t, { tarefas, eventos, contextos, agora })
+    if (Array.isArray(r) && r.length) mapa.set(t.id, r)
+  }
+  return mapa
 }
 
 /** Agrupa itens conectados por sobreposição (para empilhar como cartas). */
@@ -157,6 +222,8 @@ function faixasDoDia(dia: string, contextos: Contexto[]): FaixaContexto[] {
 export interface OpcoesPlano {
   /** contextos de rotina editáveis (faixas de fundo). */
   contextos?: Contexto[]
+  /** sugestões vivas do Motor (ver `sugestoesVivas`) — desenhadas como "fantasma". */
+  sugestoes?: Map<string, BlocoTarefa[]>
 }
 
 /** Monta o plano de um dia a partir dos eventos e tarefas. */
@@ -170,18 +237,31 @@ export function planoDoDia(
     .filter((o) => o.data === dia && !o.evento.diaInteiro)
     .map((o) => itemDoEvento(o.evento, dia, o.ehOcorrencia))
 
-  const blocosTarefa: ItemPlano[] = tarefas
-    .filter((t) => t.blocoData === dia && t.blocoInicio)
-    .map(itemDaTarefa)
+  // Cada tarefa pode ter vários blocos (Item 12) — só os FIXADOS com hora
+  // marcada aparecem na grade; um por bloco (uma tarefa dividida gera vários itens).
+  const blocosTarefa: ItemPlano[] = tarefas.flatMap((t) =>
+    blocosFixados(t)
+      .filter((b) => b.data === dia && b.inicio)
+      .map((b) => itemDaTarefa(t, b)),
+  )
 
-  const itens = [...timados, ...blocosTarefa]
+  // Sugestões vivas (fantasmas, Item 4): mesma lógica, mas nunca fixadas —
+  // não contam pra ocupação/estatísticas, só aparecem visualmente na grade.
+  const blocosFantasma: ItemPlano[] = tarefas.flatMap((t) => {
+    const sug = opts.sugestoes?.get(t.id)
+    if (!sug) return []
+    return sug.filter((b) => b.data === dia && b.inicio).map((b) => itemDaTarefaFantasma(t, b))
+  })
+
+  const itensReais = [...timados, ...blocosTarefa]
+  const itens = [...itensReais, ...blocosFantasma]
 
   const diaInteiro: ItemPlano[] = ocorrencias
     .filter((o) => o.data === dia && o.evento.diaInteiro)
     .map((o) => itemDoEvento(o.evento, dia, o.ehOcorrencia))
 
   const deadlines: Deadline[] = tarefas
-    .filter((t) => t.data === dia && t.horario && !t.blocoData && !t.concluidaEm)
+    .filter((t) => t.data === dia && t.horario && !blocosFixados(t).some((b) => b.inicio) && !t.concluidaEm)
     .map((t) => ({
       id: `dl:${t.id}`,
       titulo: t.titulo,
@@ -190,8 +270,9 @@ export function planoDoDia(
       ref: t,
     }))
 
-  // Ocupação: união dos intervalos dos eventos (não conta blocos concluídos).
-  const intervalos = itens
+  // Ocupação: união dos intervalos dos eventos (não conta blocos concluídos
+  // nem sugestões fantasma — não são compromissos reais ainda).
+  const intervalos = itensReais
     .filter((i) => !i.concluida)
     .map((i) => [i.inicioMin, i.fimMin] as [number, number])
   const ocupadoMin = uniaoMinutos(intervalos)
@@ -199,6 +280,7 @@ export function planoDoDia(
   return {
     dia,
     grupos: agrupar(itens),
+    gruposReais: agrupar(itensReais),
     diaInteiro,
     deadlines,
     contextos: faixasDoDia(dia, opts.contextos ?? []),
@@ -264,8 +346,8 @@ export function estatisticas(planos: PlanoDia[]): EstatisticasPeriodo {
     ocupadoMin += p.ocupadoMin
     if (!diaMaisCheio || p.ocupadoMin > diaMaisCheio.ocupadoMin) diaMaisCheio = { dia: p.dia, ocupadoMin: p.ocupadoMin }
 
-    // Maior lacuna livre no horário ativo.
-    const ocup = p.grupos.map((g) => [g.inicioMin, g.fimMin] as [number, number]).sort((a, b) => a[0] - b[0])
+    // Maior lacuna livre no horário ativo (sugestões fantasma não contam como ocupação).
+    const ocup = p.gruposReais.map((g) => [g.inicioMin, g.fimMin] as [number, number]).sort((a, b) => a[0] - b[0])
     let cursor = ATIVO_INI
     for (const [a, b] of ocup) {
       const gapIni = cursor
@@ -361,7 +443,7 @@ export function analisePeriodo(planos: PlanoDia[], est: EstatisticasPeriodo, nom
 /** Minutos ocupados em cada hora [ini..fim) de um dia — para a linha de carga. */
 export function cargaPorHora(plano: PlanoDia, iniH: number, fimH: number): number[] {
   const horas: number[] = []
-  const intervalos = plano.grupos.map((g) => [g.inicioMin, g.fimMin] as [number, number])
+  const intervalos = plano.gruposReais.map((g) => [g.inicioMin, g.fimMin] as [number, number])
   for (let h = iniH; h < fimH; h++) {
     const a = h * 60
     const b = a + 60

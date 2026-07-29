@@ -3,7 +3,10 @@ import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
 import { hojeISO } from '../../core/dates'
 import type { Contexto } from '../agenda/types'
-import type { Prioridade, Projeto, Recorrencia, Task } from './types'
+import type { BlocoTarefa, Prioridade, Projeto, Recorrencia, Task } from './types'
+
+/** Duração padrão (min) quando a tarefa não informa `duracaoMin` (usada só na migração de blocos). */
+const DUR_PADRAO_MIGRACAO = 30
 
 /* ---------- contexto ---------- */
 
@@ -37,6 +40,50 @@ export async function migrarContextosTarefas(contextosAgenda: Contexto[]): Promi
     const achado = contextosAgenda.find((c) => semAcentoLower(c.nome) === alvo)
     if (achado) await db.tasks.update(t.id, { contextoId: achado.id })
   }
+}
+
+/* ---------- blocos ---------- */
+
+const CHAVE_MIGRACAO_BLOCOS = 'lume:tarefas:blocos-migrados'
+
+function jaMigrouBlocos(): boolean {
+  return typeof localStorage !== 'undefined' && localStorage.getItem(CHAVE_MIGRACAO_BLOCOS) === '1'
+}
+
+function marcarBlocosMigrados(): void {
+  if (typeof localStorage !== 'undefined') localStorage.setItem(CHAVE_MIGRACAO_BLOCOS, '1')
+}
+
+/**
+ * Migração única (idempotente, mesmo padrão de `migrarContextosTarefas`):
+ * tarefas antigas tinham bloco único `blocoData`/`blocoInicio`. Agora usam
+ * uma lista `blocos: BlocoTarefa[]`. Toda tarefa com um desses campos legados
+ * preenchidos vira um único item em `blocos`, já `fixado: true` (já era uma
+ * decisão manual do Matheus). Marca uma chave no `localStorage` pra nunca
+ * reprocessar.
+ */
+export async function migrarBlocosTarefas(): Promise<void> {
+  if (jaMigrouBlocos()) return
+  marcarBlocosMigrados()
+  const todas = await db.tasks.toArray()
+  for (const t of todas) {
+    if (t.blocos?.length) continue
+    const legado = t as unknown as { blocoData?: string; blocoInicio?: string }
+    if (!legado.blocoData && !legado.blocoInicio) continue
+    const bloco: BlocoTarefa = {
+      id: nanoid(),
+      data: legado.blocoData,
+      inicio: legado.blocoInicio,
+      duracaoMin: t.duracaoMin ?? DUR_PADRAO_MIGRACAO,
+      fixado: true,
+    }
+    await db.tasks.update(t.id, { blocos: [bloco] })
+  }
+}
+
+/** Blocos fixados (confirmados pelo Matheus) de uma tarefa, com `data` definida. */
+export function blocosFixados(t: Task): BlocoTarefa[] {
+  return (t.blocos ?? []).filter((b) => b.fixado && !!b.data)
 }
 
 /* ---------- prioridades ---------- */
@@ -153,7 +200,11 @@ export interface DadosTarefa {
   descricao?: string
   data?: string
   horario?: string
-  /** Bloco de tempo dedicado — dia planejado (ISO), independente do prazo. */
+  /**
+   * Dia planejado (ISO), independente do prazo — atalho de criação: vira um
+   * único `BlocoTarefa` já `fixado: true` (dia escolhido manualmente/herdado
+   * de um filtro; hora ainda fica em aberto, o Motor sugere depois).
+   */
   blocoData?: string
   prioridade?: Prioridade
   projetoId?: string
@@ -174,7 +225,9 @@ export async function criarTarefa(dados: DadosTarefa | string, dataLegado?: stri
     descricao: d.descricao?.trim() || undefined,
     data: d.data,
     horario: d.horario,
-    blocoData: d.blocoData,
+    blocos: d.blocoData
+      ? [{ id: nanoid(), data: d.blocoData, duracaoMin: DUR_PADRAO_MIGRACAO, fixado: true }]
+      : undefined,
     prioridade: d.prioridade ?? 4,
     projetoId: d.projetoId,
     paiId: d.paiId,
@@ -306,17 +359,30 @@ export function estaAtrasada(t: Task) {
 }
 
 /**
- * Dia "efetivo" de uma tarefa, pra classificar/agrupar (Hoje/Próximas/
- * Calendário): o dia planejado (`blocoData`) quando existir, senão o prazo
- * (`data`). Duas datas distintas — ver Item 4 do plano.
+ * Dia "efetivo" de uma tarefa, pra classificar/agrupar (Próximas/Calendário):
+ * a data do bloco FIXADO mais próximo/cedo quando existir 1+ blocos fixados,
+ * senão o prazo (`data`). Só blocos com `fixado: true` contam — uma sugestão
+ * viva (ainda recalculando) nunca entra aqui, só aparece na Agenda como
+ * "fantasma". Duas datas distintas — ver Item 4 do plano.
  */
 export function diaEfetivo(t: Task): string | undefined {
-  return t.blocoData ?? t.data
+  const datas = blocosFixados(t)
+    .map((b) => b.data!)
+    .sort()
+  return datas[0] ?? t.data
 }
 
-/** Hoje = dia efetivo é hoje; nunca conta se já está atrasada ou concluída. */
+/**
+ * Hoje = QUALQUER bloco fixado com `data` = hoje (mesmo que outros blocos da
+ * mesma tarefa dividida estejam em outros dias), OU — sem nenhum bloco
+ * fixado — o prazo (`data`) é hoje. Nunca conta se já está atrasada ou
+ * concluída.
+ */
 export function ehHoje(t: Task, hoje: string = hojeISO()): boolean {
-  return estaPendente(t) && !estaAtrasada(t) && diaEfetivo(t) === hoje
+  if (!estaPendente(t) || estaAtrasada(t)) return false
+  const fixados = blocosFixados(t)
+  if (fixados.length) return fixados.some((b) => b.data === hoje)
+  return t.data === hoje
 }
 
 /** Ordena por prioridade (P1 primeiro), depois data, depois ordem manual. */
@@ -368,7 +434,7 @@ export function filtrarHoje(tarefas: Task[]): Task[] {
 export function filtrarProximas(tarefas: Task[]): Task[] {
   const hoje = hojeISO()
   return ordenarPorData(
-    tarefas.filter((t) => estaPendente(t) && !estaAtrasada(t) && !!diaEfetivo(t) && diaEfetivo(t) !== hoje),
+    tarefas.filter((t) => estaPendente(t) && !estaAtrasada(t) && !!diaEfetivo(t) && !ehHoje(t, hoje)),
   )
 }
 
@@ -483,4 +549,107 @@ export function dataRelativa(quando: 'hoje' | 'amanha' | 'fim_semana' | 'prox_se
 
 export async function reagendar(id: string, data: string | undefined) {
   await atualizarTarefa(id, { data })
+}
+
+/* ---------- API de blocos (usada pela Agenda: arrastar/fixar/destravar) ---------- */
+
+/**
+ * Grava/atualiza um bloco de tempo como `fixado: true` (confirmado pelo
+ * Matheus) na tarefa `taskId`.
+ *
+ * - Se `bloco.id` corresponde a um bloco já existente naquela tarefa,
+ *   ATUALIZA esse bloco (dia/início/duração) e garante `fixado: true`.
+ * - Senão, ADICIONA um novo bloco (gera um `id` novo se `bloco.id` não foi
+ *   informado).
+ *
+ * Uso típico: ao arrastar um bloco/sugestão na Agenda para um horário, ou ao
+ * criar/editar um bloco manualmente no editor de tarefa.
+ */
+export async function fixarBlocoTarefa(
+  taskId: string,
+  bloco: { id?: string; data: string; inicio: string; duracaoMin: number },
+): Promise<void> {
+  const task = await db.tasks.get(taskId)
+  if (!task) return
+  const atuais = task.blocos ?? []
+  const idx = bloco.id ? atuais.findIndex((b) => b.id === bloco.id) : -1
+  const atualizado: BlocoTarefa = {
+    id: idx >= 0 ? atuais[idx].id : (bloco.id ?? nanoid()),
+    data: bloco.data,
+    inicio: bloco.inicio,
+    duracaoMin: bloco.duracaoMin,
+    fixado: true,
+  }
+  const novos = idx >= 0 ? atuais.map((b, i) => (i === idx ? atualizado : b)) : [...atuais, atualizado]
+  await db.tasks.update(taskId, { blocos: novos })
+}
+
+/**
+ * Destrava um bloco específico (`blocoId`) de uma tarefa: seta `fixado:
+ * false`. A partir daí, esse bloco volta a ser uma sugestão viva — o Motor
+ * de Planejamento (`sugerirBlocos`, em `execucao.ts`) recalcula o melhor
+ * horário pra ele na próxima leitura, considerando o resto do dia.
+ *
+ * Não remove o bloco nem apaga dia/hora/duração antigos (eles só deixam de
+ * "contar" como fixados; o próximo `sugerirBlocos` decide o que fazer).
+ */
+export async function destravarBlocoTarefa(taskId: string, blocoId: string): Promise<void> {
+  const task = await db.tasks.get(taskId)
+  if (!task) return
+  const novos = (task.blocos ?? []).map((b) => (b.id === blocoId ? { ...b, fixado: false } : b))
+  await db.tasks.update(taskId, { blocos: novos })
+}
+
+/**
+ * Tenta mover um bloco JÁ FIXADO (`blocoId`, da tarefa `taskId`) pra um novo
+ * dia/hora — usado pelo arrastar-pra-mover na Agenda.
+ *
+ * Antes de gravar, valida a regra de dependência (Item 11 do plano):
+ * - Se a tarefa tem `dependeDe` com alguma dependência ainda NÃO concluída,
+ *   rejeita (nenhuma tarefa dependente pode ter horário antes da dependência
+ *   terminar — nem manualmente).
+ * - Se alguma dependência concluída tem bloco(s) fixado(s), o novo horário
+ *   não pode ser ANTES do fim do bloco fixado mais tardio daquela
+ *   dependência.
+ *
+ * `contexto.tarefas` deve trazer a lista completa de tarefas (pra resolver
+ * os ids de `dependeDe` sem precisar reler o banco todo).
+ *
+ * Retorna `{ ok: true }` e já persiste a mudança quando a validação passa, ou
+ * `{ ok: false, motivo }` SEM gravar nada quando rejeita — quem chama (ex.: o
+ * `aoSoltar` do arrastar) deve desfazer visualmente o movimento.
+ */
+export async function moverBlocoFixado(
+  taskId: string,
+  blocoId: string,
+  novaData: string,
+  novoInicio: string,
+  contexto: { tarefas: Task[] },
+): Promise<{ ok: true } | { ok: false; motivo: string }> {
+  const task = await db.tasks.get(taskId)
+  if (!task) return { ok: false, motivo: 'Tarefa não encontrada.' }
+  const bloco = (task.blocos ?? []).find((b) => b.id === blocoId)
+  if (!bloco) return { ok: false, motivo: 'Bloco não encontrado.' }
+
+  const deps = (task.dependeDe ?? [])
+    .map((id) => contexto.tarefas.find((t) => t.id === id))
+    .filter((t): t is Task => !!t)
+  if (deps.some((d) => !d.concluidaEm)) {
+    return { ok: false, motivo: 'Esta tarefa depende de outra ainda não concluída.' }
+  }
+
+  const novoInicioInstante = new Date(`${novaData}T${novoInicio}:00`).getTime()
+  for (const dep of deps) {
+    for (const b of blocosFixados(dep)) {
+      if (!b.inicio) continue
+      const fimInstante = new Date(`${b.data}T${b.inicio}:00`).getTime() + b.duracaoMin * 60000
+      if (novoInicioInstante < fimInstante) {
+        return { ok: false, motivo: `Só pode começar depois do fim do bloco de "${dep.titulo}".` }
+      }
+    }
+  }
+
+  const novos = (task.blocos ?? []).map((b) => (b.id === blocoId ? { ...b, data: novaData, inicio: novoInicio } : b))
+  await db.tasks.update(taskId, { blocos: novos })
+  return { ok: true }
 }

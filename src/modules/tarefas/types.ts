@@ -11,6 +11,28 @@ export interface Recorrencia {
   dias?: number[]
 }
 
+/**
+ * Um pedaço de tempo dedicado a uma tarefa — dia+hora que ela ocupa na Agenda.
+ * Uma `Task` pode ter vários (divisão em blocos, Item 12 do plano).
+ *
+ * - `fixado: false` = sugestão viva do Motor de Planejamento (`sugerirBlocos`
+ *   em `execucao.ts`): recalculada a cada mudança relevante do dia, nunca
+ *   persistida sozinha — só aparece como "fantasma" na Agenda.
+ * - `fixado: true` = confirmado pelo Matheus (arrastou na Agenda, criou
+ *   manualmente, ou herdou o dia de um filtro/calendário) — o Motor não mexe
+ *   mais nele; só volta a ser sugestão viva se destravado
+ *   (`destravarBlocoTarefa`).
+ */
+export interface BlocoTarefa {
+  id: string
+  /** Dia ISO yyyy-MM-dd. Ausente = ainda não tem dia definido. */
+  data?: string
+  /** HH:mm. Ausente = só o dia foi definido; a hora ainda é sugerida pelo Motor. */
+  inicio?: string
+  duracaoMin: number
+  fixado: boolean
+}
+
 export interface Task {
   id: string
   titulo: string
@@ -22,10 +44,14 @@ export interface Task {
   horario?: string
   /** Quanto tempo a tarefa leva para ser feita (estimativa, em minutos). */
   duracaoMin?: number
-  /** Bloco de tempo dedicado — dia em que vou fazer a tarefa (ISO). */
-  blocoData?: string
-  /** Bloco de tempo dedicado — hora de início HH:mm. */
-  blocoInicio?: string
+  /**
+   * Tempo mínimo de um pedaço, se o Motor precisar dividir a tarefa em vários
+   * `blocos` (Item 12). Ausente ou igual a `duracaoMin` = não dividir
+   * automaticamente (só divisão manual).
+   */
+  duracaoMinBloco?: number
+  /** Blocos de tempo dedicados (dia+hora, sugeridos ou fixados). Ver `BlocoTarefa`. */
+  blocos?: BlocoTarefa[]
   /** 1 (P1) … 4 (P4). Padrão 4. */
   prioridade: Prioridade
   /** Projeto ao qual pertence; ausente = Entrada (Inbox). */

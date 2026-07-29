@@ -23,7 +23,7 @@ import { QuickAdd } from './components/QuickAdd'
 import { TaskEditorSheet } from './components/TaskEditorSheet'
 import { TaskList } from './components/TaskList'
 import {
-  atualizarTarefa,
+  blocosFixados,
   buscar,
   corPrioridade,
   diaEfetivo,
@@ -35,6 +35,8 @@ import {
   filtrarLabel,
   filtrarProjeto,
   filtrarProximas,
+  fixarBlocoTarefa,
+  migrarBlocosTarefas,
   migrarContextosTarefas,
   todasLabels,
 } from './db'
@@ -47,6 +49,7 @@ import {
   prioridadeMaxima,
   resumoMes,
   sugerirBloco,
+  sugerirBlocos,
 } from './execucao'
 import { useProjetos, useTarefas } from './hooks'
 import type { Projeto, Task } from './types'
@@ -91,10 +94,28 @@ export function TarefasPage() {
     if (contextosAgenda) void migrarContextosTarefas(contextosAgenda)
   }, [contextosAgenda])
 
+  // Migração única: bloco singular antigo (`blocoData`/`blocoInicio`) → lista
+  // `blocos: BlocoTarefa[]` (Item 12 do plano). Não depende de nada externo.
+  useEffect(() => {
+    void migrarBlocosTarefas()
+  }, [])
+
   const listaHoje = useMemo(() => filtrarHoje(todas), [todas])
   const listaProximas = useMemo(() => filtrarProximas(todas), [todas])
   const atrasadas = useMemo(() => todas.filter((t) => !t.paiId && estaPendente(t) && estaAtrasada(t)), [todas])
   const labels = useMemo(() => todasLabels(todas), [todas])
+
+  // Tarefas sem horário possível pro Motor encaixar antes do prazo/contexto
+  // (Item 9) — vira o aviso "⚠️ sem horário" na lista (Item 4 do plano desta fase).
+  const semHorarioIds = useMemo(() => {
+    const agora = new Date()
+    const ids = new Set<string>()
+    for (const t of todas) {
+      if (!estaPendente(t)) continue
+      if (sugerirBlocos(t, { tarefas: todas, eventos: evs, contextos, agora }) === 'sem-horario-possivel') ids.add(t.id)
+    }
+    return ids
+  }, [todas, evs, contextos])
 
   const ind = useMemo(() => indicadoresDia(todas, hoje), [todas, hoje])
   const foco = useMemo(() => focoDoDia(todas, ps, hoje), [todas, ps, hoje])
@@ -103,7 +124,7 @@ export function TarefasPage() {
   const insights = useMemo(() => insightsTarefas({ todas, hoje, eventos: evs }), [todas, hoje, evs])
 
   const gapsHoje = useMemo(() => janelasLivres(evs, todas, hoje), [evs, todas, hoje])
-  const sugPmax = pmax && !pmax.blocoData ? sugerirBloco(pmax, gapsHoje) : undefined
+  const sugPmax = pmax && !blocosFixados(pmax).length ? sugerirBloco(pmax, gapsHoje) : undefined
 
   const hojeOrd = useMemo(() => (ordInteligente ? ordenarInteligente(listaHoje, hoje, todas) : listaHoje), [ordInteligente, listaHoje, hoje, todas])
 
@@ -135,7 +156,9 @@ export function TarefasPage() {
   }, [aba, subTudo, diaCalendario, hoje])
 
   function reservarBloco() {
-    if (pmax && sugPmax) atualizarTarefa(pmax.id, { blocoData: hoje, blocoInicio: paraHHMM(sugPmax.inicioMin) })
+    if (pmax && sugPmax) {
+      void fixarBlocoTarefa(pmax.id, { data: hoje, inicio: paraHHMM(sugPmax.inicioMin), duracaoMin: pmax.duracaoMin ?? 30 })
+    }
   }
 
   const indicadores = [
@@ -226,7 +249,7 @@ export function TarefasPage() {
       )}
 
       {emBusca ? (
-        <TaskList tarefas={resultadosBusca} todas={todas} projetos={ps} contextos={contextos} onAbrir={setSelecionada} mostrarProjeto vazio={<EmptyState icone={<IconLupa />} titulo="Nada encontrado" descricao="Tente outro termo ou etiqueta." />} />
+        <TaskList tarefas={resultadosBusca} todas={todas} projetos={ps} contextos={contextos} semHorarioIds={semHorarioIds} onAbrir={setSelecionada} mostrarProjeto vazio={<EmptyState icone={<IconLupa />} titulo="Nada encontrado" descricao="Tente outro termo ou etiqueta." />} />
       ) : (
         <>
           {/* Indicadores */}
@@ -260,13 +283,13 @@ export function TarefasPage() {
 
               {aba === 'hoje' && (
                 <div className={CARTAO}>
-                  <TaskList tarefas={hojeOrd} todas={todas} projetos={ps} contextos={contextos} onAbrir={setSelecionada} ocultarData mostrarProjeto vazio={<EmptyState icone={<IconSol />} titulo="Nada para hoje" descricao="Adicione uma tarefa ou aproveite o dia livre." />} />
+                  <TaskList tarefas={hojeOrd} todas={todas} projetos={ps} contextos={contextos} semHorarioIds={semHorarioIds} onAbrir={setSelecionada} ocultarData mostrarProjeto vazio={<EmptyState icone={<IconSol />} titulo="Nada para hoje" descricao="Adicione uma tarefa ou aproveite o dia livre." />} />
                 </div>
               )}
-              {aba === 'proximas' && <ProximasView listas={listaProximas} todas={todas} projetos={ps} contextos={contextos} onAbrir={setSelecionada} />}
+              {aba === 'proximas' && <ProximasView listas={listaProximas} todas={todas} projetos={ps} contextos={contextos} semHorarioIds={semHorarioIds} onAbrir={setSelecionada} />}
               {aba === 'atrasadas' && (
                 <div className={CARTAO}>
-                  <TaskList tarefas={ordenarInteligente(atrasadas, hoje, todas)} todas={todas} projetos={ps} contextos={contextos} onAbrir={setSelecionada} mostrarProjeto vazio={<EmptyState icone={<IconCheckCircle />} titulo="Nada atrasado" descricao="Você está em dia. 🎉" />} />
+                  <TaskList tarefas={ordenarInteligente(atrasadas, hoje, todas)} todas={todas} projetos={ps} contextos={contextos} semHorarioIds={semHorarioIds} onAbrir={setSelecionada} mostrarProjeto vazio={<EmptyState icone={<IconCheckCircle />} titulo="Nada atrasado" descricao="Você está em dia. 🎉" />} />
                 </div>
               )}
               {aba === 'tudo' && (
@@ -277,6 +300,7 @@ export function TarefasPage() {
                   labels={labels}
                   todas={todas}
                   contextos={contextos}
+                  semHorarioIds={semHorarioIds}
                   diaCalendario={diaCalendario}
                   setDiaCalendario={setDiaCalendario}
                   onAbrir={setSelecionada}
@@ -325,7 +349,7 @@ export function TarefasPage() {
         </>
       )}
 
-      <TaskEditorSheet task={selecionada} projetos={ps} todas={todas} onFechar={() => setSelecionada(null)} />
+      <TaskEditorSheet task={selecionada} projetos={ps} todas={todas} eventos={evs} onFechar={() => setSelecionada(null)} />
       <EditorProjeto projeto={editorProjeto} onFechar={() => setEditorProjeto(undefined)} onCriado={(id) => { setAba('tudo'); setSubTudo({ projeto: id }) }} />
     </div>
   )
@@ -338,12 +362,14 @@ function ProximasView({
   todas,
   projetos,
   contextos,
+  semHorarioIds,
   onAbrir,
 }: {
   listas: Task[]
   todas: Task[]
   projetos: Projeto[]
   contextos: Contexto[]
+  semHorarioIds: Set<string>
   onAbrir: (t: Task) => void
 }) {
   // Agrupa pelo dia efetivo (bloco planejado, senão prazo) — regra de duas datas (Item 4).
@@ -360,7 +386,7 @@ function ProximasView({
       {[...grupos.entries()].map(([dia, tks]) => (
         <div key={dia} className="rounded-2xl border border-line bg-surface/50 p-3">
           <h2 className="mb-1 px-1 text-[13px] font-semibold text-muted">{rotuloData(dia)}</h2>
-          <TaskList tarefas={tks} todas={todas} projetos={projetos} contextos={contextos} onAbrir={onAbrir} ocultarData mostrarProjeto vazio={null} />
+          <TaskList tarefas={tks} todas={todas} projetos={projetos} contextos={contextos} semHorarioIds={semHorarioIds} onAbrir={onAbrir} ocultarData mostrarProjeto vazio={null} />
         </div>
       ))}
     </div>
@@ -376,6 +402,7 @@ function TudoView({
   labels,
   todas,
   contextos,
+  semHorarioIds,
   diaCalendario,
   setDiaCalendario,
   onAbrir,
@@ -388,6 +415,7 @@ function TudoView({
   labels: { label: string; qtd: number }[]
   todas: Task[]
   contextos: Contexto[]
+  semHorarioIds: Set<string>
   diaCalendario: string
   setDiaCalendario: (dia: string) => void
   onAbrir: (t: Task) => void
@@ -397,7 +425,7 @@ function TudoView({
   const chave = typeof sub === 'string' ? sub : 'projeto' in sub ? `p:${sub.projeto}` : `l:${sub.label}`
   const projAtual = typeof sub === 'object' && 'projeto' in sub ? projetos.find((p) => p.id === sub.projeto) : undefined
   const labelAtual = typeof sub === 'object' && 'label' in sub ? sub.label : undefined
-  const comum = { todas, projetos, contextos, onAbrir }
+  const comum = { todas, projetos, contextos, semHorarioIds, onAbrir }
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-1.5">
@@ -429,6 +457,7 @@ function TudoView({
             todas={todas}
             projetos={projetos}
             contextos={contextos}
+            semHorarioIds={semHorarioIds}
             onAbrir={onAbrir}
             selecionado={diaCalendario}
             onSelecionar={setDiaCalendario}
@@ -457,7 +486,7 @@ function MiniCalendario({ todas }: { todas: Task[] }) {
   const mesStr = `${ano}-${String(mes + 1).padStart(2, '0')}`
   for (const t of todas) {
     if (t.concluidaEm) continue
-    for (const d of [t.data, t.blocoData]) {
+    for (const d of [t.data, ...blocosFixados(t).map((b) => b.data)]) {
       if (d && d.startsWith(mesStr)) comTarefa.add(Number(d.slice(8, 10)))
     }
   }

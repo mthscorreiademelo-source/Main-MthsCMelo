@@ -14,13 +14,15 @@ interface Props {
   projetos: Projeto[]
   /** Contextos reais da Agenda (exibidos nas tarefas da lista). */
   contextos?: Contexto[]
+  /** Ids de tarefas sem horário possível dentro do prazo/contexto (Item 9) — mostra um aviso. */
+  semHorarioIds?: Set<string>
   onAbrir: (t: Task) => void
   /** Dia selecionado (ISO), controlado pela página — afeta o padrão de "Nova tarefa". */
   selecionado: string
   onSelecionar: (dia: string) => void
 }
 
-export function CalendarioTarefas({ tarefas, todas, projetos, contextos, onAbrir, selecionado, onSelecionar }: Props) {
+export function CalendarioTarefas({ tarefas, todas, projetos, contextos, semHorarioIds, onAbrir, selecionado, onSelecionar }: Props) {
   const hoje = hojeISO()
   const [mesRef, setMesRef] = useState(selecionado.slice(0, 7)) // yyyy-MM
 
@@ -162,6 +164,7 @@ export function CalendarioTarefas({ tarefas, todas, projetos, contextos, onAbrir
           todas={todas}
           projetos={projetos}
           contextos={contextos}
+          semHorarioIds={semHorarioIds}
           onAbrir={onAbrir}
           ocultarData
           mostrarProjeto
