@@ -14,6 +14,7 @@ import {
 import { NOMES_DIA } from '../freq'
 import { FONTES, fonteDe } from '../integracoes'
 import { usePets } from '../../pets/hooks'
+import { useMedicamentos } from '../../saude/hooks'
 import { estadoNotificacoes, pedirPermissaoNotificacoes, type EstadoNotif } from '../lembretes'
 import type {
   CategoriaHabito,
@@ -64,7 +65,12 @@ export function EditorHabito({
   const [vinculoPetId, setVinculoPetId] = useState(habito?.vinculoPetId ?? '')
   const [vinculoAgua, setVinculoAgua] = useState(!!habito?.vinculoAgua)
   const [mlPorUnidade, setMlPorUnidade] = useState(habito?.mlPorUnidade != null ? String(habito.mlPorUnidade) : '')
+  const [vinculoMedicamentoId, setVinculoMedicamentoId] = useState(habito?.vinculoMedicamentoId ?? '')
   const pets = usePets() ?? []
+  const medicamentos = useMedicamentos() ?? []
+  // Mostra os remédios ativos e mantém o já escolhido na lista mesmo se inativo.
+  const medsLista = medicamentos.filter((m) => m.ativo !== false || m.id === vinculoMedicamentoId)
+  const medVinculado = medicamentos.find((m) => m.id === vinculoMedicamentoId)
   const [lembretes, setLembretes] = useState<string[]>(
     habito?.lembretes ?? (habito?.horario ? [habito.horario] : []),
   )
@@ -154,6 +160,7 @@ export function EditorHabito({
       vinculoPetId: vinculoPetId || undefined,
       vinculoAgua: vinculoAgua || undefined,
       mlPorUnidade: vinculoAgua && Number(mlPorUnidade) > 0 ? Number(mlPorUnidade) : undefined,
+      vinculoMedicamentoId: vinculoMedicamentoId || undefined,
       unidade: medido ? unidade.trim() || undefined : undefined,
       meta: medido ? Math.max(1, Number(meta) || 1) : undefined,
       passo: medido ? Math.max(1, Number(passo) || 1) : undefined,
@@ -494,7 +501,42 @@ export function EditorHabito({
             />
           </label>
         )}
-        {pets.length === 0 && !vinculoAgua && (
+        {medicamentos.length > 0 && (
+          <>
+            <label className="flex items-center justify-between gap-2 text-[14px]">
+              <span className="text-muted">💊 Baixa do estoque de um remédio</span>
+              <select
+                value={vinculoMedicamentoId}
+                onChange={(e) => setVinculoMedicamentoId(e.target.value)}
+                className={`${CAMPO} max-w-[55%]`}
+              >
+                <option value="">Nenhum</option>
+                {medsLista.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nome}
+                    {m.dosagem ? ` — ${m.dosagem}` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {vinculoMedicamentoId && (
+              <p className="text-[12px] text-muted/80">
+                Cada vez que você marcar este hábito como feito, tiramos 1 do estoque
+                desse remédio na Saúde. Se desmarcar, devolvemos 1.
+                {medVinculado?.estoque != null && (
+                  <>
+                    {' '}Estoque atual: <strong>{medVinculado.estoque}</strong>
+                    {medVinculado.estoqueAlerta != null &&
+                      medVinculado.estoque <= medVinculado.estoqueAlerta && (
+                        <span className="text-red-500"> — estoque baixo, hora de repor.</span>
+                      )}
+                  </>
+                )}
+              </p>
+            )}
+          </>
+        )}
+        {pets.length === 0 && !vinculoAgua && medicamentos.length === 0 && (
           <p className="text-[12px] text-muted/70">Cadastre um pet para vincular hábitos como “passear”.</p>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { format, parseISO, subDays } from 'date-fns'
 import { nanoid } from 'nanoid'
 import { db } from '../../core/db/db'
+import { ajustarEstoqueMedicamento } from '../saude/db'
 import { hojeISO } from '../../core/dates'
 import type {
   CategoriaHabito,
@@ -146,17 +147,45 @@ function idReg(habitoId: string, data: string) {
   return `${habitoId}:${data}`
 }
 
+/**
+ * Se o hábito estiver vinculado a um remédio da Saúde, ajusta o estoque desse
+ * remédio conforme o hábito passa a "feito" ou deixa de ser "feito". Só age na
+ * transição REAL para não contar duas vezes: entrar em "feito" baixa 1
+ * (delta −1); sair de "feito" devolve 1 (delta +1); qualquer outra mudança (ex.:
+ * pendente ↔ "falhou") não mexe no estoque.
+ */
+async function ajustarEstoquePorEstado(
+  habitoId: string,
+  eraFeito: boolean,
+  ficaFeito: boolean,
+) {
+  if (eraFeito === ficaFeito) return
+  const habito = await db.habitos.get(habitoId)
+  const medId = habito?.vinculoMedicamentoId
+  if (!medId) return
+  await ajustarEstoqueMedicamento(medId, ficaFeito ? -1 : 1)
+}
+
+/** "feito" a partir do registro do dia (aceita registros antigos só com valor). */
+function estadoEhFeito(reg: HabitoRegistro | undefined): boolean {
+  if (!reg) return false
+  return (reg.estado ?? ((reg.valor ?? 0) >= 1 ? 'feito' : undefined)) === 'feito'
+}
+
 /** Sim/Não: ciclo pendente → feito → não fez → pendente. */
 export async function cicloSimNao(habitoId: string, data: string) {
   const id = idReg(habitoId, data)
   const existe = await db.habitoRegistros.get(id)
-  const estado = existe?.estado ?? (existe && (existe.valor ?? 0) >= 1 ? 'feito' : undefined)
+  const eraFeito = estadoEhFeito(existe)
   if (!existe) {
     await db.habitoRegistros.add({ id, habitoId, data, estado: 'feito', valor: 1 })
-  } else if (estado === 'feito') {
+    await ajustarEstoquePorEstado(habitoId, eraFeito, true)
+  } else if (eraFeito) {
     await db.habitoRegistros.update(id, { estado: 'falhou', valor: 0 })
+    await ajustarEstoquePorEstado(habitoId, eraFeito, false)
   } else {
     await db.habitoRegistros.delete(id)
+    await ajustarEstoquePorEstado(habitoId, eraFeito, false)
   }
 }
 
@@ -167,14 +196,17 @@ export async function definirEstadoSimNao(
   estado: 'feito' | 'falhou' | 'pendente',
 ) {
   const id = idReg(habitoId, data)
+  const existe = await db.habitoRegistros.get(id)
+  const eraFeito = estadoEhFeito(existe)
   if (estado === 'pendente') {
     await db.habitoRegistros.delete(id)
+    await ajustarEstoquePorEstado(habitoId, eraFeito, false)
     return
   }
-  const existe = await db.habitoRegistros.get(id)
   const doc = { estado, valor: estado === 'feito' ? 1 : 0 }
   if (existe) await db.habitoRegistros.update(id, doc)
   else await db.habitoRegistros.add({ id, habitoId, data, ...doc })
+  await ajustarEstoquePorEstado(habitoId, eraFeito, estado === 'feito')
 }
 
 /** Tipos medidos: soma `delta` (pode ser negativo). Remove o registro se zerar. */

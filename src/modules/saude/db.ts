@@ -244,6 +244,18 @@ export async function criarMedicamento(d: Partial<Medicamento> & { nome: string 
 export const atualizarMedicamento = (id: string, m: Partial<Medicamento>) => db.medicamentos.update(id, m)
 export const excluirMedicamento = (id: string) => db.medicamentos.delete(id)
 
+/**
+ * Ajusta o estoque de um medicamento em `delta` unidades (ex.: -1 ao tomar, +1 ao desfazer).
+ * Nunca deixa o estoque ficar negativo (piso em 0). No-op se o medicamento não existir
+ * ou não tiver controle de estoque (`estoque` undefined). Pensado para ser chamado por
+ * outros módulos (ex.: um hábito vinculado a este medicamento).
+ */
+export async function ajustarEstoqueMedicamento(medicamentoId: string, delta: number): Promise<void> {
+  const med = await db.medicamentos.get(medicamentoId)
+  if (med?.estoque == null) return
+  await db.medicamentos.update(medicamentoId, { estoque: Math.max(0, med.estoque + delta) })
+}
+
 /** Marca/desmarca uma dose como tomada e baixa/repõe o estoque. */
 export async function alternarTomada(medicamentoId: string, data: string, hora: string) {
   const id = `${medicamentoId}:${data}:${hora}`

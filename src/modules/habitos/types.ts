@@ -53,6 +53,11 @@ export interface Habito {
   vinculoAgua?: boolean
   /** Quantos ml cada unidade do hábito representa (copo = 250; ml = 1). */
   mlPorUnidade?: number
+  /**
+   * Vínculo com um remédio da Saúde (id do `Medicamento`). Marcar este hábito
+   * como "feito" no dia baixa 1 do estoque desse remédio; desmarcar devolve 1.
+   */
+  vinculoMedicamentoId?: string
   /** 1 (alta) … 4 (baixa). */
   prioridade?: number
   ordem: number
