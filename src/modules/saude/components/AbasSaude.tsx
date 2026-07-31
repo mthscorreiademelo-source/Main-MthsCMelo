@@ -26,6 +26,7 @@ import {
   criarProfissional,
   criarRefeicao,
   criarVacina,
+  atualizarMedicamento,
   atualizarProfissional,
   excluirAtividade,
   excluirConsulta,
@@ -600,6 +601,7 @@ export function AbaMedicamentos() {
   const meds = useMedicamentos() ?? []
   const tomadas = useMedicamentoTomadas() ?? []
   const [novo, setNovo] = useState(false)
+  const [editar, setEditar] = useState<import('../types').Medicamento | null>(null)
   const hoje = hojeISO()
   const tomouSet = new Set(tomadas.filter((t) => t.data === hoje).map((t) => `${t.medicamentoId}:${t.hora}`))
   return (
@@ -611,10 +613,11 @@ export function AbaMedicamentos() {
           <div key={m.id} className="rounded-2xl border border-line p-3">
             <div className="flex items-center gap-3">
               <span className="flex size-10 items-center justify-center rounded-full text-[18px]" style={{ backgroundColor: `color-mix(in srgb, ${m.cor ?? '#6a86b8'} 16%, transparent)` }}>💊</span>
-              <div className="min-w-0 flex-1">
+              <button onClick={() => setEditar(m)} className="min-w-0 flex-1 text-left">
                 <div className="truncate text-[14px] font-semibold">{m.nome}</div>
                 <div className="text-[12px] text-muted">{[m.dosagem, m.frequencia].filter(Boolean).join(' · ')}{m.estoque != null ? ` · estoque ${m.estoque}` : ''}</div>
-              </div>
+              </button>
+              <button onClick={() => setEditar(m)} aria-label="Editar" className="shrink-0 text-muted hover:text-ink"><IconLapis width={15} height={15} /></button>
               <BotaoExcluir onClick={() => excluirMedicamento(m.id)} />
             </div>
             {baixo && <div className="mt-2 rounded-lg bg-danger/10 px-2 py-1 text-[11px] font-medium text-danger">⚠️ Estoque baixo — hora de repor.</div>}
@@ -633,32 +636,53 @@ export function AbaMedicamentos() {
       })}
       <button onClick={() => setNovo(true)} className={BTNADD}><IconMais width={15} height={15} /> Adicionar medicamento</button>
       {novo && <EditorMedicamento onFechar={() => setNovo(false)} />}
+      {editar && <EditorMedicamento medicamento={editar} onFechar={() => setEditar(null)} />}
     </div>
   )
 }
 
-function EditorMedicamento({ onFechar }: { onFechar: () => void }) {
-  const [nome, setNome] = useState('')
-  const [dosagem, setDosagem] = useState('')
-  const [horarios, setHorarios] = useState('08:00')
-  const [freq, setFreq] = useState('Diário')
-  const [estoque, setEstoque] = useState('')
+function EditorMedicamento({ medicamento, onFechar }: { medicamento?: import('../types').Medicamento; onFechar: () => void }) {
+  const editando = !!medicamento
+  const [nome, setNome] = useState(medicamento?.nome ?? '')
+  const [dosagem, setDosagem] = useState(medicamento?.dosagem ?? '')
+  const [horarios, setHorarios] = useState(medicamento?.horarios?.join(', ') ?? '08:00')
+  const [freq, setFreq] = useState(medicamento?.frequencia ?? 'Diário')
+  const [estoque, setEstoque] = useState(medicamento?.estoque != null ? String(medicamento.estoque) : '')
+  const [estoqueAlerta, setEstoqueAlerta] = useState(medicamento?.estoqueAlerta != null ? String(medicamento.estoqueAlerta) : '7')
   async function salvar() {
-    await criarMedicamento({ nome, dosagem: dosagem || undefined, horarios: horarios.split(',').map((h) => h.trim()).filter(Boolean), frequencia: freq || undefined, estoque: num(estoque), estoqueAlerta: 7 })
+    if (!nome.trim()) return
+    const dados = {
+      nome: nome.trim(),
+      dosagem: dosagem || undefined,
+      horarios: horarios.split(',').map((h) => h.trim()).filter(Boolean),
+      frequencia: freq || undefined,
+      estoque: num(estoque),
+      estoqueAlerta: num(estoqueAlerta),
+    }
+    if (editando && medicamento) await atualizarMedicamento(medicamento.id, dados)
+    else await criarMedicamento(dados)
+    onFechar()
+  }
+  async function apagar() {
+    if (!medicamento) return
+    if (!confirm(`Excluir ${medicamento.nome}?`)) return
+    await excluirMedicamento(medicamento.id)
     onFechar()
   }
   return (
-    <FolhaInferior titulo="Novo medicamento" onFechar={onFechar}>
+    <FolhaInferior titulo={editando ? 'Editar medicamento' : 'Novo medicamento'} onFechar={onFechar}>
       <Campo rotulo="Nome"><input value={nome} onChange={(e) => setNome(e.target.value)} className={CAMPO} /></Campo>
       <div className="flex gap-3">
         <Campo rotulo="Dosagem"><input value={dosagem} onChange={(e) => setDosagem(e.target.value)} className={CAMPO} placeholder="1 cápsula, 200 mg…" /></Campo>
         <Campo rotulo="Frequência"><input value={freq} onChange={(e) => setFreq(e.target.value)} className={CAMPO} /></Campo>
       </div>
+      <Campo rotulo="Horários (HH:mm, vírgula)"><input value={horarios} onChange={(e) => setHorarios(e.target.value)} className={CAMPO} placeholder="08:00, 20:00" /></Campo>
       <div className="flex gap-3">
-        <Campo rotulo="Horários (HH:mm, vírgula)"><input value={horarios} onChange={(e) => setHorarios(e.target.value)} className={CAMPO} placeholder="08:00, 20:00" /></Campo>
-        <Campo rotulo="Estoque"><input inputMode="decimal" value={estoque} onChange={(e) => setEstoque(e.target.value)} className={CAMPO} /></Campo>
+        <Campo rotulo="Estoque"><input inputMode="decimal" value={estoque} onChange={(e) => setEstoque(e.target.value)} className={CAMPO} placeholder="Ex.: 30" /></Campo>
+        <Campo rotulo="Avisar quando restar"><input inputMode="decimal" value={estoqueAlerta} onChange={(e) => setEstoqueAlerta(e.target.value)} className={CAMPO} placeholder="Ex.: 7" /></Campo>
       </div>
       <button onClick={salvar} className={BTNSALVAR}>Salvar</button>
+      {editando && <button onClick={apagar} className="min-h-10 rounded-xl text-[13px] font-medium text-danger hover:bg-danger/10">Excluir medicamento</button>}
     </FolhaInferior>
   )
 }

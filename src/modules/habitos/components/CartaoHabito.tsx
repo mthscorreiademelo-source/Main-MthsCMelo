@@ -9,6 +9,9 @@ import type { Habito, HabitoRegistro } from '../types'
 import { AnelProgresso } from './AnelProgresso'
 
 const VERMELHO = '#d8695e'
+// Verde fixo de "concluído" — par semântico do vermelho no estado Sim/Não
+// (verde = feito, vermelho = não fez), independente da cor do hábito.
+const VERDE = '#6db56a'
 
 export function CartaoHabito({
   habito,
@@ -42,6 +45,9 @@ export function CartaoHabito({
   const frac = ehSemanal ? Math.min(1, semana.feitos / Math.max(1, semana.meta)) : fracao(habito, registro)
   const checkSimNao = estado === 'feito' || semanalCompleto
   const falhouVisual = falhou && !ehSemanal
+  // No Sim/Não, o estado "feito" é sempre VERDE (não a cor do hábito).
+  // Nos demais tipos, o "completo" continua usando a cor do hábito.
+  const corCompleto = habito.tipo === 'sim_nao' ? VERDE : cor
 
   function primaria() {
     if (auto) navigate(`/habitos/${habito.id}`)
@@ -61,7 +67,7 @@ export function CartaoHabito({
           : habito.descricao || rotuloFrequencia(habito.frequencia)
 
   const bordaEstilo = completo
-    ? { borderColor: `${cor}66`, backgroundColor: `${cor}0f` }
+    ? { borderColor: `${corCompleto}66`, backgroundColor: `${corCompleto}0f` }
     : falhouVisual
       ? { borderColor: `${VERMELHO}55`, backgroundColor: `${VERMELHO}0d` }
       : undefined
@@ -70,7 +76,7 @@ export function CartaoHabito({
     if (habito.tipo === 'sim_nao') {
       if (checkSimNao)
         return (
-          <span className="lume-pop flex size-8 items-center justify-center rounded-full" style={{ backgroundColor: cor, color: '#fff' }}>
+          <span className="lume-pop flex size-8 items-center justify-center rounded-full" style={{ backgroundColor: VERDE, color: '#fff' }}>
             <IconCheck width={18} height={18} />
           </span>
         )

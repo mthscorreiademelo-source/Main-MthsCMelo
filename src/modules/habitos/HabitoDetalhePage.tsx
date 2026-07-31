@@ -48,6 +48,8 @@ export function HabitoDetalhePage() {
     )
 
   const cor = habito.cor ?? 'var(--vida-ink)'
+  // No Sim/Não o "feito" é verde fixo (igual ao cartão); nos outros tipos, a cor do hábito.
+  const corFeito = habito.tipo === 'sim_nao' ? '#6db56a' : cor
   const cat = categorias?.find((c) => c.id === habito.categoriaId)
 
   return (
@@ -108,10 +110,13 @@ export function HabitoDetalhePage() {
       <section className="flex flex-col gap-2">
         <h2 className="text-[13px] font-medium text-muted">Últimos meses</h2>
         <div className="rounded-xl border border-line bg-surface/60 p-3">
-          <Heatmap dias={heat} cor={cor} />
+          <Heatmap dias={heat} cor={cor} habito={habito} />
+          {habito.tipo === 'sim_nao' && (
+            <p className="mt-2 text-[11px] text-muted">Toque num dia para marcar feito / não fez.</p>
+          )}
           <div className="mt-2 flex items-center gap-3 text-[11px] text-muted">
             <span className="flex items-center gap-1">
-              <span className="size-3 rounded-[3px]" style={{ backgroundColor: cor }} /> feito
+              <span className="size-3 rounded-[3px]" style={{ backgroundColor: corFeito }} /> feito
             </span>
             <span className="flex items-center gap-1">
               <span className="size-3 rounded-[3px]" style={{ backgroundColor: '#d8695e' }} /> não feito
