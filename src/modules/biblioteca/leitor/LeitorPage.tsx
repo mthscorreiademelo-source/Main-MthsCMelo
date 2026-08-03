@@ -96,24 +96,51 @@ export function LeitorPage() {
           if (vivo) setPreparo({ modo: 'epub' })
           return
         }
-        if (livro.formato === 'cbz') {
-          const { default: JSZip } = await import('jszip')
-          const zip = await JSZip.loadAsync(blob)
-          const nomes = Object.keys(zip.files)
-            .filter((n) => IMG_EXT.test(n) && !zip.files[n].dir)
-            .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-          const cache = new Map<number, string>()
-          const provider = async (n: number) => {
-            if (cache.has(n)) return cache.get(n)
-            const b = await zip.file(nomes[n])?.async('blob')
-            if (!b) return undefined
-            const url = URL.createObjectURL(b)
-            urls.push(url)
-            cache.set(n, url)
-            return url
+        if (livro.formato === 'cbz' || livro.formato === 'cbr') {
+          // CBZ é sempre ZIP. CBR pode ser RAR (o comum) OU um ZIP renomeado —
+          // olhamos os primeiros bytes pra decidir o descompactador certo.
+          const { detectarCompactacao } = await import('../descompactar')
+          const container = livro.formato === 'cbz' ? 'zip' : await detectarCompactacao(blob)
+
+          if (container === 'zip') {
+            const { default: JSZip } = await import('jszip')
+            const zip = await JSZip.loadAsync(blob)
+            const nomes = Object.keys(zip.files)
+              .filter((n) => IMG_EXT.test(n) && !zip.files[n].dir)
+              .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+            const cache = new Map<number, string>()
+            const provider = async (n: number) => {
+              if (cache.has(n)) return cache.get(n)
+              const b = await zip.file(nomes[n])?.async('blob')
+              if (!b) return undefined
+              const url = URL.createObjectURL(b)
+              urls.push(url)
+              cache.set(n, url)
+              return url
+            }
+            if (vivo) setPreparo({ modo: 'paginado', total: nomes.length, provider })
+            return
           }
-          if (vivo) setPreparo({ modo: 'paginado', total: nomes.length, provider })
-          return
+
+          if (container === 'rar') {
+            const { abrirCbrRar } = await import('../descompactar')
+            const { nomes, extrair } = await abrirCbrRar(blob)
+            if (nomes.length === 0) throw new Error('Não encontrei imagens neste arquivo.')
+            const cache = new Map<number, string>()
+            const provider = async (n: number) => {
+              if (cache.has(n)) return cache.get(n)
+              const b = await extrair(nomes[n])
+              if (!b) return undefined
+              const url = URL.createObjectURL(b)
+              urls.push(url)
+              cache.set(n, url)
+              return url
+            }
+            if (vivo) setPreparo({ modo: 'paginado', total: nomes.length, provider })
+            return
+          }
+
+          throw new Error('Não reconheci o formato deste quadrinho (não é ZIP nem RAR).')
         }
         // PDF
         const pdfjs = await import('pdfjs-dist')

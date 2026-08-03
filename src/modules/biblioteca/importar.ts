@@ -1,3 +1,4 @@
+import { abrirCbrRar, detectarCompactacao, IMG_EXT } from './descompactar'
 import type { FormatoArquivo, TipoObra } from './types'
 
 export interface MetadadosLivro {
@@ -9,13 +10,12 @@ export interface MetadadosLivro {
   paginasTotais?: number
 }
 
-const IMG_EXT = /\.(jpe?g|png|webp|gif|avif)$/i
-
 export function detectarFormato(arquivo: File): FormatoArquivo | null {
   const nome = arquivo.name.toLowerCase()
   if (nome.endsWith('.epub')) return 'epub'
   if (nome.endsWith('.pdf')) return 'pdf'
   if (nome.endsWith('.cbz') || nome.endsWith('.zip')) return 'cbz'
+  if (nome.endsWith('.cbr') || nome.endsWith('.rar')) return 'cbr'
   if (nome.endsWith('.mobi') || nome.endsWith('.azw') || nome.endsWith('.azw3')) return 'mobi'
   if (arquivo.type === 'application/pdf') return 'pdf'
   if (arquivo.type === 'application/epub+zip') return 'epub'
@@ -100,19 +100,54 @@ async function metadadosEpub(arquivo: File, JSZip: typeof import('jszip')): Prom
   }
 }
 
+/** Capa (primeira imagem) e contagem de páginas a partir de um arquivo ZIP. */
+async function metadadosDeZip(
+  arquivo: Blob,
+  JSZip: typeof import('jszip'),
+  base: MetadadosLivro,
+): Promise<MetadadosLivro> {
+  const zip = await JSZip.loadAsync(arquivo)
+  const imagens = Object.keys(zip.files)
+    .filter((n) => IMG_EXT.test(n) && !zip.files[n].dir)
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  if (imagens.length === 0) return base
+  const primeira = await zip.file(imagens[0])?.async('blob')
+  const capa = primeira ? await gerarMiniatura(primeira) : undefined
+  return { ...base, capa, paginasTotais: imagens.length }
+}
+
 /** Capa (primeira imagem) e contagem de páginas de um CBZ. */
 async function metadadosCbz(arquivo: File, JSZip: typeof import('jszip')): Promise<MetadadosLivro> {
   const base: MetadadosLivro = { titulo: semExtensao(arquivo.name), formato: 'cbz', tipo: 'quadrinho' }
   try {
-    const zip = await JSZip.loadAsync(arquivo)
-    const imagens = Object.keys(zip.files)
-      .filter((n) => IMG_EXT.test(n) && !zip.files[n].dir)
-      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-    if (imagens.length === 0) return base
-    const primeira = await zip.file(imagens[0])?.async('blob')
-    const capa = primeira ? await gerarMiniatura(primeira) : undefined
-    return { ...base, capa, paginasTotais: imagens.length }
+    return await metadadosDeZip(arquivo, JSZip, base)
   } catch {
+    return base
+  }
+}
+
+/**
+ * Capa e contagem de páginas de um CBR. O .cbr pode ser um RAR (o comum) OU um
+ * ZIP renomeado — a gente checa os primeiros bytes e usa o caminho certo.
+ */
+async function metadadosCbr(arquivo: File): Promise<MetadadosLivro> {
+  const base: MetadadosLivro = { titulo: semExtensao(arquivo.name), formato: 'cbr', tipo: 'quadrinho' }
+  try {
+    const compactacao = await detectarCompactacao(arquivo)
+    if (compactacao === 'zip') {
+      const { default: JSZip } = await import('jszip')
+      return metadadosDeZip(arquivo, JSZip, base)
+    }
+    if (compactacao === 'rar') {
+      const { nomes, extrair } = await abrirCbrRar(arquivo)
+      if (nomes.length === 0) return base
+      const primeira = await extrair(nomes[0])
+      const capa = primeira ? await gerarMiniatura(primeira) : undefined
+      return { ...base, capa, paginasTotais: nomes.length }
+    }
+    return base
+  } catch {
+    // CBR corrompido / RAR não suportado: cataloga pelo nome do arquivo.
     return base
   }
 }
@@ -152,6 +187,7 @@ export async function extrairMetadados(arquivo: File): Promise<MetadadosLivro | 
   if (formato === 'pdf') return metadadosPdf(arquivo)
   // MOBI/AZW: sem parser no navegador — cataloga pelo nome do arquivo.
   if (formato === 'mobi') return { titulo: semExtensao(arquivo.name), formato: 'mobi', tipo: 'livro' }
+  if (formato === 'cbr') return metadadosCbr(arquivo)
   const { default: JSZip } = await import('jszip')
   if (formato === 'epub') return metadadosEpub(arquivo, JSZip)
   return metadadosCbz(arquivo, JSZip)

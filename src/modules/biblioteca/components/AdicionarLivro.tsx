@@ -45,7 +45,7 @@ export function AdicionarLivro({
     setErro(null)
     const fmt = detectarFormato(file)
     if (!fmt) {
-      setErro('Formato não suportado. Use EPUB, PDF ou CBZ.')
+      setErro('Formato não suportado. Use EPUB, PDF, CBZ ou CBR.')
       return
     }
     setLendo(true)
@@ -160,7 +160,7 @@ export function AdicionarLivro({
                 <>
                   <IconUpload width={18} height={18} />
                   <span className="text-[13px] font-medium">Arquivo do livro</span>
-                  <span className="text-[11px] text-muted/70">EPUB · PDF · CBZ (opcional)</span>
+                  <span className="text-[11px] text-muted/70">EPUB · PDF · CBZ · CBR (opcional)</span>
                 </>
               )}
             </button>
@@ -178,7 +178,7 @@ export function AdicionarLivro({
       <input
         ref={inputArquivo}
         type="file"
-        accept=".epub,.pdf,.cbz,.zip,.mobi,.azw,.azw3,application/epub+zip,application/pdf"
+        accept=".epub,.pdf,.cbz,.zip,.cbr,.rar,.mobi,.azw,.azw3,application/epub+zip,application/pdf"
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0]
