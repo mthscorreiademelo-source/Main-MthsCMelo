@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="description" content="Seu espaço minimalista para organizar todas as áreas da vida." />
+    <title>Lume</title>
+    <script>
+      // Aplica o tema salvo antes da primeira pintura para evitar flash
+      if (
+        localStorage.getItem('vida:tema') === 'dark' ||
+        (!localStorage.getItem('vida:tema') &&
+          window.matchMedia('(prefers-color-scheme: dark)').matches)
+      ) {
+        document.documentElement.classList.add('dark')
+      }
+    </script>
+    <script type="module" crossorigin src="/assets/index-Cki7nHGt.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-DAXXjFlN.js">
+    <link rel="modulepreload" crossorigin href="/assets/index.browser-BVFZ7UkQ.js">
+    <link rel="modulepreload" crossorigin href="/assets/react-dom-D9ffM4eT.js">
+    <link rel="modulepreload" crossorigin href="/assets/pt-BR-BzAwyDCv.js">
+    <link rel="modulepreload" crossorigin href="/assets/dates-YMQJlJmJ.js">
+    <link rel="modulepreload" crossorigin href="/assets/addMonths-B22TfXje.js">
+    <link rel="modulepreload" crossorigin href="/assets/db-BNVdG720.js">
+    <link rel="modulepreload" crossorigin href="/assets/db-N3Dme0Fb.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-BG8fQYZ3.css">
+  <link rel="manifest" href="/manifest.webmanifest"></head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

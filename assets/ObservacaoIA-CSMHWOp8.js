@@ -1,0 +1,1 @@
+import{yt as e}from"./index.browser-BVFZ7UkQ.js";var t=e();function n({resultado:e,className:n=``}){return e.texto?(0,t.jsxs)(`div`,{className:`flex items-start gap-2 ${n}`,children:[(0,t.jsx)(`span`,{className:`mt-0.5 shrink-0 text-[13px]`,"aria-hidden":!0,children:`✨`}),(0,t.jsx)(`p`,{className:`text-[13.5px] leading-snug text-ink`,children:e.texto})]}):null}export{n as t};
