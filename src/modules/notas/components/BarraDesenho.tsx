@@ -20,7 +20,7 @@ import {
   type ConfigCaneta,
   type ConfigsCanetas,
 } from '../desenho'
-import type { TipoCaneta } from '../types'
+import type { FundoQuadro, TipoCaneta } from '../types'
 import type { ConfigBorracha } from './QuadroInfinito'
 import { SeletorCor } from './SeletorCor'
 
@@ -44,6 +44,45 @@ const PALETA = [
   '#2383E2',
   '#9065B0',
 ]
+
+const FUNDOS: { id: FundoQuadro; rotulo: string }[] = [
+  { id: 'pontilhado', rotulo: 'Pontilhado' },
+  { id: 'quadriculado', rotulo: 'Quadriculado' },
+  { id: 'pautado', rotulo: 'Pautado' },
+  { id: 'liso', rotulo: 'Liso' },
+]
+
+/** Miniatura do padrão de fundo (usa currentColor para acompanhar o tema). */
+function MiniFundo({ tipo }: { tipo: FundoQuadro }) {
+  return (
+    <svg viewBox="0 0 44 44" className="size-full text-muted" aria-hidden="true">
+      {tipo === 'pontilhado' &&
+        [11, 22, 33].flatMap((cy) =>
+          [11, 22, 33].map((cx) => (
+            <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.6" fill="currentColor" />
+          )),
+        )}
+      {tipo === 'quadriculado' && (
+        <g stroke="currentColor" strokeWidth="1">
+          {[11, 22, 33].map((v) => (
+            <line key={`v${v}`} x1={v} y1="4" x2={v} y2="40" />
+          ))}
+          {[11, 22, 33].map((v) => (
+            <line key={`h${v}`} x1="4" y1={v} x2="40" y2={v} />
+          ))}
+        </g>
+      )}
+      {tipo === 'pautado' && (
+        <g stroke="currentColor" strokeWidth="1">
+          {[11, 22, 33].map((v) => (
+            <line key={`h${v}`} x1="4" y1={v} x2="40" y2={v} />
+          ))}
+        </g>
+      )}
+      {/* liso = nada (só o fundo do cartão) */}
+    </svg>
+  )
+}
 
 const POSICAO: Record<Lado, string> = {
   baixo: 'bottom-5 left-1/2 -translate-x-1/2 flex-row',
@@ -70,11 +109,13 @@ interface Props {
   configBorracha: ConfigBorracha
   selecaoTipo: 'retangulo' | 'laco'
   reguaAtiva: boolean
+  fundoQuadro: FundoQuadro
   onModo: (modo: ModoBarra) => void
   onConfig: (tipo: TipoCaneta, config: ConfigCaneta) => void
   onConfigBorracha: (config: ConfigBorracha) => void
   onSelecaoTipo: (tipo: 'retangulo' | 'laco') => void
   onRegua: (ativa: boolean) => void
+  onFundoQuadro: (fundo: FundoQuadro) => void
   onNovoPostIt: (cor: string) => void
   onImportarImagem: () => void
   onImportarPdf: () => void
@@ -87,16 +128,18 @@ export function BarraDesenho({
   configBorracha,
   selecaoTipo,
   reguaAtiva,
+  fundoQuadro,
   onModo,
   onConfig,
   onConfigBorracha,
   onSelecaoTipo,
   onRegua,
+  onFundoQuadro,
   onNovoPostIt,
   onImportarImagem,
   onImportarPdf,
 }: Props) {
-  const [painel, setPainel] = useState<'ferramenta' | 'postit' | 'inserir' | null>(null)
+  const [painel, setPainel] = useState<'ferramenta' | 'postit' | 'inserir' | 'fundo' | null>(null)
   const [pickerAberto, setPickerAberto] = useState(false)
   const [lado, setLado] = useState<Lado>(ladoInicial)
   const [minimizada, setMinimizada] = useState(false)
@@ -446,6 +489,36 @@ export function BarraDesenho({
         </div>
       )}
 
+      {painel === 'fundo' && (
+        <div data-testid="painel-fundo" className={painelClasse}>
+          <span className="text-sm font-medium">Fundo do quadro</span>
+          <div className="grid grid-cols-2 gap-2">
+            {FUNDOS.map((f) => {
+              const ativa = fundoQuadro === f.id
+              return (
+                <button
+                  key={f.id}
+                  onClick={() => onFundoQuadro(f.id)}
+                  aria-label={f.rotulo}
+                  aria-pressed={ativa}
+                  className={`flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border p-2 transition-colors ${
+                    ativa ? 'border-accent bg-accent/10 text-ink' : 'border-line hover:bg-hover/60'
+                  }`}
+                >
+                  <span className="size-14 rounded-md border border-line bg-bg p-1">
+                    <MiniFundo tipo={f.id} />
+                  </span>
+                  <span className="text-xs font-medium">{f.rotulo}</span>
+                </button>
+              )
+            })}
+          </div>
+          <p className="text-xs leading-relaxed text-muted">
+            O padrão fica salvo neste desenho e acompanha o zoom e o giro da folha.
+          </p>
+        </div>
+      )}
+
       <div
         data-testid="barra-desenho"
         data-lado={lado}
@@ -541,6 +614,20 @@ export function BarraDesenho({
           className={botao(reguaAtiva)}
         >
           <IconRegua width={19} height={19} />
+        </button>
+        <button
+          onClick={() => setPainel((p) => (p === 'fundo' ? null : 'fundo'))}
+          aria-label="Fundo do quadro"
+          aria-pressed={painel === 'fundo'}
+          className={botao(painel === 'fundo')}
+        >
+          <svg width={19} height={19} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="2.5" stroke="currentColor" strokeWidth="1.7" />
+            <circle cx="8.5" cy="8.5" r="1.15" fill="currentColor" />
+            <circle cx="15.5" cy="8.5" r="1.15" fill="currentColor" />
+            <circle cx="8.5" cy="15.5" r="1.15" fill="currentColor" />
+            <circle cx="15.5" cy="15.5" r="1.15" fill="currentColor" />
+          </svg>
         </button>
       </div>
     </>

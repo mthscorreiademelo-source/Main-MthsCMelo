@@ -17,7 +17,7 @@ import {
   transformarTraco,
   urlDoItem,
 } from '../desenho'
-import type { Camera, ItemQuadro, PostIt, TipoCaneta, Traco } from '../types'
+import type { Camera, FundoQuadro, ItemQuadro, PostIt, TipoCaneta, Traco } from '../types'
 
 export interface FerramentaAtiva {
   modo: TipoCaneta | 'borracha' | 'selecao' | 'ponteiro' | 'texto'
@@ -55,6 +55,8 @@ interface Props {
   configBorracha: ConfigBorracha
   selecaoTipo: 'retangulo' | 'laco'
   reguaAtiva: boolean
+  /** Padrão do fundo do quadro; ausente = 'pontilhado' */
+  fundoQuadro?: FundoQuadro
   cameraInicial?: Camera
   onNovoTraco: (traco: Traco) => void
   onApagarTraco: (indice: number) => void
@@ -76,6 +78,41 @@ interface Props {
 
 const ESCALA_MIN = 0.1
 const ESCALA_MAX = 8
+
+/** Converte "#rgb"/"#rrggbb" em [r,g,b]; null se não reconhecer. */
+function hexParaRgb(hex: string): [number, number, number] | null {
+  const h = hex.trim().replace('#', '')
+  const n = h.length === 3 ? h.split('').map((c) => c + c).join('') : h
+  if (n.length !== 6) return null
+  const r = parseInt(n.slice(0, 2), 16)
+  const g = parseInt(n.slice(2, 4), 16)
+  const b = parseInt(n.slice(4, 6), 16)
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return null
+  return [r, g, b]
+}
+
+/**
+ * Cor da grade do fundo, ADAPTADA ao tema/papel atual. Antes era fixa
+ * (#E4E4E1) e sumia no modo claro. Agora parte da cor real do papel
+ * (--vida-bg) e a "empurra" na direção contrária: escurece no claro (fica um
+ * cinza médio-claro perceptível, mas discreto) e clareia de leve no escuro
+ * (mantém-se discreta sobre o fundo escuro). Assim funciona em qualquer papel.
+ */
+function corDaGrade(): string {
+  const bgRaw =
+    getComputedStyle(document.documentElement).getPropertyValue('--vida-bg').trim() || '#ffffff'
+  const escuro = document.documentElement.classList.contains('dark')
+  const rgb = hexParaRgb(bgRaw)
+  // Fallback seguro caso o papel não seja um hex reconhecível.
+  if (!rgb) return escuro ? '#404040' : '#c2c2c2'
+  const [r, g, b] = rgb
+  // No claro escurece bastante (contraste visível); no escuro clareia pouco.
+  const alvo = escuro ? 255 : 0
+  const amt = escuro ? 0.18 : 0.26
+  const mix = (v: number) => Math.round(v + (alvo - v) * amt)
+  const c = (v: number) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')
+  return `#${c(mix(r))}${c(mix(g))}${c(mix(b))}`
+}
 const LARGURA_REGUA = 96 // px de tela
 const SNAP_REGUA = 32 // px de tela
 
@@ -101,6 +138,7 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     configBorracha,
     selecaoTipo,
     reguaAtiva,
+    fundoQuadro,
     cameraInicial,
     onNovoTraco,
     onApagarTraco,
@@ -171,6 +209,8 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
   borrachaRef.current = configBorracha
   const selecaoTipoRef = useRef(selecaoTipo)
   selecaoTipoRef.current = selecaoTipo
+  const fundoQuadroRef = useRef(fundoQuadro)
+  fundoQuadroRef.current = fundoQuadro
   const onCameraVivoRef = useRef(onCameraVivo)
   onCameraVivoRef.current = onCameraVivo
   const onCriarTextoRef = useRef(onCriarTexto)
@@ -256,33 +296,71 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--vida-bg').trim() || '#ffffff'
     ctx.fillRect(0, 0, w, h)
 
-    let passo = 64
-    while (passo * escala < 24) passo *= 4
-    ctx.fillStyle = '#E4E4E1'
-    // A grade acompanha a folha (roda junto). Cobre o retângulo do mundo que
-    // envolve os quatro cantos da tela e projeta cada ponto com a rotação.
-    const cos = Math.cos(cam.current.rot ?? 0)
-    const sin = Math.sin(cam.current.rot ?? 0)
-    const paraMundoRel = (sxp: number, syp: number): [number, number] => [
-      x + (sxp * cos + syp * sin) / escala,
-      y + (-sxp * sin + syp * cos) / escala,
-    ]
-    const paraTelaRel = (wx: number, wy: number): [number, number] => {
-      const ddx = (wx - x) * escala
-      const ddy = (wy - y) * escala
-      return [ddx * cos - ddy * sin, ddx * sin + ddy * cos]
-    }
-    const cantos = [paraMundoRel(0, 0), paraMundoRel(w, 0), paraMundoRel(0, h), paraMundoRel(w, h)]
-    const minX = Math.min(...cantos.map((c) => c[0]))
-    const maxX = Math.max(...cantos.map((c) => c[0]))
-    const minY = Math.min(...cantos.map((c) => c[1]))
-    const maxY = Math.max(...cantos.map((c) => c[1]))
-    for (let gx = Math.floor(minX / passo) * passo; gx < maxX; gx += passo) {
-      for (let gy = Math.floor(minY / passo) * passo; gy < maxY; gy += passo) {
-        const [sxp, syp] = paraTelaRel(gx, gy)
+    // Padrão do fundo escolhido para este quadro (ausente = pontinhos, como antes).
+    const fundo: FundoQuadro = fundoQuadroRef.current ?? 'pontilhado'
+    if (fundo !== 'liso') {
+      let passo = 64
+      while (passo * escala < 24) passo *= 4
+      const corGrade = corDaGrade()
+      ctx.fillStyle = corGrade
+      ctx.strokeStyle = corGrade
+      ctx.lineWidth = 1
+      // A grade acompanha a folha (roda junto). Cobre o retângulo do mundo que
+      // envolve os quatro cantos da tela e projeta cada ponto com a rotação.
+      const cos = Math.cos(cam.current.rot ?? 0)
+      const sin = Math.sin(cam.current.rot ?? 0)
+      const paraMundoRel = (sxp: number, syp: number): [number, number] => [
+        x + (sxp * cos + syp * sin) / escala,
+        y + (-sxp * sin + syp * cos) / escala,
+      ]
+      const paraTelaRel = (wx: number, wy: number): [number, number] => {
+        const ddx = (wx - x) * escala
+        const ddy = (wy - y) * escala
+        return [ddx * cos - ddy * sin, ddx * sin + ddy * cos]
+      }
+      const cantos = [paraMundoRel(0, 0), paraMundoRel(w, 0), paraMundoRel(0, h), paraMundoRel(w, h)]
+      const minX = Math.min(...cantos.map((c) => c[0]))
+      const maxX = Math.max(...cantos.map((c) => c[0]))
+      const minY = Math.min(...cantos.map((c) => c[1]))
+      const maxY = Math.max(...cantos.map((c) => c[1]))
+      const gx0 = Math.floor(minX / passo) * passo
+      const gy0 = Math.floor(minY / passo) * passo
+      if (fundo === 'pontilhado') {
+        // bolinhas nas interseções da grade
+        for (let gx = gx0; gx < maxX; gx += passo) {
+          for (let gy = gy0; gy < maxY; gy += passo) {
+            const [sxp, syp] = paraTelaRel(gx, gy)
+            ctx.beginPath()
+            ctx.arc(sxp, syp, 1.4, 0, Math.PI * 2)
+            ctx.fill()
+          }
+        }
+      } else if (fundo === 'quadriculado') {
+        // linhas verticais + horizontais formando quadrados (papel milimetrado)
         ctx.beginPath()
-        ctx.arc(sxp, syp, 1.4, 0, Math.PI * 2)
-        ctx.fill()
+        for (let gx = gx0; gx < maxX; gx += passo) {
+          const [ax, ay] = paraTelaRel(gx, minY)
+          const [bx, by] = paraTelaRel(gx, maxY)
+          ctx.moveTo(ax, ay)
+          ctx.lineTo(bx, by)
+        }
+        for (let gy = gy0; gy < maxY; gy += passo) {
+          const [ax, ay] = paraTelaRel(minX, gy)
+          const [bx, by] = paraTelaRel(maxX, gy)
+          ctx.moveTo(ax, ay)
+          ctx.lineTo(bx, by)
+        }
+        ctx.stroke()
+      } else if (fundo === 'pautado') {
+        // só linhas horizontais (caderno de linhas)
+        ctx.beginPath()
+        for (let gy = gy0; gy < maxY; gy += passo) {
+          const [ax, ay] = paraTelaRel(minX, gy)
+          const [bx, by] = paraTelaRel(maxX, gy)
+          ctx.moveTo(ax, ay)
+          ctx.lineTo(bx, by)
+        }
+        ctx.stroke()
       }
     }
 
@@ -738,6 +816,12 @@ export const QuadroInfinito = forwardRef<QuadroApi, Props>(function QuadroInfini
     cenaSuja.current = true
     pedirRender()
   }, [tracos, itens, postIts, pedirRender])
+
+  // Trocar o padrão do fundo repinta a "folha" (a grade fica no cena offscreen).
+  useEffect(() => {
+    cenaSuja.current = true
+    pedirRender()
+  }, [fundoQuadro, pedirRender])
 
   // liga/desliga régua: nasce no centro da tela, horizontal
   useEffect(() => {

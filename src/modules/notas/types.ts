@@ -72,6 +72,12 @@ export interface TextoQuadro {
   rotacao?: number
 }
 
+/**
+ * Padrão do fundo do quadro infinito (o "papel"): pontinhos, quadriculado,
+ * pautado (linhas horizontais) ou liso (sem grade). Ausente = 'pontilhado'.
+ */
+export type FundoQuadro = 'pontilhado' | 'quadriculado' | 'pautado' | 'liso'
+
 /** Posição/zoom do quadro infinito (canto superior esquerdo em mundo + escala). */
 export interface Camera {
   x: number
@@ -145,6 +151,8 @@ export interface Pagina {
   relacoes?: RelacaoNota[]
   /** Tipo da nota; ausente = 'texto' */
   tipo?: 'texto' | 'desenho' | 'arquivos'
+  /** Padrão do fundo do quadro (só tipo 'desenho'); ausente = 'pontilhado' */
+  fundoQuadro?: FundoQuadro
   /** Traços do desenho (somente tipo 'desenho') */
   tracos?: Traco[]
   /** Miniatura JPEG (dataURL) para preview na lista */

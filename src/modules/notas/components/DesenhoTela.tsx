@@ -475,6 +475,7 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
         configBorracha={configBorracha}
         selecaoTipo={selecaoTipo}
         reguaAtiva={reguaAtiva}
+        fundoQuadro={pagina.fundoQuadro}
         cameraInicial={pagina.camera}
         onNovoTraco={(t) => aplicar([...tracos, t])}
         onApagarTraco={(i) => aplicar(tracos.filter((_, j) => j !== i))}
@@ -730,11 +731,13 @@ export function DesenhoTela({ pagina, grupos, onMudar, onVoltar, onExcluir }: Pr
         configBorracha={configBorracha}
         selecaoTipo={selecaoTipo}
         reguaAtiva={reguaAtiva}
+        fundoQuadro={pagina.fundoQuadro ?? 'pontilhado'}
         onModo={setModo}
         onConfig={mudarConfig}
         onConfigBorracha={mudarBorracha}
         onSelecaoTipo={setSelecaoTipo}
         onRegua={setReguaAtiva}
+        onFundoQuadro={(f) => onMudar({ fundoQuadro: f })}
         onNovoPostIt={novoPostIt}
         onImportarImagem={() => inputImagem.current?.click()}
         onImportarPdf={() => inputPdf.current?.click()}
